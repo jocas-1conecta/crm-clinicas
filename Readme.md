@@ -1,6 +1,6 @@
-# Clinical CRM - Prototipo de Alta Fidelidad
+# CRM Clinicas - Prototipo de Alta Fidelidad
 
-Bienvenido al prototipo funcional del **CRM para Clínica Rangel**. Esta aplicación es una solución moderna y centrada en la experiencia de usuario para la gestión de pacientes, citas y leads comerciales.
+Bienvenido al prototipo funcional del **CRM Clinicas**. Esta aplicación es una solución moderna y centrada en la experiencia de usuario para la gestión de pacientes, citas y leads comerciales.
 
 ## 🌟 Características Principales
 

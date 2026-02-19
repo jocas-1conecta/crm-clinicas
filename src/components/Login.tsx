@@ -88,7 +88,7 @@ export const Login = () => {
                                 type="submit"
                                 className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 group"
                             >
-                                <span>Iniciar Sesión</span>
+                                <span>Ingresar</span>
                                 <LucideArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
                         </form>
