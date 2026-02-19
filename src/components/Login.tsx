@@ -1,12 +1,22 @@
 import React, { useState } from 'react'
 import { useStore } from '../store/useStore'
-import { LucideShieldCheck, LucideMail, LucideLock, LucideArrowRight } from 'lucide-react'
+import { LucideShieldCheck, LucideMail, LucideLock, LucideArrowRight, LucideUser } from 'lucide-react'
 
 export const Login = () => {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
     const login = useStore((state) => state.login)
+
+    const handleDemoLogin = (role: 'admin' | 'asesora') => {
+        if (role === 'admin') {
+            setEmail('admin@clinica.com')
+            setPassword('123456')
+        } else {
+            setEmail('asesora1@clinica.com')
+            setPassword('123456')
+        }
+    }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -93,10 +103,30 @@ export const Login = () => {
                             </button>
                         </form>
 
-                        <div className="mt-8 pt-8 border-t border-gray-100">
-                            <p className="text-xs text-center text-gray-400">
-                                Tip: admin@clinica.com o asesora1@clinica.com
-                            </p>
+                        <div className="mt-8 pt-6 border-t border-gray-100">
+                            <p className="text-center text-sm font-medium text-gray-500 mb-4">Acceso Rápido (Demo)</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => handleDemoLogin('admin')}
+                                    className="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-all hover:border-clinical-200 hover:shadow-sm"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-clinical-100 text-clinical-600 flex items-center justify-center mb-2">
+                                        <LucideShieldCheck className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-semibold text-sm text-gray-700">Admin</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDemoLogin('asesora')}
+                                    className="flex flex-col items-center justify-center p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-all hover:border-pink-200 hover:shadow-sm"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center mb-2">
+                                        <LucideUser className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-semibold text-sm text-gray-700">Asesora</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
