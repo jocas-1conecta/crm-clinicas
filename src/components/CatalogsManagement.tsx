@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LucideBriefcaseMedical, LucidePlus, LucideStethoscope, LucideX } from 'lucide-react'
+import { LucideBriefcase, LucidePlus, LucideStethoscope, LucideX, LucideUser } from 'lucide-react'
 import { useStore } from '../store/useStore'
 
 export const CatalogsManagement = () => {
@@ -50,8 +50,8 @@ export const CatalogsManagement = () => {
                     <button
                         onClick={() => setActiveTab('doctors')}
                         className={`pb-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === 'doctors'
-                                ? 'border-clinical-500 text-clinical-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-clinical-500 text-clinical-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         <LucideStethoscope className="w-5 h-5" />
@@ -60,11 +60,11 @@ export const CatalogsManagement = () => {
                     <button
                         onClick={() => setActiveTab('services')}
                         className={`pb-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === 'services'
-                                ? 'border-clinical-500 text-clinical-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-clinical-500 text-clinical-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
-                        <LucideBriefcaseMedical className="w-5 h-5" />
+                        <LucideBriefcase className="w-5 h-5" />
                         <span>Servicios y Tratamientos</span>
                     </button>
                 </nav>

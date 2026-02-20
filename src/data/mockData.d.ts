@@ -4,3 +4,8 @@ export const PATIENTS: any[];
 export const APPOINTMENTS: any[];
 export const CHATS: any;
 export const CONFIG: any;
+export const CLINICS: any[];
+export const BRANCHES: any[];
+export const TEAM_MEMBERS: any[];
+export const DOCTORS: any[];
+export const SERVICES: any[];

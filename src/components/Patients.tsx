@@ -11,7 +11,7 @@ export const Patients = () => {
             (patient.condition && patient.condition.toLowerCase().includes(searchTerm.toLowerCase()))
 
         // If currentUser is an admin, show all patients. Otherwise, show only patients assigned to the current user.
-        const matchesRole = currentUser?.role === 'admin' || patient.assignedTo === currentUser?.id
+        const matchesRole = currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica' || patient.assignedTo === currentUser?.id
 
         return matchesSearch && matchesRole
     })

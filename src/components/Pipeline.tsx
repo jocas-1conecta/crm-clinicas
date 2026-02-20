@@ -11,7 +11,7 @@ export const Pipeline = () => {
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
     const filteredLeads = leads.filter(lead => {
-        const isAdmin = currentUser?.role === 'admin'
+        const isAdmin = currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica'
         const isAssigned = lead.assignedTo === currentUser?.id
         const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             lead.service.toLowerCase().includes(searchTerm.toLowerCase())

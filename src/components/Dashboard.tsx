@@ -14,7 +14,7 @@ export const Dashboard = () => {
 
     // KPIs Calculation
     const totalLeads = leads.length
-    const qualifiedLeads = leads.filter(l => l.status === 'Calificado').length
+    const qualifiedLeads = leads.filter(l => l.status === 'Cita Agendada').length
     const conversionRate = totalLeads > 0 ? ((qualifiedLeads / totalLeads) * 100).toFixed(1) : '0'
 
     const activeAppointments = appointments.filter(a =>

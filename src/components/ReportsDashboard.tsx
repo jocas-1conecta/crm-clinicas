@@ -3,7 +3,8 @@ import { LucideBarChart3, LucideTrendingUp, LucideUsers, LucideBuilding, LucideA
 
 export const ReportsDashboard = () => {
     const { currentUser, clinics, branches, leads, appointments, team } = useStore()
-    const role = currentUser?.role
+    if (!currentUser) return null;
+    const role = currentUser.role
 
     // Render based on role
     const renderContent = () => {
