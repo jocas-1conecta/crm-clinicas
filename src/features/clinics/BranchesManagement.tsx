@@ -1,26 +1,80 @@
 import { useState } from 'react'
 import { LucideBuilding, LucideMapPin, LucidePlus, LucideUsers, LucideX } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const BranchesManagement = () => {
-    const { currentUser, branches, team, addBranch } = useStore()
+    const { currentUser } = useStore()
+    const queryClient = useQueryClient()
     const [showModal, setShowModal] = useState(false)
     const [formData, setFormData] = useState({ name: '', address: '' })
 
-    // Filter branches for current clinic
-    const myBranches = branches.filter(b => b.clinica_id === currentUser?.clinica_id)
+    // Fetch branches from Supabase
+    const { data: myBranches = [], isLoading, isError } = useQuery({
+        queryKey: ['branches', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase
+                .from('sucursales')
+                .select('*')
+                .eq('clinica_id', currentUser.clinica_id)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    // Fetch profiles to count staff per branch
+    const { data: myTeam = [] } = useQuery({
+        queryKey: ['team', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('sucursal_id')
+                .eq('clinica_id', currentUser.clinica_id)
+                .eq('role', 'Asesor_Sucursal');
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    // Mutation to add a new branch
+    const addBranchMutation = useMutation({
+        mutationFn: async (newBranch: { name: string, address: string, clinica_id: string }) => {
+            const { data, error } = await supabase
+                .from('sucursales')
+                .insert([newBranch])
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['branches', currentUser?.clinica_id] });
+            setShowModal(false);
+            setFormData({ name: '', address: '' });
+        },
+        onError: (error) => {
+            console.error('Error adding branch:', error);
+            alert('Error al crear la sucursal');
+        }
+    })
 
     const handleSave = () => {
-        if (!formData.name || !formData.address) return;
-
-        addBranch({
+        if (!formData.name || !formData.address || !currentUser?.clinica_id) return;
+        addBranchMutation.mutate({
             name: formData.name,
             address: formData.address,
-            clinica_id: currentUser?.clinica_id || ''
-        })
-        setShowModal(false)
-        setFormData({ name: '', address: '' })
+            clinica_id: currentUser.clinica_id
+        });
     }
+
+    if (isLoading) return <div className="p-8 text-center text-gray-500">Cargando sucursales...</div>;
+    if (isError) return <div className="p-8 text-center text-red-500">Error al cargar las sucursales.</div>;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -40,7 +94,7 @@ export const BranchesManagement = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myBranches.map((branch) => {
-                    const staffCount = team.filter(t => t.sucursal_id === branch.id).length
+                    const staffCount = myTeam.filter(t => t.sucursal_id === branch.id).length
                     return (
                         <div key={branch.id} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-4">
@@ -106,9 +160,10 @@ export const BranchesManagement = () => {
 
                             <button
                                 onClick={handleSave}
-                                className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl transition-colors mt-4"
+                                disabled={addBranchMutation.isPending}
+                                className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl transition-colors mt-4 disabled:opacity-50"
                             >
-                                Guardar Sucursal
+                                {addBranchMutation.isPending ? 'Guardando...' : 'Guardar Sucursal'}
                             </button>
                         </div>
                     </div>

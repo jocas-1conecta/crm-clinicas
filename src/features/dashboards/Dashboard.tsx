@@ -1,61 +1,131 @@
 import React from 'react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
     LucideUsers,
     LucideTrendingUp,
     LucideCalendar,
     LucideDollarSign,
     LucideActivity,
-    LucidePieChart
+    LucidePieChart,
+    LucideClock
 } from 'lucide-react'
 
 export const Dashboard = () => {
-    const { leads, appointments, config } = useStore()
+    const { currentUser } = useStore()
+    const clinicaId = currentUser?.clinica_id
 
-    // KPIs Calculation
+    const { data: leads = [] } = useQuery({
+        queryKey: ['leads-admin', clinicaId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data;
+        }
+    })
+
+    const { data: stages = [] } = useQuery({
+        queryKey: ['pipeline_stages', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', clinicaId);
+            return data || [];
+        },
+        enabled: !!clinicaId
+    })
+
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['appointments-admin', clinicaId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('appointments').select('*');
+            if (error) throw error;
+            return data;
+        }
+    })
+
+    const { data: services = [] } = useQuery({
+        queryKey: ['services', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('services').select('*').eq('clinica_id', clinicaId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
+    })
+
+    // Pipeline KPIs Calculation
     const totalLeads = leads.length
-    const qualifiedLeads = leads.filter(l => l.status === 'Cita Agendada').length
-    const conversionRate = totalLeads > 0 ? ((qualifiedLeads / totalLeads) * 100).toFixed(1) : '0'
+    
+    // Map leads by their stage resolution_type
+    const getResolutionType = (stageId: string) => {
+        const s = stages.find((st:any) => st.id === stageId);
+        return s ? s.resolution_type : 'open';
+    }
+
+    const wonLeads = leads.filter(l => getResolutionType(l.stage_id) === 'won');
+    const lostLeads = leads.filter(l => getResolutionType(l.stage_id) === 'lost');
+    const openLeads = leads.filter(l => getResolutionType(l.stage_id) === 'open');
+
+    // Win Rate Calculation (Won / (Won + Lost))
+    const closedContext = wonLeads.length + lostLeads.length;
+    const winRate = closedContext > 0 ? ((wonLeads.length / closedContext) * 100).toFixed(1) : '0';
+
+    // Avg Time to Close (Days)
+    let avgCloseTimeDays = 0;
+    if (wonLeads.length > 0) {
+        let totalTimeMs = 0;
+        let validWonLeads = 0;
+        wonLeads.forEach(l => {
+            if (l.closed_at && l.created_at) {
+                totalTimeMs += (new Date(l.closed_at).getTime() - new Date(l.created_at).getTime());
+                validWonLeads++;
+            }
+        });
+        if (validWonLeads > 0) {
+            avgCloseTimeDays = Math.max(1, Math.round((totalTimeMs / validWonLeads) / (1000 * 60 * 60 * 24)));
+        }
+    }
 
     const activeAppointments = appointments.filter(a =>
         ['Solicitada', 'Por Confirmar', 'Confirmada'].includes(a.status)
     ).length
 
     // Simulated Revenue: Sum of prices of 'Atendida' appointments
-    // We match service name from appointment to service price in config
     const revenue = appointments
         .filter(a => a.status === 'Atendida')
         .reduce((acc, curr) => {
-            const service = config.services.find((s: any) => s.name === curr.serviceName)
-            return acc + (service ? service.price : 0)
+            const service = services.find((s: any) => s.name === curr.service_name || s.name === curr.serviceName)
+            return acc + (service ? Number(service.price) : 0)
         }, 0)
 
     const stats = [
         {
-            label: 'Total Leads Mensuales',
-            value: totalLeads,
-            change: '+12%',
+            label: 'Total Leads (Activos)',
+            value: openLeads.length,
+            change: `${totalLeads} Históricos`,
             icon: LucideUsers,
             color: 'bg-blue-50 text-blue-600'
         },
         {
-            label: 'Tasa de Conversión',
-            value: `${conversionRate}%`,
-            change: '+2.5%',
+            label: 'Win Rate (Eficacia)',
+            value: `${winRate}%`,
+            change: `${wonLeads.length} de ${closedContext} resueltos`,
             icon: LucideTrendingUp,
             color: 'bg-green-50 text-green-600'
         },
         {
-            label: 'Citas Activas',
-            value: activeAppointments,
-            change: '+5',
-            icon: LucideCalendar,
+            label: 'Tiempo a Cierre',
+            value: `${avgCloseTimeDays} Días`,
+            change: 'Promedio aprox.',
+            icon: LucideClock,
             color: 'bg-purple-50 text-purple-600'
         },
         {
-            label: 'Ingresos Estimados',
+            label: 'Ingresos Estimados (Citas)',
             value: `$${revenue.toLocaleString()}`,
-            change: '+8%',
+            change: 'Estimado mensual',
             icon: LucideDollarSign,
             color: 'bg-emerald-50 text-emerald-600'
         },
@@ -94,9 +164,9 @@ export const Dashboard = () => {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        {config.services.map((service: any) => {
-                            const count = leads.filter(l => l.service === service.name.split(' ')[0]).length + Math.floor(Math.random() * 5) // Mock logic to match loose names
-                            const percentage = Math.min(100, Math.round((count / totalLeads) * 100))
+                        {services.map((service: any) => {
+                            const count = leads.filter(l => l.service === service.name || (l.service && service.name.includes(l.service))).length
+                            const percentage = totalLeads > 0 ? Math.min(100, Math.round((count / totalLeads) * 100)) : 0
 
                             return (
                                 <div key={service.id}>
@@ -106,7 +176,7 @@ export const Dashboard = () => {
                                     </div>
                                     <div className="w-full bg-gray-100 rounded-full h-2">
                                         <div
-                                            className="bg-clinical-500 h-2 rounded-full transition-all duration-1000"
+                                            className={`h-2 rounded-full transition-all duration-1000 bg-${service.color || 'blue'}-500`}
                                             style={{ width: `${percentage}%` }}
                                         />
                                     </div>

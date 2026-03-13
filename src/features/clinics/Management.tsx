@@ -1,15 +1,62 @@
 import React from 'react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import { LucideStethoscope, LucideClipboardList, LucidePackage, LucidePlus, LucideMoreVertical, LucideMessageSquare } from 'lucide-react'
 
 export const Management = () => {
-    const { config } = useStore()
+    const { currentUser } = useStore()
+    const clinicaId = currentUser?.clinica_id
+
+    const { data: doctors = [] } = useQuery({
+        queryKey: ['doctors', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('doctors').select('*').eq('clinica_id', clinicaId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
+    })
+
+    const { data: services = [] } = useQuery({
+        queryKey: ['services', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('services').select('*').eq('clinica_id', clinicaId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
+    })
+
+    const { data: products = [] } = useQuery({
+        queryKey: ['products', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('products').select('*').eq('clinica_id', clinicaId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
+    })
+
+    const { data: quickResponses = [] } = useQuery({
+        queryKey: ['quick_responses', clinicaId],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('quick_responses').select('*').eq('clinica_id', clinicaId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
+    })
 
     const sections = [
-        { name: 'Médicos', icon: LucideStethoscope, data: config.doctors, fields: ['name', 'specialty'] },
-        { name: 'Servicios', icon: LucideClipboardList, data: config.services, fields: ['name', 'price'] },
-        { name: 'Productos', icon: LucidePackage, data: config.products, fields: ['name', 'price'] },
-        { name: 'Respuestas Rápidas', icon: LucideMessageSquare, data: config.quickResponses || [], fields: ['title', 'text'] },
+        { name: 'Médicos', icon: LucideStethoscope, data: doctors, fields: ['name', 'specialty'] },
+        { name: 'Servicios', icon: LucideClipboardList, data: services, fields: ['name', 'price'] },
+        { name: 'Productos', icon: LucidePackage, data: products, fields: ['name', 'price'] },
+        { name: 'Respuestas Rápidas', icon: LucideMessageSquare, data: quickResponses, fields: ['title', 'text'] },
     ]
 
     return (

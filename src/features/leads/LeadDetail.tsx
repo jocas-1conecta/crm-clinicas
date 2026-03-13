@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 import {
     LucideX,
     LucideUser,
@@ -15,16 +17,112 @@ import {
     LucidePlus,
     LucideZap,
     LucideImage,
-    LucideFileText
+    LucideFileText,
+    LucideClock,
+    LucideArrowRight,
+    LucideCheckCircle2
 } from 'lucide-react'
 
 export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () => void }) => {
-    const { leads, chats, addMessage, addDocument, currentUser, config } = useStore()
-    const lead = leads.find(l => l.id === leadId)
-    const [activeTab, setActiveTab] = useState('whatsapp')
+    const { currentUser } = useStore()
+    const queryClient = useQueryClient()
+    
+    const { data: lead } = useQuery({
+        queryKey: ['lead', leadId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('leads').select('*').eq('id', leadId).single();
+            if (error) throw error;
+            return data;
+        }
+    })
+    const { data: quickResponses = [] } = useQuery({
+        queryKey: ['quick_responses', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase.from('quick_responses').select('*').eq('clinica_id', currentUser.clinica_id);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id
+    })
+
+    const { data: stages = [] } = useQuery({
+        queryKey: ['pipeline_stages', currentUser?.clinica_id],
+        queryFn: async () => {
+            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', currentUser!.clinica_id);
+            return data || [];
+        },
+        enabled: !!currentUser?.clinica_id
+    });
+    
+    const { data: substages = [] } = useQuery({
+        queryKey: ['pipeline_substages', currentUser?.clinica_id],
+        queryFn: async () => {
+            const { data } = await supabase.from('pipeline_substages')
+                .select('*, pipeline_stages!inner(clinica_id)')
+                .eq('pipeline_stages.clinica_id', currentUser!.clinica_id);
+            return data || [];
+        },
+        enabled: !!currentUser?.clinica_id
+    });
+
+    const { data: history = [] } = useQuery({
+        queryKey: ['lead_history', leadId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('lead_history_log')
+                .select(`
+                    id, 
+                    changed_at,
+                    profiles!changed_by (first_name, last_name),
+                    from_substage:pipeline_substages!from_substage_id(name),
+                    to_substage:pipeline_substages!to_substage_id(name),
+                    from_stage:pipeline_stages!from_stage_id(name),
+                    to_stage:pipeline_stages!to_stage_id(name)
+                `)
+                .eq('lead_id', leadId)
+                .order('changed_at', { ascending: false });
+            if (error) throw error;
+            return data;
+        }
+    })
+
+    const [activeTab, setActiveTab] = useState('info')
     const [message, setMessage] = useState('')
     const [showEmojiPicker, setShowEmojiPicker] = useState(false)
     const [showQuickResponses, setShowQuickResponses] = useState(false)
+    const [localChats, setLocalChats] = useState<any[]>([])
+    
+    // Resolution Modals
+    const [showWonModal, setShowWonModal] = useState(false)
+    const [showLostModal, setShowLostModal] = useState(false)
+    const [resolutionData, setResolutionData] = useState({ sale_value: '', lost_reason: '' })
+
+    const resolveLeadMutation = useMutation({
+        mutationFn: async ({ stage_id, data }: { stage_id: string, data: any }) => {
+            const { error } = await supabase.from('leads').update({
+                stage_id,
+                substage_id: null,
+                closed_at: new Date().toISOString(),
+                ...data
+            }).eq('id', lead.id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
+            queryClient.invalidateQueries({ queryKey: ['leads'] })
+            setShowWonModal(false)
+            setShowLostModal(false)
+        }
+    })
+
+    const addMessage = (id: string, msg: any) => {
+        setLocalChats(prev => [...prev, msg])
+    }
+
+    const addDocument = (id: string, doc: any) => {
+        // Mocked document add for UI purposes
+        console.log("Document added", doc)
+    }
 
     if (!lead) return null
 
@@ -44,8 +142,8 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
         { id: 'info', name: 'Info General', icon: LucideUser },
         { id: 'tasks', name: 'Tareas', icon: LucideCheckSquare },
         { id: 'files', name: 'Archivos', icon: LucideFiles },
-        { id: 'forum', name: 'Foro', icon: LucideAtSign },
         { id: 'whatsapp', name: 'WhatsApp', icon: LucideMessageSquare },
+        { id: 'history', name: 'Auditoría', icon: LucideClock },
     ]
 
     return (
@@ -59,10 +157,12 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                         </div>
                         <div>
                             <h2 className="text-2xl font-bold text-gray-900">{lead.name}</h2>
-                            <div className="flex items-center space-x-2">
-                                <span className="text-xs font-bold text-clinical-600">{lead.service}</span>
+                            <div className="flex items-center space-x-2 mt-1">
+                                <span className="text-xs font-bold bg-clinical-50 text-clinical-600 px-2 py-0.5 rounded">{lead.service}</span>
                                 <span className="text-gray-300">•</span>
-                                <span className="text-xs text-gray-500">{lead.status}</span>
+                                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
+                                    {stages.find((s:any) => s.id === lead.stage_id)?.name || lead.status}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -134,7 +234,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                             <div className="h-full flex flex-col bg-[#e5ddd5] rounded-3xl overflow-hidden border border-gray-200">
                                 {/* Chat History */}
                                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat relative">
-                                    {(chats[leadId] || []).map((msg, i) => (
+                                    {localChats.map((msg, i) => (
                                         <div
                                             key={i}
                                             className={`flex ${msg.sender === 'asesora' ? 'justify-end' : 'justify-start'}`}
@@ -173,7 +273,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                                 <button onClick={() => setShowQuickResponses(false)}><LucideX className="w-4 h-4 text-gray-400" /></button>
                                             </div>
                                             <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto">
-                                                {config.quickResponses?.map((qr: any) => (
+                                                {quickResponses?.map((qr: any) => (
                                                     <button
                                                         key={qr.id}
                                                         onClick={() => {
@@ -336,29 +436,50 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                             </div>
                         )}
 
-                        {activeTab === 'forum' && (
-                            <div className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                                        <p className="text-sm text-gray-700">
-                                            <span className="font-bold text-blue-600">@LauraAsesora</span> El paciente está muy interesado en el servicio de ortodoncia invisible. Por favor validar si aplica el descuento de convenio.
-                                        </p>
-                                        <p className="text-[10px] text-blue-400 mt-2">Hace 2 horas • Admin</p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <p className="text-sm text-gray-700">
-                                            Entendido, ya estoy revisando con coordinación financiera.
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 mt-2">Hace 10 min • Laura Asesora</p>
-                                    </div>
+                        {activeTab === 'history' && (
+                            <div className="space-y-6 max-w-2xl px-4 py-2">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                                        <LucideClock className="w-5 h-5 text-clinical-600" />
+                                        Bitácora Inmutable de Transiciones
+                                    </h3>
+                                    <span className="text-xs font-medium text-gray-400 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">Registros protegidos</span>
                                 </div>
-                                <div className="flex items-center space-x-4 bg-white p-2 border border-gray-200 rounded-2xl shadow-sm">
-                                    <input
-                                        type="text"
-                                        placeholder="Escribe un comentario o usa @ para etiquetar..."
-                                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-4"
-                                    />
-                                    <button className="px-4 py-2 bg-clinical-600 text-white rounded-xl text-sm font-bold">Comentar</button>
+
+                                <div className="relative pl-6 space-y-8 border-l-2 border-gray-100 ml-4">
+                                    {history.length === 0 ? (
+                                        <div className="text-center py-10">
+                                            <p className="text-sm text-gray-500 italic">No hay historial de movimientos recientes en la base de datos.</p>
+                                        </div>
+                                    ) : (
+                                        history.map((log: any) => (
+                                            <div key={log.id} className="relative group">
+                                                <div className="absolute -left-[33px] top-1 w-4 h-4 bg-white border-[3px] border-clinical-500 rounded-full shadow-sm group-hover:scale-125 transition-transform"></div>
+                                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:border-gray-200">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <p className="text-sm text-gray-700">
+                                                            <strong className="text-gray-900">{log.profiles?.first_name} {log.profiles?.last_name}</strong> trasladó este prospecto a una nueva fase:
+                                                        </p>
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-col md:flex-row md:items-center gap-3 mt-1 text-xs font-bold font-mono bg-white p-3 rounded-lg border border-gray-100 shadow-inner w-full">
+                                                        <div className="flex-1 truncate text-gray-500 line-through decoration-gray-300">
+                                                            {log.from_stage?.name || 'Recién Creado'} {log.from_substage?.name ? `(${log.from_substage.name})` : ''}
+                                                        </div>
+                                                        <LucideArrowRight className="w-4 h-4 text-clinical-400 shrink-0 hidden md:block" />
+                                                        <div className="flex-1 truncate text-clinical-700 bg-clinical-50 px-2 py-1 rounded">
+                                                            {log.to_stage?.name} {log.to_substage?.name ? `(${log.to_substage.name})` : ''}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <p className="text-[10px] uppercase font-bold text-gray-400 mt-4 flex justify-between items-center">
+                                                        <span>{new Date(log.changed_at).toLocaleDateString()} a las {new Date(log.changed_at).toLocaleTimeString()}</span>
+                                                        <LucideCheckCircle2 className="w-3.5 h-3.5 text-gray-300" />
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -367,13 +488,21 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                     {/* Sidebar - Quick Actions */}
                     <div className="w-80 border-l border-gray-100 bg-gray-50/30 p-8 space-y-8 hidden xl:block">
                         <div className="space-y-4">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estado del Lead</h4>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Embudo de Vida</h4>
                             <div className="space-y-2">
-                                <p className="text-sm font-bold text-gray-900">Actual: <span className="text-clinical-600">{lead.status}</span></p>
-                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-clinical-500 w-[40%]"></div>
+                                <p className="text-sm font-bold text-gray-900">Estado: <span className="text-clinical-600">{stages.find((s:any) => s.id === lead.stage_id)?.name || lead.status}</span></p>
+                                {lead.substage_id && (
+                                    <p className="text-xs text-gray-500 font-medium">Sub-estado: <span className="text-gray-800">{substages.find((s:any) => s.id === lead.substage_id)?.name}</span></p>
+                                )}
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
+                                    <div className="h-full bg-clinical-500 w-[50%]"></div>
                                 </div>
-                                <p className="text-[10px] text-gray-500">Última actualización: Hoy, 10:45 AM</p>
+                                {lead.stage_entered_at && (
+                                    <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1">
+                                        <LucideClock className="w-3 h-3" />
+                                        Tiempo en etapa: {Math.floor((new Date().getTime() - new Date(lead.stage_entered_at).getTime()) / (1000 * 60 * 60))} horas
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -381,32 +510,78 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Asignado a</h4>
                             <div className="flex items-center space-x-3">
                                 <img
-                                    src={`https://i.pravatar.cc/150?u=${lead.assignedTo}`}
+                                    src={`https://ui-avatars.com/api/?name=${lead.assigned_to}`}
                                     className="w-10 h-10 rounded-full ring-2 ring-clinical-100"
                                     alt="Assignee"
                                 />
                                 <div>
                                     <p className="text-sm font-bold text-gray-900">
-                                        {useStore.getState().leads.find(l => l.assignedTo === lead.assignedTo)?.assignedTo === 'u1' ? 'Admin' : 'Laura Asesora'}
+                                        Asignado
                                     </p>
-                                    <p className="text-[10px] text-gray-500">Asesora Comercial</p>
+                                    <p className="text-[10px] text-gray-500">ID: {lead.assigned_to?.substring(0,8)}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="pt-8 border-t border-gray-100 space-y-3">
-                            <button className="w-full flex items-center justify-center space-x-2 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
-                                <span>Agendar Cita</span>
-                            </button>
-                            <button className="w-full flex items-center justify-center space-x-2 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
-                                <span>Convertir a Paciente</span>
-                            </button>
-                            <button className="w-full py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                                Marcar No Viable
-                            </button>
+                            {stages.filter((s:any) => s.resolution_type === 'won').map((s:any) => (
+                                <button key={s.id} onClick={() => setShowWonModal(true)} className="w-full flex items-center justify-center space-x-2 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm">
+                                    <LucideCheckCircle2 className="w-4 h-4" />
+                                    <span>Ganar ({s.name})</span>
+                                </button>
+                            ))}
+                            {stages.filter((s:any) => s.resolution_type === 'lost').map((s:any) => (
+                                <button key={s.id} onClick={() => setShowLostModal(true)} className="w-full py-3 text-sm font-bold text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-xl transition-all">
+                                    Descartar ({s.name})
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
+
+                {/* Modals */}
+                {showWonModal && (
+                    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <LucideCheckCircle2 className="w-6 h-6 text-emerald-500" /> Convertir a Ganado
+                            </h3>
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Monto de Venta (Opcional)</label>
+                                <input type="number" placeholder="Ej. 150000" className="w-full px-4 py-2 border rounded-xl" value={resolutionData.sale_value} onChange={e => setResolutionData({...resolutionData, sale_value: e.target.value})} />
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowWonModal(false)} className="flex-1 px-4 py-2 bg-gray-100 font-bold rounded-xl text-gray-600">Cancelar</button>
+                                <button onClick={() => resolveLeadMutation.mutate({ stage_id: stages.find((s:any) => s.resolution_type === 'won')?.id || '', data: { sale_value: resolutionData.sale_value ? parseFloat(resolutionData.sale_value) : null } })} className="flex-1 px-4 py-2 bg-emerald-600 font-bold text-white rounded-xl hover:bg-emerald-700">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showLostModal && (
+                    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <LucideX className="w-6 h-6 text-red-500" /> Marcar como Perdido
+                            </h3>
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Motivo de Descarte</label>
+                                <select className="w-full px-4 py-2 border rounded-xl bg-white" value={resolutionData.lost_reason} onChange={e => setResolutionData({...resolutionData, lost_reason: e.target.value})}>
+                                    <option value="">-- Selecciona un motivo --</option>
+                                    <option value="Muy Caro">Muy Caro (Precio)</option>
+                                    <option value="No Responde">No responde / Inubicable</option>
+                                    <option value="Ya se opero">Ya se operó / Trató en otro sitio</option>
+                                    <option value="Baja prioridad">Baja Prioridad / Solo curioseaba</option>
+                                    <option value="Otro">Otro Motivo</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowLostModal(false)} className="flex-1 px-4 py-2 bg-gray-100 font-bold rounded-xl text-gray-600">Cancelar</button>
+                                <button onClick={() => resolveLeadMutation.mutate({ stage_id: stages.find((s:any) => s.resolution_type === 'lost')?.id || '', data: { lost_reason: resolutionData.lost_reason } })} disabled={!resolutionData.lost_reason} className="flex-1 px-4 py-2 bg-red-600 font-bold text-white rounded-xl hover:bg-red-700 disabled:opacity-50">Descartar</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

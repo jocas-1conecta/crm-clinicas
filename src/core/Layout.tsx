@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import {
     LucideLayoutDashboard,
@@ -14,11 +15,14 @@ import {
     LucideMapPin,
     LucideBriefcase,
     LucideActivity,
-    LucideBarChart3
+    LucideBarChart3,
+    LucideCheckSquare,
+    LucideWaypoints
 } from 'lucide-react'
 
-export const Layout = ({ children, activeView, onViewChange }: { children: React.ReactNode, activeView: string, onViewChange: (view: string) => void }) => {
+export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, logout } = useStore()
+    const location = useLocation()
 
     // Role Helper
     const roleLabel = {
@@ -33,31 +37,38 @@ export const Layout = ({ children, activeView, onViewChange }: { children: React
         'Asesor_Sucursal': 'bg-green-100 text-green-700'
     }[currentUser?.role || 'Asesor_Sucursal'];
 
+    const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : '';
+
     const navItems = [
         // Shared
-        { name: 'Dashboard', icon: LucideLayoutDashboard, roles: ['Super_Admin', 'Admin_Clinica'] }, // Restricted
+        { name: 'Dashboard', path: `${slugPrefix}/dashboard`, icon: LucideLayoutDashboard, roles: ['Super_Admin', 'Admin_Clinica'] },
 
         // Super Admin
-        { name: 'Clinicas', icon: LucideBuilding, roles: ['Super_Admin'] },
+        { name: 'Clinicas', path: `${slugPrefix}/clinicas`, icon: LucideBuilding, roles: ['Super_Admin'] },
 
         // Clinic Admin Specific
-        { name: 'Mis Sucursales', icon: LucideMapPin, roles: ['Admin_Clinica'] },
-        { name: 'Mi Equipo', icon: LucideUsers, roles: ['Admin_Clinica'] },
-        { name: 'Catálogos', icon: LucideBriefcase, roles: ['Admin_Clinica'] },
+        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica'] },
+        { name: 'Mi Equipo', path: `${slugPrefix}/mi-equipo`, icon: LucideUsers, roles: ['Admin_Clinica'] },
+        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica'] },
+        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica'] },
 
-        // Advisor Specific (renamed or specific)
-        { name: 'Mi Dashboard', icon: LucideActivity, roles: ['Asesor_Sucursal'] },
+        // Advisor Specific
+        { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },
 
         // Operating Roles (Admin & Asesor)
-        { name: 'Leads', icon: LucideUsers, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Citas', icon: LucideCalendar, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Pacientes', icon: LucideUserSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
 
         // Analytics (ALL ROLES)
-        { name: 'Reportes', icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', icon: LucideSettings, roles: ['Admin_Clinica'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideSettings, roles: ['Admin_Clinica'] },
     ]
+
+    const activeItem = navItems.find(item => item.path === location.pathname)
+    const activeViewName = activeItem ? activeItem.name : '1Clinic'
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -68,29 +79,37 @@ export const Layout = ({ children, activeView, onViewChange }: { children: React
                         <div className="bg-clinical-100 p-2 rounded-lg">
                             <LucideShieldCheck className="w-8 h-8" />
                         </div>
-                        <span className="text-xl font-bold text-gray-900 tracking-tight">Rangel CRM</span>
+                        <span className="text-xl font-bold text-gray-900 tracking-tight">1Clinic</span>
                     </div>
                 </div>
 
                 <nav className="flex-1 px-4 space-y-2 mt-4">
                     {navItems.filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
-                        <button
+                        <Link
                             key={item.name}
-                            onClick={() => onViewChange(item.name)}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeView === item.name
+                            to={item.path}
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path
                                 ? 'bg-clinical-50 text-clinical-700 font-medium shadow-sm'
                                 : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                 }`}
                         >
-                            <item.icon className={`w-5 h-5 ${activeView === item.name ? 'text-clinical-600' : 'text-gray-400'}`} />
+                            <item.icon className={`w-5 h-5 ${location.pathname === item.path ? 'text-clinical-600' : 'text-gray-400'}`} />
                             <span>{item.name}</span>
-                        </button>
+                        </Link>
                     ))}
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
                     <button
-                        onClick={logout}
+                        onClick={async () => {
+                            const slug = currentUser?.clinica_slug;
+                            await logout();
+                            if (slug) {
+                                window.location.href = `/${slug}`;
+                            } else {
+                                window.location.href = '/';
+                            }
+                        }}
                         className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium"
                     >
                         <LucideLogOut className="w-5 h-5" />
@@ -105,12 +124,12 @@ export const Layout = ({ children, activeView, onViewChange }: { children: React
                 <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 z-10">
                     <div className="flex items-center space-x-4 md:hidden">
                         <LucideMenu className="w-6 h-6 text-gray-500" />
-                        <span className="text-xl font-bold">Rangel CRM</span>
+                        <span className="text-xl font-bold">1Clinic</span>
                     </div>
 
                     <div className="hidden md:block">
                         <h2 className="text-xl font-bold text-gray-800">
-                            {activeView}
+                            {activeViewName}
                         </h2>
                     </div>
 

@@ -1,26 +1,47 @@
 import { LucideCalendar, LucideCheckCircle, LucideUsers } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const AdvisorDashboard = () => {
-    const { currentUser, leads, appointments, patients } = useStore()
+    const { currentUser } = useStore()
 
     // Filter by branch
     const branchId = currentUser?.sucursal_id || ''
 
+    const { data: leads = [] } = useQuery({
+        queryKey: ['leads', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['appointments', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
     // KPIs
     const newLeadsToday = leads.filter(l =>
-        l.sucursal_id === branchId &&
         l.status === 'Nuevo' &&
-        new Date(l.createdAt).toDateString() === new Date().toDateString()
+        new Date(l.created_at).toDateString() === new Date().toDateString()
     ).length
 
     const confirmedAppointments = appointments.filter(a =>
-        a.sucursal_id === branchId &&
         a.status === 'Confirmada'
     ).length
 
     const patientsAttended = appointments.filter(a =>
-        a.sucursal_id === branchId &&
         a.status === 'Atendida'
     ).length
 

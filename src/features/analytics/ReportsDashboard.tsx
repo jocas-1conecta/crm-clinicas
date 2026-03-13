@@ -1,8 +1,10 @@
-import { useStore } from '../store/useStore'
-import { LucideBarChart3, LucideTrendingUp, LucideUsers, LucideBuilding, LucideArrowUpRight, LucideArrowDownRight, LucidePieChart } from 'lucide-react'
+import { useStore } from '../../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
+import { LucideBarChart3, LucideTrendingUp, LucideUsers, LucideBuilding, LucideArrowUpRight, LucideArrowDownRight, LucidePieChart, LucideBriefcase, LucideDollarSign, LucideCheckSquare } from 'lucide-react'
 
 export const ReportsDashboard = () => {
-    const { currentUser, clinics, branches, leads, appointments, team } = useStore()
+    const { currentUser } = useStore()
     if (!currentUser) return null;
     const role = currentUser.role
 
@@ -10,20 +12,11 @@ export const ReportsDashboard = () => {
     const renderContent = () => {
         switch (role) {
             case 'Super_Admin':
-                return <SuperAdminReports clinics={clinics} />
+                return <SuperAdminReports currentUser={currentUser} />
             case 'Admin_Clinica':
-                return <ClinicAdminReports
-                    branches={branches.filter(b => b.clinica_id === currentUser.clinica_id)}
-                    leads={leads} // These should ideally be filtered by clinic in a real app backend, but here we filter in component
-                    appointments={appointments}
-                    team={team.filter(t => t.clinica_id === currentUser.clinica_id)}
-                    clinicId={currentUser.clinica_id!}
-                />
+                return <ClinicAdminReports currentUser={currentUser} />
             case 'Asesor_Sucursal':
-                return <AdvisorReports
-                    leads={leads.filter(l => l.sucursal_id === currentUser.sucursal_id)}
-                    appointments={appointments.filter(a => a.sucursal_id === currentUser.sucursal_id)}
-                />
+                return <AdvisorReports currentUser={currentUser} />
             default:
                 return <div>No tienes acceso a reportes.</div>
         }
@@ -42,10 +35,19 @@ export const ReportsDashboard = () => {
 
 // Sub-components for cleaner code
 
-const SuperAdminReports = ({ clinics }: { clinics: any[] }) => {
+const SuperAdminReports = ({ currentUser }: { currentUser: any }) => {
+    const { data: clinics = [] } = useQuery({
+        queryKey: ['clinics-admin'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('clinicas').select('*');
+            if (error) throw error;
+            return data;
+        }
+    })
+
     const activeClinics = clinics.filter(c => c.status === 'activa').length
     const suspendedClinics = clinics.filter(c => c.status === 'suspendida').length
-    const newClinicsThisMonth = clinics.filter(c => new Date(c.createdAt) > new Date(new Date().setDate(1))).length // Mock logic
+    const newClinicsThisMonth = clinics.filter(c => new Date(c.created_at) > new Date(new Date().setDate(1))).length // Mock logic
 
     // Calculate Projected MRR
     const mrr = clinics.reduce((acc, c) => {
@@ -81,7 +83,65 @@ const SuperAdminReports = ({ clinics }: { clinics: any[] }) => {
     )
 }
 
-const ClinicAdminReports = ({ branches, leads, appointments, team, clinicId }: any) => {
+const ClinicAdminReports = ({ currentUser }: any) => {
+    const clinicId = currentUser?.clinica_id;
+
+    const { data: branches = [] } = useQuery({
+        queryKey: ['branches', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('sucursales').select('*').eq('clinica_id', clinicId)
+            if (error) throw error
+            return data
+        },
+        enabled: !!clinicId
+    })
+
+    const { data: leads = [] } = useQuery({
+        queryKey: ['leads-admin', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('leads').select('*')
+            if (error) throw error
+            return data
+        }
+    })
+
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['appointments-admin', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('appointments').select('*')
+            if (error) throw error
+            return data
+        }
+    })
+
+    const { data: team = [] } = useQuery({
+        queryKey: ['team', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('profiles').select('*').eq('clinica_id', clinicId)
+            if (error) throw error
+            return data
+        },
+        enabled: !!clinicId
+    })
+
+    const { data: patients = [] } = useQuery({
+        queryKey: ['patients-admin', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('patients').select('*')
+            if (error) throw error
+            return data
+        }
+    })
+
+    const { data: deals = [] } = useQuery({
+        queryKey: ['deals-admin', clinicId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('deals').select('*')
+            if (error) throw error
+            return data
+        }
+    })
+
     return (
         <div className="space-y-8">
             {/* Branch Performance */}
@@ -130,6 +190,7 @@ const ClinicAdminReports = ({ branches, leads, appointments, team, clinicId }: a
                                 <th className="pb-3 text-center">Leads Asignados</th>
                                 <th className="pb-3 text-center">Citas Agendadas</th>
                                 <th className="pb-3 text-right">Efectividad</th>
+                                <th className="pb-3 text-right">Ingresos Ganados</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -142,7 +203,12 @@ const ClinicAdminReports = ({ branches, leads, appointments, team, clinicId }: a
                                 // we will simulate data here for display if IDs don't align perfectly in the mock.
                                 const assignedLeads = Math.floor(Math.random() * 20) + 5
                                 const scheduled = Math.floor(Math.random() * assignedLeads)
-                                const rate = Math.round((scheduled / assignedLeads) * 100)
+                                const rate = assignedLeads > 0 ? Math.round((scheduled / assignedLeads) * 100) : 0
+
+                                const memberPatients = patients.filter((p: any) => p.assigned_to === member.id)
+                                const memberPatientIds = memberPatients.map((p: any) => p.id)
+                                const memberDeals = deals.filter((d: any) => memberPatientIds.includes(d.patient_id))
+                                const memberWonValue = memberDeals.filter((d: any) => d.status === 'Ganado').reduce((sum: number, d: any) => sum + Number(d.estimated_value), 0)
 
                                 return (
                                     <tr key={member.id}>
@@ -159,6 +225,9 @@ const ClinicAdminReports = ({ branches, leads, appointments, team, clinicId }: a
                                                 {rate}%
                                             </span>
                                         </td>
+                                        <td className="py-3 text-right font-bold text-emerald-600">
+                                            ${memberWonValue.toLocaleString()}
+                                        </td>
                                     </tr>
                                 )
                             })}
@@ -170,9 +239,60 @@ const ClinicAdminReports = ({ branches, leads, appointments, team, clinicId }: a
     )
 }
 
-const AdvisorReports = ({ leads, appointments }: any) => {
+const AdvisorReports = ({ currentUser }: any) => {
+    const branchId = currentUser?.sucursal_id
+
+    const { data: leads = [] } = useQuery({
+        queryKey: ['leads', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['appointments', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
+    const { data: patients = [] } = useQuery({
+        queryKey: ['patients', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data, error } = await supabase.from('patients').select('*').eq('assigned_to', currentUser.id);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
+    const { data: deals = [] } = useQuery({
+        queryKey: ['deals', branchId],
+        queryFn: async () => {
+            if (!branchId) return [];
+            const { data: pData, error: pError } = await supabase.from('patients').select('id').eq('assigned_to', currentUser.id);
+            if (pError) throw pError;
+            const pIds = pData.map(p => p.id);
+            if (pIds.length === 0) return [];
+
+            const { data, error } = await supabase.from('deals').select('*').in('patient_id', pIds);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!branchId,
+    })
+
     const totalLeads = leads.length
-    const scheduled = leads.filter((l: any) => l.status === 'Cita Agendada').length
+    const scheduled = leads.filter((l: any) => l.status === 'Agendado').length
     // In our store, converted leads become patients and are removed from leads list. 
     // So "Pacientes" count would be current patients minus imported ones? 
     // For specific funnel visualization, let's just use "Contactado" vs "Cita Agendada".
@@ -181,6 +301,9 @@ const AdvisorReports = ({ leads, appointments }: any) => {
     const attended = appointments.filter((a: any) => a.status === 'Atendida').length
     const canceled = appointments.filter((a: any) => a.status === 'Cancelada').length
     const totalAppts = attended + canceled || 1 // avoid div 0
+
+    const wonDeals = deals.filter((d: any) => d.status === 'Ganado')
+    const wonValue = wonDeals.reduce((sum: number, d: any) => sum + Number(d.estimated_value), 0)
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -226,6 +349,19 @@ const AdvisorReports = ({ leads, appointments }: any) => {
                         <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                         <span className="text-sm text-gray-600">Canceladas ({canceled})</span>
                     </div>
+                </div>
+            </div>
+
+            {/* Oportunidades / Negocios */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
+                <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <LucideTrendingUp className="w-5 h-5 text-emerald-600" />
+                    Mis Oportunidades de Negocio
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <StatCard title="Total Oportunidades" value={deals.length} icon={LucideBriefcase} color="blue" />
+                    <StatCard title="Negocios Ganados" value={wonDeals.length} icon={LucideCheckSquare} color="emerald" />
+                    <StatCard title="Ingresos Generados" value={`$${wonValue.toLocaleString()}`} icon={LucideDollarSign} color="emerald" />
                 </div>
             </div>
         </div>

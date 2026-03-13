@@ -1,8 +1,16 @@
 import { LucideBuilding, LucideTrendingUp, LucideUsers, LucideActivity, LucideAlertCircle } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const SuperAdminDashboard = () => {
-    const { clinics } = useStore()
+    const { data: clinics = [] } = useQuery({
+        queryKey: ['clinicas-dashboard'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('clinicas').select('*');
+            if (error) throw error;
+            return data;
+        }
+    })
 
     // Calculate KPIs
     const totalClinics = clinics.length

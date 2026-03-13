@@ -1,8 +1,33 @@
 import { LucideSearch, LucideMoreVertical, LucideCheckCircle, LucideXCircle, LucidePauseCircle } from 'lucide-react'
-import { useStore, Clinic } from '../store/useStore'
+import { useStore, Clinic } from '../../store/useStore'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const ClinicsManagement = () => {
-    const { clinics, updateClinicStatus } = useStore()
+    const queryClient = useQueryClient()
+
+    const { data: clinics = [] } = useQuery({
+        queryKey: ['clinicas'],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('clinicas').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data;
+        }
+    })
+
+    const updateClinicStatusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            const { error } = await supabase.from('clinicas').update({ status }).eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clinicas'] })
+        }
+    })
+
+    const updateClinicStatus = (id: string, status: string) => {
+        updateClinicStatusMutation.mutate({ id, status })
+    }
 
     const getStatusBadge = (status: Clinic['status']) => {
         switch (status) {
@@ -59,7 +84,7 @@ export const ClinicsManagement = () => {
                                         {getStatusBadge(clinic.status)}
                                     </td>
                                     <td className="p-6 text-sm text-gray-500">
-                                        {new Date(clinic.createdAt).toLocaleDateString()}
+                                        {new Date(clinic.created_at || new Date()).toLocaleDateString()}
                                     </td>
                                     <td className="p-6">
                                         <div className="flex items-center justify-end space-x-2">

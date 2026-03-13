@@ -1,29 +1,56 @@
 import { useState } from 'react'
 import { LucideMail, LucideMoreVertical, LucidePlus, LucideSearch, LucideUser, LucideX } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const TeamManagement = () => {
-    const { currentUser, team, branches, addTeamMember } = useStore()
+    const { currentUser } = useStore()
     const [showModal, setShowModal] = useState(false)
     const [formData, setFormData] = useState({ name: '', email: '', role: 'Asesor', sucursal_id: '' })
 
-    // Filter team for current clinic
-    const myTeam = team.filter(t => t.clinica_id === currentUser?.clinica_id)
-    const myBranches = branches.filter(b => b.clinica_id === currentUser?.clinica_id)
+    // Fetch team (profiles for this clinic)
+    const { data: myTeam = [], isLoading: isLoadingTeam } = useQuery({
+        queryKey: ['team', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('clinica_id', currentUser.clinica_id)
+                .neq('role', 'Super_Admin');
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    // Fetch branches to resolve sucursal_id names
+    const { data: myBranches = [] } = useQuery({
+        queryKey: ['branches', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase
+                .from('sucursales')
+                .select('*')
+                .eq('clinica_id', currentUser.clinica_id);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
 
     const handleSave = () => {
         if (!formData.name || !formData.email || !formData.sucursal_id) return;
-
-        addTeamMember({
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            sucursal_id: formData.sucursal_id,
-            clinica_id: currentUser?.clinica_id || ''
-        })
+        
+        // En una app real, aquí llamaríamos a una Supabase Edge Function
+        // para enviar un correo de invitación a Auth y crear su perfil base.
+        alert('En un entorno productivo, esto enviaría un correo de Supabase Auth a ' + formData.email);
         setShowModal(false)
         setFormData({ name: '', email: '', role: 'Asesor', sucursal_id: '' })
     }
+
+    if (isLoadingTeam) return <div className="p-8 text-center text-gray-500">Cargando equipo...</div>;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -67,7 +94,7 @@ export const TeamManagement = () => {
                             <tr key={member.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="p-6">
                                     <div className="flex items-center space-x-3">
-                                        <img src={member.avatar || `https://ui-avatars.com/api/?name=${member.name}`} alt="" className="w-10 h-10 rounded-full" />
+                                        <img src={member.avatar_url || `https://ui-avatars.com/api/?name=${member.name}`} alt="" className="w-10 h-10 rounded-full" />
                                         <span className="font-medium text-gray-900">{member.name}</span>
                                     </div>
                                 </td>

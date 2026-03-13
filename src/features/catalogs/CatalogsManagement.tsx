@@ -1,32 +1,95 @@
 import { useState } from 'react'
 import { LucideBriefcase, LucidePlus, LucideStethoscope, LucideX, LucideUser } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useStore } from '../../store/useStore'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../services/supabase'
 
 export const CatalogsManagement = () => {
-    const { currentUser, doctors, services, addDoctor, addService } = useStore()
+    const { currentUser } = useStore()
+    const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState<'doctors' | 'services'>('doctors')
     const [showModal, setShowModal] = useState(false)
 
     // Form states
     const [docForm, setDocForm] = useState({ name: '', specialty: '', email: '', phone: '' })
-    const [serviceForm, setServiceForm] = useState({ name: '', price: 0 })
+    const [serviceForm, setServiceForm] = useState({ name: '', price: 0, scripts: '', supportMaterial: '' })
 
-    const myDoctors = doctors.filter(d => d.clinica_id === currentUser?.clinica_id)
-    const myServices = services.filter(s => s.clinica_id === currentUser?.clinica_id)
+    // Fetch Doctors
+    const { data: myDoctors = [], isLoading: isLoadingDocs } = useQuery({
+        queryKey: ['doctors', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase.from('doctors').select('*').eq('clinica_id', currentUser.clinica_id);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    // Fetch Services
+    const { data: myServices = [], isLoading: isLoadingSvc } = useQuery({
+        queryKey: ['services', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase.from('services').select('*').eq('clinica_id', currentUser.clinica_id);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    const addDoctorMutation = useMutation({
+        mutationFn: async (newDoc: any) => {
+            const { data, error } = await supabase.from('doctors').insert([newDoc]).select();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['doctors', currentUser?.clinica_id] })
+            setShowModal(false)
+            setDocForm({ name: '', specialty: '', email: '', phone: '' })
+        },
+        onError: (error: any) => {
+            console.error('Error adding doctor:', error);
+            alert(`Error al guardar: ${error.message || 'Error desconocido'}`);
+        }
+    })
+
+    const addServiceMutation = useMutation({
+        mutationFn: async (newSvc: any) => {
+            const { data, error } = await supabase.from('services').insert([newSvc]).select();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['services', currentUser?.clinica_id] })
+            setShowModal(false)
+            setServiceForm({ name: '', price: 0, scripts: '', supportMaterial: '' })
+        },
+        onError: (error: any) => {
+            console.error('Error adding service:', error);
+            alert(`Error al guardar: ${error.message || 'Error desconocido'}`);
+        }
+    })
 
     const handleSaveDoctor = () => {
-        if (!docForm.name || !docForm.specialty) return;
-        addDoctor({ ...docForm, clinica_id: currentUser?.clinica_id || '' })
-        setShowModal(false)
-        setDocForm({ name: '', specialty: '', email: '', phone: '' })
+        if (!docForm.name || !docForm.specialty || !currentUser?.clinica_id) return;
+        addDoctorMutation.mutate({ ...docForm, clinica_id: currentUser.clinica_id });
     }
 
     const handleSaveService = () => {
-        if (!serviceForm.name || !serviceForm.price) return;
-        addService({ ...serviceForm, clinica_id: currentUser?.clinica_id || '' })
-        setShowModal(false)
-        setServiceForm({ name: '', price: 0 })
+        if (!serviceForm.name || !serviceForm.price || !currentUser?.clinica_id) return;
+        
+        addServiceMutation.mutate({
+            name: serviceForm.name,
+            price: serviceForm.price,
+            scripts: serviceForm.scripts.split('\n').filter(s => s.trim()),
+            support_material: serviceForm.supportMaterial.split('\n').filter(s => s.trim()),
+            clinica_id: currentUser.clinica_id
+        });
     }
+
+    if (isLoadingDocs || isLoadingSvc) return <div className="p-8 text-center text-gray-500">Cargando catálogos...</div>;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -95,7 +158,14 @@ export const CatalogsManagement = () => {
                                     <div className={`w-3 h-3 rounded-full bg-${svc.color || 'blue'}-500`} />
                                     <div>
                                         <h4 className="font-bold text-gray-900">{svc.name}</h4>
-                                        <p className="text-xs text-gray-400">Código: {svc.id}</p>
+                                        <div className="flex space-x-2 mt-1">
+                                            <span className="text-xs font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
+                                                {svc.scripts?.length || 0} Guiones
+                                            </span>
+                                            <span className="text-xs font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-100">
+                                                {svc.support_material?.length || 0} Materiales
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 <span className="font-bold text-gray-900">
@@ -143,7 +213,9 @@ export const CatalogsManagement = () => {
                                         <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none"
                                             value={docForm.phone} onChange={e => setDocForm({ ...docForm, phone: e.target.value })} />
                                     </div>
-                                    <button onClick={handleSaveDoctor} className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4">Guardar Doctor</button>
+                                    <button onClick={handleSaveDoctor} disabled={addDoctorMutation.isPending} className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4 disabled:opacity-50">
+                                        {addDoctorMutation.isPending ? 'Guardando...' : 'Guardar Doctor'}
+                                    </button>
                                 </>
                             ) : (
                                 <>
@@ -157,7 +229,23 @@ export const CatalogsManagement = () => {
                                         <input type="number" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none"
                                             value={serviceForm.price} onChange={e => setServiceForm({ ...serviceForm, price: Number(e.target.value) })} />
                                     </div>
-                                    <button onClick={handleSaveService} className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4">Guardar Servicio</button>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Guiones (Uno por línea)</label>
+                                        <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none h-20"
+                                            value={serviceForm.scripts} onChange={e => setServiceForm({ ...serviceForm, scripts: e.target.value })}
+                                            placeholder="Ej: Hola, soy de Clínica Rangel..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Material de Apoyo (URLs, uno por línea)</label>
+                                        <textarea className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none h-20"
+                                            value={serviceForm.supportMaterial} onChange={e => setServiceForm({ ...serviceForm, supportMaterial: e.target.value })}
+                                            placeholder="Ej: https://youtube.com/..."
+                                        />
+                                    </div>
+                                    <button onClick={handleSaveService} disabled={addServiceMutation.isPending} className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4 disabled:opacity-50">
+                                        {addServiceMutation.isPending ? 'Guardando...' : 'Guardar Servicio'}
+                                    </button>
                                 </>
                             )}
                         </div>
