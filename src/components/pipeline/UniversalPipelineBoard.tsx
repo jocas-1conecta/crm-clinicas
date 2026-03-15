@@ -233,19 +233,14 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                                             onChange={e => setGatekeepingForm({...gatekeepingForm, [field]: e.target.value})}
                                         />
                                     ) : field === 'lost_reason' ? (
-                                        <select 
-                                            required
-                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-clinical-500 bg-white"
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-clinical-500"
+                                            placeholder="Ingresa el motivo exacto..."
                                             value={gatekeepingForm[field] || ''}
                                             onChange={e => setGatekeepingForm({...gatekeepingForm, [field]: e.target.value})}
-                                        >
-                                            <option value="">-- Selecciona un motivo --</option>
-                                            <option value="Muy Caro">Muy Caro (Precio)</option>
-                                            <option value="No Responde">No responde / Inubicable</option>
-                                            <option value="Ya se opero">Ya se operó o Trató</option>
-                                            <option value="Baja prioridad">Baja Prioridad</option>
-                                            <option value="Otro">Otro Motivo</option>
-                                        </select>
+                                        />
                                     ) : (
                                         <input 
                                             type="text" 

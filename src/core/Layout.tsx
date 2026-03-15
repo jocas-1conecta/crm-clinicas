@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useStore } from '../store/useStore'
 import {
     LucideLayoutDashboard,
@@ -23,6 +24,7 @@ import {
 export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, logout } = useStore()
     const location = useLocation()
+    const queryClient = useQueryClient()
 
     // Role Helper
     const roleLabel = {
@@ -38,6 +40,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     }[currentUser?.role || 'Asesor_Sucursal'];
 
     const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : '';
+    const hasClinicModule = currentUser?.active_modules?.includes('clinic_core');
 
     const navItems = [
         // Shared
@@ -48,7 +51,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
         // Clinic Admin Specific
         { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica'] },
-        { name: 'Mi Equipo', path: `${slugPrefix}/mi-equipo`, icon: LucideUsers, roles: ['Admin_Clinica'] },
         { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica'] },
         { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica'] },
 
@@ -58,17 +60,22 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Operating Roles (Admin & Asesor)
         { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
         { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        ...(hasClinicModule ? [
+            { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+            { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        ] : []),
 
         // Analytics (ALL ROLES)
         { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideSettings, roles: ['Admin_Clinica'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Admin_Clinica'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)
-    const activeViewName = activeItem ? activeItem.name : '1Clinic'
+    const activeViewName = location.pathname.includes('/configuracion') 
+        ? 'Configuración' 
+        : (activeItem ? activeItem.name : '1Clinic')
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -84,25 +91,32 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </div>
 
                 <nav className="flex-1 px-4 space-y-2 mt-4">
-                    {navItems.filter(item => item.roles.includes(currentUser?.role || '')).map((item) => (
+                    {navItems.filter(item => item.roles.includes(currentUser?.role || '')).map((item) => {
+                        // Mark active if pathname starts with the config base path for Settings
+                        const isActive = item.name === 'Configuración' 
+                            ? location.pathname.includes('/configuracion') 
+                            : location.pathname === item.path;
+                            
+                        return (
                         <Link
                             key={item.name}
                             to={item.path}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${location.pathname === item.path
+                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive
                                 ? 'bg-clinical-50 text-clinical-700 font-medium shadow-sm'
                                 : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                 }`}
                         >
-                            <item.icon className={`w-5 h-5 ${location.pathname === item.path ? 'text-clinical-600' : 'text-gray-400'}`} />
+                            <item.icon className={`w-5 h-5 ${isActive ? 'text-clinical-600' : 'text-gray-400'}`} />
                             <span>{item.name}</span>
                         </Link>
-                    ))}
+                    )})}
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
                     <button
                         onClick={async () => {
                             const slug = currentUser?.clinica_slug;
+                            queryClient.clear();
                             await logout();
                             if (slug) {
                                 window.location.href = `/${slug}`;
@@ -134,13 +148,12 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     </div>
 
                     <div className="flex items-center space-x-6">
-                        {/* Clinic/Branch Info (Mock) */}
                         <div className="hidden md:flex flex-col items-end mr-4">
                             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                                 {
                                     currentUser?.role === 'Super_Admin' ? 'Vista Global' :
-                                        currentUser?.role === 'Admin_Clinica' ? 'Clínica Principal' :
-                                            'Sucursal Centro (S-001)'
+                                        currentUser?.role === 'Admin_Clinica' ? 'Vista Administrativa' :
+                                            'Vista de Sucursal'
                                 }
                             </span>
                             {currentUser?.role === 'Admin_Clinica' && (
@@ -156,9 +169,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                         </button>
 
-                        <div className="flex items-center space-x-4 pl-6 border-l border-gray-100">
+                        <Link to={`${slugPrefix}/configuracion/perfil`} className="flex items-center space-x-4 pl-6 border-l border-gray-100 group cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
                             <div className="text-right">
-                                <p className="text-sm font-bold text-gray-900 leading-none">{currentUser?.name}</p>
+                                <p className="text-sm font-bold text-gray-900 leading-none group-hover:text-clinical-600 transition-colors">{currentUser?.name}</p>
                                 <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${roleColor}`}>
                                     {roleLabel}
                                 </span>
@@ -166,14 +179,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <img
                                 src={currentUser?.avatarUrl}
                                 alt="Profile"
-                                className="w-10 h-10 rounded-full ring-2 ring-clinical-100 object-cover"
+                                className="w-10 h-10 rounded-full ring-2 ring-clinical-100 object-cover group-hover:ring-clinical-200 transition-all"
                             />
-                        </div>
+                        </Link>
                     </div>
                 </header>
 
                 {/* Viewport */}
-                <main className="flex-1 overflow-auto p-6 bg-gray-50">
+                <main className={`flex-1 overflow-auto bg-gray-50 ${location.pathname.includes('/configuracion') ? 'p-0' : 'p-6'}`}>
                     {children}
                 </main>
             </div>

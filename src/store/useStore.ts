@@ -16,11 +16,15 @@ export interface User {
     role: 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal';
     avatarUrl: string;
     clinica_id?: string;
+    tenant_id?: string; // Generic abstraction
     sucursal_id?: string;
+    location_id?: string; // Generic abstraction
     clinica_slug?: string;
+    tenant_slug?: string; // Generic abstraction
+    active_modules?: string[];
 }
 
-export interface Clinic {
+export interface Organization {
     id: string;
     name: string;
     email_contacto: string;
@@ -29,11 +33,17 @@ export interface Clinic {
     createdAt: string;
 }
 
-export interface Branch {
+export interface Clinic extends Organization {}
+
+export interface Location {
     id: string;
     name: string;
     address: string;
     status: string;
+    tenant_id: string;
+}
+
+export interface Branch extends Location {
     clinica_id: string;
 }
 

@@ -46,11 +46,12 @@ Este directorio encapsula el motor transversal del SaaS. Contiene todas las part
     *   **Resolución de Perfil (Hydration)**: Al hacer submit, el componente no solo verifica credenciales de JWT vía Supabase Auth, sino que hace un JOIN contra la tabla `profiles` e hidrata el estado global en `Zustand` con el rol estricto (`Asesor_Sucursal` o `Admin_Clinica`), el Branch ID geográfico y el arreglo `active_modules` que la empresa ha alquilado.
     *   **`ModuleGuard.tsx` (Proxy Firewall)**: Es el componente de alto orden (HOC) que envuelve las rutas sensibles en `App.tsx`. Analiza a nivel de re-renderizado en tiempo real el arreglo de `active_modules` del usuario. Si un negocio de seguros (`insurance_core`) intenta invocar la ruta de Citas Médicas (`/citas`), el ModuleGuard interceptará el renderizado de React, arrojando al usuario de vuelta al inicio. Esto garantiza que la licencia SaaS contratada sea técnica y criptográficamente inviolable desde el frontend.
 *   **`core/dashboards/` (Paneles Neutros y KPIs Analíticos)**:
+    *   **Enrutador Proxy Inteligente (`RootDashboard.tsx`)**: Actúa como la única puerta de entrada en la ruta de inicio. Lee el `role` del usuario desde Zustand de forma síncrona y delega dinámicamente el montaje del dashboard correcto, aislando por completo la lógica de enrutamiento y bloqueando accesos no autorizados a nivel de renderizado.
     *   **Jerarquía de Tres Niveles Estrictos**: La plataforma distribuye la carga analítica y la visibilidad matemática dependiendo del token del usuario en tiempo real:
-        *   **`SuperAdminDashboard.tsx` (Root)**: Interfaz diseñada exclusivamente para el dueño del SaaS. Expone métricas de alto nivel a través de todas las instancias como ingresos totales por suscripción (MRR), volumen total de Tenants activos (Clínicas), y salud del sistema mediante conectores directos a Supabase Admin.
-        *   **`AdminClinicaDashboard.tsx` (Tenant Manager)**: El panel directivo de una clínica específica. Destruye métricas de código (SaaS) y se concentra en inteligencia de negocio local. Consumo de KPIs operativos en tiempo real: Ticket Promedio, Tasa de Conversión General de Leads, y rendimiento del embudo agregando la data de todas sus sucursales.
-        *   **`AsesorSucursalDashboard.tsx` (Tactical View)**: El radar del empleado de piso. Cero distracciones gerenciales. Muestra exclusivamente lo que exige acción inmediata: "Leads Críticos Hoy", "Pacientes en Sala de Espera" (si operan módulo clínico), y el estado de sus citas personales.
-    *   **Arquitectura de Widgets Dinámicos**: En lugar de recargar vistas monolíticas Gigantes, todos los dashboards están ensamblados usando mini-componentes de suspensión asíncrona (Suspense Boundaries). Si el widget de "Ganancias" falla por una consulta SQL lenta, la vista renderiza el esqueleto de carga local, sin frenar la visión del resto de la pantalla.
+        *   **`SuperAdminDashboard.tsx` (Root)**: Interfaz diseñada exclusivamente para el dueño del SaaS. Expone métricas de alto nivel a través de todas las instancias como ingresos totales por suscripción (MRR), volumen total de Tenants activos (Clínicas), y salud del sistema. Sub-Módulos fracturados: `GlobalKPIs` y `SystemStatus`.
+        *   **`AdminClinicaDashboard.tsx` (Tenant Manager)**: El panel directivo de una clínica específica. Destruye métricas de código (SaaS) y se concentra en inteligencia de negocio local. Consume KPIs operativos con alto rigor matemático manejados nativamente mediante `useMemo` y encapsulados asíncronamente en componentes como `DashboardKPIs`, `LeadsByServiceChart` y `RecentActivityFeed`.
+        *   **`AsesorSucursalDashboard.tsx` (Tactical View)**: El radar del empleado de piso filtrado minuciosamente por `sucursal_id` dictado en el payload JWT. Muestra exclusivamente lo que exige acción inmediata a través de su encapsulado `TacticalKPIs`.
+    *   **Arquitectura de Widgets Dinámicos (React Suspense)**: En lugar de renderizar vistas monolíticas gigantes que se asfixian calculando arrays extensos, la interfaz visual fue partida atómicamente. Todos los dashboards están ensamblados usando importaciones perezosas bajo `Suspense Boundaries`. Si un bloque de gráficas sufre latencia SQL, reaccionará un Skeleton Loader inofensivo mientras el resto del dashboard retiene interactividad total (Bloqueo Sub-segundo).
 *   **`core/organizations/` (Gestión Jerárquica)**:
     *   Todo negocio SaaS necesita gestionar: Sus inquilinos (Tenants/Clínicas), sus puntos geográficos (Sucursales), y su talento humano (`TeamManagement.tsx` restringe la visión de un empleado solo a la Sucursal donde fue asignado).
     *   **`PipelineConfig.tsx`**: El cerebro del flujo comercial. Permite a los gerentes "pintar" y estructurar embudos libremente guardando en Supabase nuevas Fases, Tiempos de Respuesta Esperados (SLA) sin tocar código.
@@ -76,7 +77,37 @@ Aquí vive todo el código estrictamente médico y operacional de la rama de la 
 
 ---
 
-## 🧹 3. Certificación de Código (Garbage Collection)
+## 🚀 3. Flujos Operativos y Funcionalidades Clave (Core Features)
+
+La plataforma está diseñada para acompañar el ciclo de vida completo de un cliente: desde que es un prospecto frío, hasta que se convierte en un paciente fidelizado en la clínica.
+
+### 3.1 Gestión Comercial y Embudos (Kanban Universal)
+*   **Captación (Leads)**: Los prospectos ingresan al sistema y se visualizan en un tablero Kanban altamente interactivo (`UniversalPipelineBoard`). El tablero muestra un conteo en tiempo real del "Valor Estimado" (Revenue) atrapado en cada columna.
+*   **Editor de Fases (Pipeline Configurator)**: La plataforma no fuerza a la empresa a seguir un proceso de ventas estricto. Desde el Hub de Configuración, los administradores pueden crear, eliminar y reordenar las Fases del Embudo (Ej. Añadir una columna personalizada llamada "Presupuesto Enviado"). El Kanban renderizará estas nuevas columnas de forma instantánea mediante React Query.
+*   **Drag & Drop en Tiempo Real**: Los asesores pueden arrastrar tarjetas de leads a través de diferentes etapas. Al soltar la tarjeta, `React Query` dispara una mutación asíncrona hacia Supabase (Optmistic UI), guardando la nueva etapa instantáneamente e invalidando la caché para repintar la pantalla sin destellos blancos ("flicker-free").
+*   **Conversión a Paciente**: Cuando un Lead llega a la etapa de cierre exitoso (Ganado), el sistema permite "promoverlo" hacia el dominio clínico a un solo clic, transformándolo en un paciente real con expediente e historial financiero.
+
+### 3.2 Operaciones Clínicas: Pacientes y Sala de Espera
+*Este módulo se bloquea automáticamente para Tenants que no tienen la licencia `clinic_core`.*
+*   **Directorio Dinámico de Pacientes (Cross-Selling)**: Un CRM tabular capaz de sostener cientos de miles de registros de pacientes históricos sin ralentizar el navegador, gracias al particionamiento de memoria (`@tanstack/react-virtual`). Permite búsqueda rápida, etiquetado de condiciones, y detección de oportunidades de Venta Cruzada (Registrando si al paciente actual se le puede ofrecer un tratamiento dermatológico adicional, por ejemplo).
+*   **Control de Citas Físicas (SLA Kanban)**: Un segundo tablero Kanban paralelo, pero diseñado estratégicamente para el flujo físico dentro de la clínica. Etapas tácticas: *Validación -> Sala de Espera -> Box 1 -> Box 2 -> Atendido/Cobrado*. 
+*   **Relojes de Nivel de Servicio (SLA)**: Incorpora temporizadores dinámicos vinculados a cada tarjeta. Si un paciente permanece en la columna "Sala de Espera" por más de 15 minutos (El SLA configurado), la tarjeta cambia a color rojo alertando visualmente al equipo médico para evitar cuellos de botella y quejas por largos tiempos de espera.
+
+### 3.3 Inteligencia Analítica: Dashboards Tri-Nivel (RBAC)
+En lugar de exportar hojas de cálculo y bloquear el navegador, la plataforma calcula la salud del negocio en milisegundos usando lógica de memorización matemática profunda (`useMemo`) en el Frontend y procesa la data a través de un **Enrutador Proxy de Roles**:
+*   **Rol Super Admin (La Arquitectura/Dueño del Software)**: Conoce la salud financiera del SaaS entero. Ve el MRR (Monthly Recurring Revenue) proyectado multiplicando las Clínicas Activas por el valor de su modelo de suscripción (Plan Pro/Enterprise), audita licencias pendientes de aprobación, y monitorea la latencia de microservicios.
+*   **Rol Admin de Clínica (Gerente Regional/Dueño de la Clínica)**: Su dashboard tritura y suma los datos de todas sus sucursales afiliadas. Muestra los "Leads Perdidos", calcula el **Win Rate General** de los asesores comerciales y pinta gráficos en barras de los "Tratamientos/Servicios más vendidos", segmentando el esfuerzo de marketing futuro.
+*   **Rol Asesor (El Empleado de Mostrador/Ventas)**: Un diseño hiper-táctico. Excluye por completo las distracciones gerenciales (Oculta números financieros). Le indica exclusivamente lo que exige su acción inmediata según su `sucursal_id` exacta: Cuántos leads nuevos tiene sin contactar ("Follow-Ups de Hoy"), cuántos pacientes hay en su sala de espera, y su listado de citas personales confirmadas. 
+
+### 3.4 Gobernanza, Seguridad Multi-Sucursal y Team Management
+*   **Aislamiento Geográfico (Row Level Security)**: Gracias a las políticas de seguridad subyacentes alojadas directamente en el núcleo de PostgreSQL, un Asesor asignado a la "Sucursal Miami" es matemáticamente incapaz (Incluso si hackeara las peticiones de red directas) de ver, buscar o mutar la información de los leads y pacientes que aterrizan en la "Sucursal Orlando". 
+*   **Team Management Avanzado**: Desde el Panel de Configuración de Equipo, los administradores pueden enviar invitaciones de correo, definir explícitamente el "Rol" en el piso (Asesor vs Manager) y anclar obligatoriamente a cada empleado a una `sucursal_id` específica.
+*   **Dual Sidebar Configuration (Settings Hub)**: Un Hub arquitectónico donde el Administrador muta su entorno operativo visual: Actualiza logotipos de la empresa (Capacidad máxima 2MB validados en cliente y servidor), renombra el Workspace corporativo, edita catálogos y zonas horarias.
+*   **Defensive UI (Pristine Form Tracking)**: Emplea algoritmos de validación en los formularios de ajustes, asegurando que el botón "Guardar" permanezca grisado/bloqueado si el usuario simplemente abrió la vista pero no tecleó una modificación real de datos (Estado Pristino), defendiendo a la base de datos de sobrecargas por llamadas de Guardado inútiles.
+
+---
+
+## 🧹 4. Certificación de Código (Garbage Collection)
 El repositorio opera en modalidad Grado Producción:
 - **Cero** Mock Data. Todo arreglo visual o variable quemada fue re-ensamblada para buscar `useQuery(supabase.from...)`.
 - **Cero** Variables huérfanas o importaciones muertas (ESLint 0 warnings).
