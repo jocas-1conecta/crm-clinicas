@@ -9,6 +9,7 @@ export const TeamManagement: React.FC = () => {
     const queryClient = useQueryClient()
     const [showModal, setShowModal] = useState(false)
     const [successMsg, setSuccessMsg] = useState('')
+    const [invitationLink, setInvitationLink] = useState('')
     const [searchTerm, setSearchTerm] = useState('')
     const [formData, setFormData] = useState({ name: '', email: '', role: 'Asesor_Sucursal', sucursal_id: '' })
 
@@ -50,13 +51,42 @@ export const TeamManagement: React.FC = () => {
         )
     }, [myTeam, searchTerm])
 
+    const inviteMutation = useMutation({
+        mutationFn: async () => {
+            if (!currentUser?.clinica_id || !currentUser?.id) throw new Error("Missing workspace context");
+            
+            const { data, error } = await supabase
+                .from('team_invitations')
+                .insert({
+                    clinica_id: currentUser.clinica_id,
+                    sucursal_id: formData.sucursal_id,
+                    email: formData.email,
+                    role: formData.role,
+                    created_by: currentUser.id
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            setShowModal(false)
+            // Construct the join link using window location
+            const baseUrl = window.location.origin;
+            const link = `${baseUrl}/join?token=${data.token}`;
+            setInvitationLink(link);
+            setSuccessMsg(`¡Invitación generada para ${formData.email}! Comparte el enlace seguro con ellos.`);
+            setFormData({ name: '', email: '', role: 'Asesor_Sucursal', sucursal_id: '' })
+        },
+        onError: (err: any) => {
+            setSuccessMsg(`Error: ${err.message || 'No se pudo crear la invitación'}`);
+        }
+    })
+
     const handleSave = () => {
         if (!formData.name || !formData.email || !formData.sucursal_id) return;
-        
-        setShowModal(false)
-        setSuccessMsg(`Invitación de acceso enviada a ${formData.email}`)
-        setTimeout(() => setSuccessMsg(''), 4000)
-        setFormData({ name: '', email: '', role: 'Asesor_Sucursal', sucursal_id: '' })
+        inviteMutation.mutate();
     }
 
     const toggleStatusMutation = useMutation({
@@ -112,8 +142,26 @@ export const TeamManagement: React.FC = () => {
             </div>
 
             {successMsg && (
-                <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl flex items-center space-x-3 border border-emerald-100 animate-in fade-in">
-                    <p className="text-sm font-medium">{successMsg}</p>
+                <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl flex flex-col space-y-2 border border-emerald-100 animate-in fade-in">
+                    <div className="flex items-center space-x-3">
+                        <p className="text-sm font-medium">{successMsg}</p>
+                    </div>
+                    {invitationLink && (
+                        <div className="mt-2 bg-white border border-emerald-200 p-3 rounded-lg flex items-center justify-between shadow-sm">
+                            <span className="text-sm font-mono text-gray-800 break-all">{invitationLink}</span>
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(invitationLink);
+                                    setSuccessMsg("¡Enlace copiado al portapapeles!");
+                                    setTimeout(() => setSuccessMsg(""), 3000);
+                                    setInvitationLink("");
+                                }}
+                                className="ml-4 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-md font-semibold transition-colors shrink-0"
+                            >
+                                Copiar Enlace
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -232,9 +280,10 @@ export const TeamManagement: React.FC = () => {
 
                             <button
                                 onClick={handleSave}
-                                className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl transition-colors mt-4"
+                                disabled={inviteMutation.isPending}
+                                className="w-full bg-clinical-600 hover:bg-clinical-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors mt-4"
                             >
-                                Enviar Invitación
+                                {inviteMutation.isPending ? 'Generando Enlace...' : 'Generar Enlace Seguro'}
                             </button>
                         </div>
                     </div>
