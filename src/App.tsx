@@ -7,6 +7,7 @@ import { Login } from './core/auth/Login'
 import { ModuleGuard } from './core/auth/ModuleGuard'
 import { ForgotPassword } from './core/auth/ForgotPassword'
 import { UpdatePassword } from './core/auth/UpdatePassword'
+import { OnboardingWizard } from './core/auth/OnboardingWizard'
 import { Profile } from './core/auth/Profile'
 import { SettingsLayout } from './core/settings/SettingsLayout'
 import { ProfileSettings } from './core/settings/ProfileSettings'
@@ -107,6 +108,7 @@ function App() {
                 {/* Identifier-First Auth Router */}
                 <Route path="/:slug/login" element={<Login />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/registro" element={<OnboardingWizard />} />
                 <Route path="/" element={<Login />} />
                 
                 {/* Fallback to Global Gateway if typing random string */}
