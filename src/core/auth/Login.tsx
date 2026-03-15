@@ -261,6 +261,16 @@ export const Login = () => {
                                         <span>{isLoading ? 'Buscando Entorno...' : 'Siguiente'}</span>
                                         {!isLoading && <LucideChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                                     </button>
+
+                                    {/* Sign Up Link */}
+                                    {isGlobalGateway && (
+                                        <div className="mt-8 text-center text-sm text-gray-500">
+                                            ¿No tienes un espacio de trabajo?{' '}
+                                            <Link to="/registro" className="font-semibold text-gray-900 hover:text-indigo-600 transition-colors">
+                                                Registra tu empresa
+                                            </Link>
+                                        </div>
+                                    )}
                                 </form>
                             )}
 
