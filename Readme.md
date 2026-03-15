@@ -105,7 +105,12 @@ En lugar de exportar hojas de cálculo y bloquear el navegador, la plataforma ca
 *   **Dual Sidebar Configuration (Settings Hub)**: Un Hub arquitectónico donde el Administrador muta su entorno operativo visual: Actualiza logotipos de la empresa (Capacidad máxima 2MB validados en cliente y servidor), renombra el Workspace corporativo, edita catálogos y zonas horarias.
 *   **Defensive UI (Pristine Form Tracking)**: Emplea algoritmos de validación en los formularios de ajustes, asegurando que el botón "Guardar" permanezca grisado/bloqueado si el usuario simplemente abrió la vista pero no tecleó una modificación real de datos (Estado Pristino), defendiendo a la base de datos de sobrecargas por llamadas de Guardado inútiles.
 
----
+### 3.5 Autenticación Empresarial (Home Realm Discovery)
+Inspirado en sistemas robustos como Microsoft 365 y Google Workspace, el sistema despacha el inicio de sesión ordinario en favor de una experiencia **"Identifier-First"** (De 2 pasos):
+*   **Paso 1 (Global Gateway)**: La ruta `/` expone un diseño corporativo neutro solicitando exclusivamente el correo del usuario.
+*   **Tenant Discovery (RPC Security Definer)**: Al hacer submit, una función RPC escrita directamente en PostgreSQL evade de forma controlada el blindaje RLS para buscar y devolver a qué empresa (`slug`) pertenece el correo, preservando la privacidad del padrón global de usuarios.
+*   **Paso 2 (Inyección de Marca)**: El gateway fuerza una Redirección Visual animada hacia la ruta privada de la clínica (`/:slug/login?email=xxx`). El formulario cambia, pre-rellena y bloquea el campo de correo, descarga el Logotipo corporativo y el color oficial de esa empresa, solicitando ahora únicamente la constraseña.
+
 
 ## 🧹 4. Certificación de Código (Garbage Collection)
 El repositorio opera en modalidad Grado Producción:

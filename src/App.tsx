@@ -104,9 +104,13 @@ function App() {
                 {['/olvide-mi-contrasena', '/:slug/olvide-mi-contrasena'].map(p => <Route key={p} path={p} element={<ForgotPassword />} />)}
                 {['/actualizar-contrasena', '/:slug/actualizar-contrasena'].map(p => <Route key={p} path={p} element={<UpdatePassword />} />)}
                 
-                {/* Default Login */}
-                <Route path="/:slug" element={<Login />} />
+                {/* Identifier-First Auth Router */}
+                <Route path="/:slug/login" element={<Login />} />
+                <Route path="/login" element={<Login />} />
                 <Route path="/" element={<Login />} />
+                
+                {/* Fallback to Global Gateway if typing random string */}
+                <Route path="/:slug" element={<Login />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         )

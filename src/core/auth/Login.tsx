@@ -1,27 +1,55 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
-import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock } from 'lucide-react'
+import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock, LucideBuilding } from 'lucide-react'
 
 export const Login = () => {
-    // URL Slug for the specific SaaS Tenant (ex: /rangelpereira)
+    // URL Slug for the specific SaaS Tenant (ex: /inmobiliaria-xyz/login)
     const { slug } = useParams<{ slug?: string }>()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
 
+    const initialEmail = searchParams.get('email') || ''
 
-    const [email, setEmail] = useState('')
+    const [email, setEmail] = useState(initialEmail)
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState('')
 
+    // Fallback: If no slug in URL, it's the Global Gateway (Step 1)
+    const isGlobalGateway = !slug
+
+    // UI steps: 1 = Email, 2 = Password
+    const [step, setStep] = useState<1 | 2>(!isGlobalGateway && initialEmail ? 2 : 1)
+
     // Custom Tenant Branding
-    const [tenantReady, setTenantReady] = useState(!slug) // Si no hay slug pasamos directo a 1Clinic
+    const [tenantReady, setTenantReady] = useState(isGlobalGateway) 
     const [tenantTheme, setTenantTheme] = useState<{ primary_color: string, logo_url: string } | null>(null)
     const [tenantName, setTenantName] = useState<string | null>(null)
 
+    // Sincroniza el step y datos cuando cambian las URLs sin desmontar React
+    useEffect(() => {
+        if (isGlobalGateway) {
+            setStep(1)
+            setPassword('')
+        } else {
+            const urlEmail = searchParams.get('email')
+            if (urlEmail) {
+                setEmail(urlEmail)
+                setStep(2)
+            } else {
+                setStep(1)
+            }
+        }
+    }, [slug, isGlobalGateway, searchParams])
+
     useEffect(() => {
         const fetchTenantBrand = async () => {
-            if (!slug) return;
+            if (isGlobalGateway) {
+                setTenantReady(true)
+                return;
+            }
             
             try {
                 const { data, error } = await supabase
@@ -30,186 +58,288 @@ export const Login = () => {
                     .eq('slug', slug)
                     .single()
                 
-                if (error) throw error;
-                if (data) {
-                    setTenantName(data.name)
-                    if (data.theme) {
-                        setTenantTheme(data.theme)
-                    }
+                if (error || !data) {
+                    // Slug not found. Fallback to gateway.
+                    navigate('/')
+                    return;
+                }
+                
+                setTenantName(data.name)
+                if (data.theme) {
+                    setTenantTheme(data.theme)
                 }
             } catch (err: any) {
-                console.error("Error cargando el branding de la clínica:", err)
+                console.error("Error cargando el branding del entorno:", err)
+                navigate('/')
             } finally {
                 setTenantReady(true)
             }
         }
         
         fetchTenantBrand()
-    }, [slug])
+    }, [slug, isGlobalGateway, navigate])
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleEmailSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setError('')
+        
+        const plainEmail = email.trim().toLowerCase()
+        if (!plainEmail) {
+            setError('Por favor ingresa un correo electrónico.')
+            return
+        }
+
+        setIsLoading(true)
+
+        if (isGlobalGateway) {
+            // Identifier-First: RPC to find Tenant
+            try {
+                const { data: foundSlug, error } = await supabase.rpc('get_tenant_slug_by_email', {
+                    user_email: plainEmail
+                })
+
+                if (error) throw error;
+
+                if (foundSlug) {
+                    // Navegar forzosamente inyectando el email. 
+                    // El effect arriba cambiará automáticamente a Step 2.
+                    navigate(`/${foundSlug}/login?email=${encodeURIComponent(plainEmail)}`)
+                } else {
+                    setError('No encontramos ninguna cuenta corporativa asociada a este correo.')
+                }
+            } catch (err: any) {
+                console.error("Ident Discovery Error:", err)
+                setError('Error al descubrir tu espacio de trabajo. Intenta de nuevo.')
+            } finally {
+                setIsLoading(false)
+            }
+        } else {
+            // Tenant Login Directo pero no pasaron ?email. 
+            // Avanzan al paso 2 dentro del mismo Tenant de forma segura.
+            setStep(2)
+            setIsLoading(false)
+        }
+    }
+
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
         setIsLoading(true)
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: email.trim().toLowerCase(),
                 password,
             })
 
-            if (error) {
-                setError(error.message)
+            if (authError) {
+                setError('Contraseña incorrecta o el usuario no existe en este servidor.')
                 setIsLoading(false)
                 return
             }
 
-            // Fallback en caso de que App.tsx tarde en reaccionar al onAuthStateChange
-            if (data.user) {
-                // El useEffect de App.tsx se encargará de hacer el fetch del profile
-                // y setear el currentUser real.
-            }
-
+            // Auth listener en App.tsx procesa el inicio de sesión real instantáneamente.
         } catch (err: any) {
-            setError(err.message || 'Error al iniciar sesión')
+            setError(err.message || 'Error grave de autenticación')
             setIsLoading(false)
+        }
+    }
+
+    const goBackToEmail = () => {
+        setPassword('')
+        setError('')
+        if (isGlobalGateway) {
+            setStep(1)
+        } else {
+            // "Cambiar cuenta" limpia todo y nos devuelve al gateway global
+            navigate('/')
         }
     }
 
     if (!tenantReady) {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-                <div className="w-12 h-12 border-4 border-clinical-200 border-t-clinical-600 rounded-full animate-spin"></div>
+                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
             </div>
         )
     }
 
+    // --- Dynamic Theming Computations ---
+    const primaryColor = isGlobalGateway ? '#0f172a' : (tenantTheme?.primary_color || '#0d9488')
+    const displayLogo = isGlobalGateway ? null : tenantTheme?.logo_url
+    const displayName = isGlobalGateway ? 'Global Workspace' : (tenantName || 'Plataforma SaaS')
+    const displaySubtitle = isGlobalGateway 
+        ? 'Ingresa tu correo electrónico corporativo. Te enrutaremos de forma segura a tu espacio de trabajo.'
+        : `Acceso protegido a la plataforma administrativa de ${tenantName}.`
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden max-w-5xl w-full flex flex-col md:flex-row h-[600px]">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden max-w-5xl w-full flex flex-col md:flex-row h-[600px] relative">
 
-                {/* Left Side - Brand & Visuals */}
+                {/* Left Side - Dynamic Brand & Visuals */}
                 <div 
-                    className="md:w-1/2 p-12 text-white flex flex-col justify-between relative overflow-hidden" 
-                    style={{ backgroundColor: tenantTheme?.primary_color || '#0d9488' }} // Fallback to clinical-600 logic
+                    className="md:w-1/2 p-12 text-white flex flex-col justify-between relative overflow-hidden transition-colors duration-700" 
+                    style={{ backgroundColor: primaryColor }}
                 >
-                    <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                        <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                            <path d="M0 100 C 20 0 50 0 100 100 Z" fill="white" />
-                        </svg>
-                    </div>
+                    {/* Soft background shape */}
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-80 h-80 bg-black opacity-15 rounded-full blur-3xl -ml-20 -mb-20"></div>
 
-                    <div className="relative z-10">
-                        {tenantTheme?.logo_url ? (
-                            <img src={tenantTheme.logo_url} alt={tenantName || 'Logo'} className="h-16 mb-8 object-contain" />
+                    <div className="relative z-10 animate-in fade-in duration-700">
+                        {displayLogo ? (
+                            <img src={displayLogo} alt={displayName} className="h-16 mb-8 object-contain drop-shadow-md" />
                         ) : (
-                            <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-sm">
-                                <LucideShieldCheck className="w-10 h-10" />
+                            <div className="bg-white/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-md border border-white/10 shadow-xl">
+                                {isGlobalGateway ? <LucideBuilding className="w-8 h-8 text-white" /> : <LucideShieldCheck className="w-8 h-8 text-white" />}
                             </div>
                         )}
-                        <h1 className="text-4xl font-bold mb-6 tracking-tight">
-                            {tenantName || '1Clinic SaaS'}
+                        <h1 className="text-4xl font-bold mb-6 tracking-tight drop-shadow-md">
+                            {displayName}
                         </h1>
-                        <p className="text-white/80 text-lg leading-relaxed max-w-sm">
-                            {slug && tenantName 
-                                ? `Acceso a la plataforma administrativa de ${tenantName}` 
-                                : 'El sistema inteligente de gestión multicéntrica para llevar tu red clínica al siguiente nivel.'}
+                        <p className="text-white/80 text-lg leading-relaxed max-w-sm font-light">
+                            {displaySubtitle}
                         </p>
                     </div>
 
-                    <div className="relative z-10 hidden md:block">
-                        <div className="flex items-center space-x-3 text-sm text-clinical-200">
-                            <LucideCheckCircle2 className="w-5 h-5 text-clinical-300" />
-                            <span>Control Total de Sucursales</span>
+                    <div className="relative z-10 hidden md:block opacity-90 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+                        <div className="flex items-center space-x-3 text-sm text-white border-l-2 border-emerald-400 pl-4 mb-4 bg-black/10 p-2.5 rounded-r-lg backdrop-blur-sm shadow-sm">
+                            <LucideCheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                            <span>Autenticación Empresarial Ruteada</span>
                         </div>
-                        <div className="flex items-center space-x-3 text-sm text-clinical-200 mt-2">
-                            <LucideCheckCircle2 className="w-5 h-5 text-clinical-300" />
-                            <span>Seguimiento de Leads en Tiempo Real</span>
+                        <div className="flex items-center space-x-3 text-sm text-white border-l-2 border-emerald-400 pl-4 bg-black/10 p-2.5 rounded-r-lg backdrop-blur-sm shadow-sm">
+                            <LucideCheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                            <span>Aislamiento Geográfico (Multi-Tenant)</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Right Side - Login Form */}
+                {/* Right Side - Discovery / Login Form */}
                 <div className="md:w-1/2 bg-white relative">
-                    <div className="h-full flex flex-col justify-center px-10 md:px-14 animate-in fade-in slide-in-from-right-8 duration-500">
-                        <div className="w-full max-w-sm mx-auto">
-                            <h2 className="text-3xl font-bold text-gray-900 mb-2">Bienvenido</h2>
-                            <p className="text-gray-500 mb-8">Inicia sesión con tu correo y contraseña.</p>
-
-                            <form onSubmit={handleLogin} className="space-y-5">
-                                {error && (
-                                    <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium">
-                                        {error}
+                    <div className="h-full flex flex-col justify-center px-10 md:px-14">
+                        <div className="w-full max-w-sm mx-auto relative overflow-hidden pb-4">
+                            
+                            {/* Step 1: Identifier Entry */}
+                            {step === 1 && (
+                                <form onSubmit={handleEmailSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Iniciar Sesión</h2>
+                                        <p className="text-gray-500 text-sm">Descubriremos tu espacio seguro de trabajo.</p>
                                     </div>
-                                )}
-                                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">
-                                        Correo Electrónico
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <LucideMail className="h-5 w-5 text-gray-400" />
+
+                                    {error && (
+                                        <div className="p-3.5 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100 flex items-center shadow-sm">
+                                            <span>{error}</span>
                                         </div>
-                                        <input
-                                            type="email"
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all"
-                                            placeholder="usuario@tuempresa.com"
-                                        />
-                                    </div>
-                                </div>
+                                    )}
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">
-                                        Contraseña
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <LucideLock className="h-5 w-5 text-gray-400" />
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 ml-1">
+                                            Correo Electrónico Corporativo
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <LucideMail className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                            <input
+                                                type="email"
+                                                required
+                                                autoFocus
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition-all shadow-sm"
+                                                placeholder="usuario@empresa.com"
+                                            />
                                         </div>
-                                        <input
-                                            type="password"
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all"
-                                            placeholder="••••••••"
-                                        />
                                     </div>
-                                </div>
 
-                                <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center">
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        style={{ backgroundColor: primaryColor }}
+                                        className="w-full flex items-center justify-center space-x-2 text-white font-medium py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-4 group"
+                                    >
+                                        <span>{isLoading ? 'Buscando Entorno...' : 'Siguiente'}</span>
+                                        {!isLoading && <LucideChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+                                    </button>
+                                </form>
+                            )}
+
+                            {/* Step 2: Password Entry */}
+                            {step === 2 && (
+                                <form onSubmit={handlePasswordSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Bienvenido</h2>
+                                        <p className="text-gray-500 text-sm">Ingresa tu contraseña para acceder.</p>
+                                    </div>
+
+                                    {error && (
+                                        <div className="p-3.5 bg-red-50 text-red-700 rounded-xl text-sm font-medium border border-red-100 flex items-center shadow-sm">
+                                            <span>{error}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Identity Locked Pill */}
+                                    <div className="p-1 px-1.5 bg-indigo-50/50 border border-indigo-100/80 rounded-2xl flex items-center justify-between transition-colors shadow-sm mb-2">
+                                        <div className="flex items-center space-x-3 px-3 overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-white border border-indigo-100 flex items-center justify-center shrink-0 shadow-sm text-indigo-500">
+                                                <LucideMail className="w-4 h-4" />
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-700 truncate">{email}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={goBackToEmail}
+                                            className="text-xs font-semibold text-gray-600 hover:text-indigo-600 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm transition-colors shrink-0 m-1"
+                                        >
+                                            Cambiar
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2 ml-1">
+                                            <label className="block text-sm font-medium text-gray-700">Contraseña</label>
+                                            <Link to={slug ? `/${slug}/olvide-mi-contrasena` : '/olvide-mi-contrasena'} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                                                ¿Olvidaste tu contraseña?
+                                            </Link>
+                                        </div>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <LucideLock className="h-5 w-5 text-gray-400" />
+                                            </div>
+                                            <input
+                                                type="password"
+                                                required
+                                                autoFocus
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white outline-none transition-all shadow-sm"
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center mt-3 pl-1">
                                         <input
                                             id="remember-me"
-                                            name="remember-me"
                                             type="checkbox"
-                                            className="h-4 w-4 text-clinical-600 focus:ring-clinical-500 border-gray-300 rounded cursor-pointer"
+                                            className="h-4.5 w-4.5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
                                         />
                                         <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                                            Recordarme
+                                            Mantener sesión iniciada
                                         </label>
                                     </div>
-                                    <div className="text-sm">
-                                        <Link to={slug ? `/${slug}/olvide-mi-contrasena` : '/olvide-mi-contrasena'} className="font-medium text-clinical-600 hover:text-clinical-500">
-                                            ¿Olvidaste tu contraseña?
-                                        </Link>
-                                    </div>
-                                </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    style={{ backgroundColor: tenantTheme?.primary_color || '#0d9488' }}
-                                    className="w-full flex items-center justify-center space-x-2 text-white font-medium py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-4 group"
-                                >
-                                    <span>{isLoading ? 'Iniciando sesión...' : 'Ingresar'}</span>
-                                    {!isLoading && <LucideChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-                                </button>
-                            </form>
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        style={{ backgroundColor: primaryColor }}
+                                        className="w-full flex items-center justify-center space-x-2 text-white font-medium py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none mt-6 group"
+                                    >
+                                        <span>{isLoading ? 'Conectando...' : 'Entrar al Workspace'}</span>
+                                        {!isLoading && <LucideChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
+                                    </button>
+                                </form>
+                            )}
 
                         </div>
                     </div>
