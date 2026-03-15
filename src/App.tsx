@@ -74,7 +74,7 @@ function App() {
                     id: data.id,
                     name: data.name,
                     email: data.email,
-                    role: data.role as 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal',
+                    role: data.role as 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal',
                     avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${data.name}`,
                     clinica_id: data.clinica_id,
                     sucursal_id: data.sucursal_id,
@@ -121,6 +121,7 @@ function App() {
     // Default redirects based on role
     const getRoleFallback = () => {
         switch(currentUser.role) {
+            case 'Platform_Owner': return '/clinicas';
             case 'Super_Admin': return '/dashboard';
             case 'Admin_Clinica': return '/dashboard';
             case 'Asesor_Sucursal': return '/dashboard';
@@ -134,12 +135,12 @@ function App() {
             <Suspense fallback={<div className="p-10 flex justify-center text-gray-400">Cargando módulo...</div>}>
                 <Routes>
                     {/* Dashboards (Universal Proxy) */}
-                    {(currentUser.role === 'Super_Admin' || currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && 
+                    {(currentUser.role === 'Platform_Owner' || currentUser.role === 'Super_Admin' || currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && 
                         ['/dashboard', '/:slug/dashboard'].map(p => <Route key={p} path={p} element={<RootDashboard />} />)
                     }
 
-                    {/* Super Admin Routes */}
-                    {currentUser.role === 'Super_Admin' && ['/clinicas', '/:slug/clinicas'].map(p => <Route key={p} path={p} element={<ClinicsManagement />} />)}
+                    {/* Platform Owner Routes (Global SaaS) */}
+                    {currentUser.role === 'Platform_Owner' && ['/clinicas', '/:slug/clinicas'].map(p => <Route key={p} path={p} element={<ClinicsManagement />} />)}
 
                     {/* Clinic Admin Routes */}
                     {currentUser.role === 'Admin_Clinica' && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}

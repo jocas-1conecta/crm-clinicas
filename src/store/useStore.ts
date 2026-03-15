@@ -13,7 +13,7 @@ export interface User {
     id: string;
     name: string;
     email: string;
-    role: 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal';
+    role: 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal';
     avatarUrl: string;
     clinica_id?: string;
     tenant_id?: string; // Generic abstraction

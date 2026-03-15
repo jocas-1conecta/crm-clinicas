@@ -9,6 +9,7 @@ export const Profile = () => {
     if (!currentUser) return null;
 
     const roleLabel = {
+        'Platform_Owner': 'SaaS Founder',
         'Super_Admin': 'Super Administrador',
         'Admin_Clinica': 'Director de Clínica',
         'Asesor_Sucursal': 'Asesor Comercial'

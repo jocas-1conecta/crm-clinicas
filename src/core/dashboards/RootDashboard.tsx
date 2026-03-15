@@ -27,8 +27,8 @@ export const RootDashboard: React.FC = () => {
 
     return (
         <Suspense fallback={<DashboardSkeleton />}>
-            {currentUser.role === 'Super_Admin' && <SuperAdminDashboard />}
-            {currentUser.role === 'Admin_Clinica' && <AdminClinicaDashboard />}
+            {currentUser.role === 'Platform_Owner' && <SuperAdminDashboard />}
+            {(currentUser.role === 'Super_Admin' || currentUser.role === 'Admin_Clinica') && <AdminClinicaDashboard />}
             {currentUser.role === 'Asesor_Sucursal' && <AsesorSucursalDashboard />}
         </Suspense>
     )

@@ -28,12 +28,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     // Role Helper
     const roleLabel = {
+        'Platform_Owner': 'SaaS Founder',
         'Super_Admin': 'Super Admin',
         'Admin_Clinica': 'Director Clínica',
         'Asesor_Sucursal': 'Asesor Comercial'
     }[currentUser?.role || 'Asesor_Sucursal'];
 
     const roleColor = {
+        'Platform_Owner': 'bg-black text-yellow-400',
         'Super_Admin': 'bg-purple-100 text-purple-700',
         'Admin_Clinica': 'bg-blue-100 text-blue-700',
         'Asesor_Sucursal': 'bg-green-100 text-green-700'
@@ -44,10 +46,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     const navItems = [
         // Shared
-        { name: 'Dashboard', path: `${slugPrefix}/dashboard`, icon: LucideLayoutDashboard, roles: ['Super_Admin', 'Admin_Clinica'] },
+        { name: 'Dashboard', path: `${slugPrefix}/dashboard`, icon: LucideLayoutDashboard, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'] },
 
-        // Super Admin
-        { name: 'Clinicas', path: `${slugPrefix}/clinicas`, icon: LucideBuilding, roles: ['Super_Admin'] },
+        // Platform Owner
+        { name: 'Clinicas', path: `/clinicas`, icon: LucideBuilding, roles: ['Platform_Owner'] },
 
         // Clinic Admin Specific
         { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica'] },
@@ -66,10 +68,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         ] : []),
 
         // Analytics (ALL ROLES)
-        { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Admin_Clinica'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Admin_Clinica'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)
@@ -151,12 +153,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         <div className="hidden md:flex flex-col items-end mr-4">
                             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                                 {
-                                    currentUser?.role === 'Super_Admin' ? 'Vista Global' :
+                                    currentUser?.role === 'Platform_Owner' ? 'Plataforma Global' :
+                                    currentUser?.role === 'Super_Admin' ? 'Vista Consolidada Tenant' :
                                         currentUser?.role === 'Admin_Clinica' ? 'Vista Administrativa' :
                                             'Vista de Sucursal'
                                 }
                             </span>
-                            {currentUser?.role === 'Admin_Clinica' && (
+                            {(currentUser?.role === 'Admin_Clinica' || currentUser?.role === 'Super_Admin') && (
                                 <div className="flex items-center space-x-1 text-gray-500">
                                     <LucideBuilding className="w-3 h-3" />
                                     <span className="text-xs">Sede Administrativa</span>
