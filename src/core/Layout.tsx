@@ -50,27 +50,27 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Platform Owner
         { name: 'Clinicas', path: `/clinicas`, icon: LucideBuilding, roles: ['Platform_Owner'] },
 
-        // Clinic Admin Specific
-        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica'] },
-        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica'] },
-        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica'] },
+        // Clinic Admin & Super Admin Specific
+        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica', 'Super_Admin'] },
+        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica', 'Super_Admin'] },
+        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica', 'Super_Admin'] },
 
         // Advisor Specific
         { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },
 
-        // Operating Roles (Admin & Asesor)
-        { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-        { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+        // Operating Roles (Super Admin, Admin & Asesor)
+        { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+        { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ...(hasClinicModule ? [
-            { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
-            { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Asesor_Sucursal'] },
+            { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+            { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ] : []),
 
         // Analytics (ALL ROLES)
         { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
         { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Admin_Clinica'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Admin_Clinica', 'Super_Admin'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)

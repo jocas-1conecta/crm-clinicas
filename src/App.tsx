@@ -164,20 +164,20 @@ function App() {
                     {/* Platform Owner Routes (Global SaaS) */}
                     {currentUser.role === 'Platform_Owner' && ['/clinicas', '/:slug/clinicas'].map(p => <Route key={p} path={p} element={<ClinicsManagement />} />)}
 
-                    {/* Clinic Admin Routes */}
-                    {currentUser.role === 'Admin_Clinica' && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
-                    {currentUser.role === 'Admin_Clinica' && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
-                    {currentUser.role === 'Admin_Clinica' && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
-                    {currentUser.role === 'Admin_Clinica' && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
+                    {/* Clinic Admin & Super Admin Routes */}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
 
-                    {/* Operation Roles (Admin & Asesor) */}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && ['/tareas', '/:slug/tareas'].map(p => <Route key={p} path={p} element={<CalendarTasks />} />)}
+                    {/* Operation Roles (Super Admin, Admin & Asesor) */}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/tareas', '/:slug/tareas'].map(p => <Route key={p} path={p} element={<CalendarTasks />} />)}
 
                     {/* Protected Clinic Modules */}
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && ['/citas', '/:slug/citas'].map(p => <Route key={p} path={p} element={<AppointmentsPipeline />} />)}
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && ['/pacientes', '/:slug/pacientes'].map(p => <Route key={p} path={p} element={currentUser.role === 'Admin_Clinica' ? <Patients /> : <PatientsDirectory />} />)}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/citas', '/:slug/citas'].map(p => <Route key={p} path={p} element={<AppointmentsPipeline />} />)}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/pacientes', '/:slug/pacientes'].map(p => <Route key={p} path={p} element={currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />} />)}
                     </Route>
 
                     {/* Universal (Needs Login o Token Temporal) */}
