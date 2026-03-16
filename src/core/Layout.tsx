@@ -11,7 +11,6 @@ import {
     LucideLogOut,
     LucideShieldCheck,
     LucideMenu,
-    LucideBell,
     LucideBuilding,
     LucideMapPin,
     LucideBriefcase,
@@ -167,10 +166,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             )}
                         </div>
 
-                        <button className="relative text-gray-400 hover:text-gray-600 transition-colors">
-                            <LucideBell className="w-6 h-6" />
-                            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                        </button>
 
                         <Link to={`${slugPrefix}/configuracion/perfil`} className="flex items-center space-x-4 pl-6 border-l border-gray-100 group cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
                             <div className="text-right">
