@@ -60,6 +60,7 @@ export const TeamManagement: React.FC = () => {
                 .insert({
                     clinica_id: currentUser.clinica_id,
                     sucursal_id: formData.sucursal_id,
+                    name: formData.name,
                     email: formData.email,
                     role: formData.role,
                     created_by: currentUser.id

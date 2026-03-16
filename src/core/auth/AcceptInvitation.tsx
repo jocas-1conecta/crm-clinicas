@@ -11,7 +11,8 @@ export const AcceptInvitation = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [invitationData, setInvitationData] = useState<{ email: string } | null>(null);
+    const [invitationData, setInvitationData] = useState<{ email: string, name: string } | null>(null);
+    const [isExistingUser, setIsExistingUser] = useState(false);
     const [password, setPassword] = useState('');
 
     useEffect(() => {
@@ -23,27 +24,16 @@ export const AcceptInvitation = () => {
 
         const verifyToken = async () => {
             try {
-                // Fetch invitation details
-                // This relies on the "Public can read by token" RLS policy
-                const { data, error } = await supabase
-                    .from('team_invitations')
-                    .select('email, used, expires_at')
-                    .eq('token', token)
-                    .single();
+                // Fetch invitation details securely using RPC
+                const { data, error } = await supabase.rpc('verify_team_invitation', {
+                    invitation_token: token
+                });
 
-                if (error || !data) {
-                    throw new Error("La invitación es inválida o no existe.");
+                if (error || !data || !data.valid) {
+                    throw new Error(error?.message || "La invitación es inválida, ha expirado o ya fue utilizada.");
                 }
 
-                if (data.used) {
-                    throw new Error("Esta invitación ya fue utilizada.");
-                }
-
-                if (new Date(data.expires_at) < new Date()) {
-                    throw new Error("Esta invitación ha expirado.");
-                }
-
-                setInvitationData({ email: data.email });
+                setInvitationData({ email: data.email, name: data.name });
             } catch (err: any) {
                 setError(err.message || "Error al verificar la invitación.");
             } finally {
@@ -65,26 +55,29 @@ export const AcceptInvitation = () => {
         setError(null);
 
         try {
-            // 1. Attempt to Sign Up
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email: invitationData!.email,
-                password: password,
-            });
+            if (isExistingUser) {
+                // Login existing user
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: invitationData!.email,
+                    password: password
+                });
+                if (signInError) throw new Error("Contraseña incorrecta. Por favor intenta de nuevo.");
+            } else {
+                // 1. Attempt to Sign Up
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                    email: invitationData!.email,
+                    password: password,
+                    options: { data: { name: invitationData!.name } }
+                });
 
-            if (signUpError) {
-                // If user already exists, Supabase throws an error.
-                // In a perfect system, we'd handle SignIn here, but for MVP we catch the standard error:
-                if (signUpError.message.includes('already registered')) {
-                     // Try logging in instead
-                     const { error: signInError } = await supabase.auth.signInWithPassword({
-                         email: invitationData!.email,
-                         password: password
-                     });
-                     if (signInError) {
-                         throw new Error("El usuario ya existe, pero la contraseña es incorrecta. Inicia sesión normalmente primero.");
-                     }
-                } else {
-                    throw signUpError;
+                if (signUpError) {
+                    if (signUpError.message.includes('already registered')) {
+                        setIsExistingUser(true);
+                        setPassword('');
+                        throw new Error("Ya tienes una cuenta con este correo. Hemos modificado el formulario para que verifiques tu contraseña actual.");
+                    } else {
+                        throw signUpError;
+                    }
                 }
             }
 
@@ -144,7 +137,7 @@ export const AcceptInvitation = () => {
                     </div>
                 </div>
                 <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 border-none">
-                    Únete a tu equipo
+                    {invitationData ? `Hola, ${invitationData.name}` : 'Únete a tu equipo'}
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
                     Estás siendo invitado para colaborar en 1Clinic.
@@ -170,7 +163,7 @@ export const AcceptInvitation = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700">
-                                Crea tu Contraseña
+                                {isExistingUser ? 'Ingresa tu Contraseña Actual' : 'Crea tu Contraseña'}
                             </label>
                             <div className="mt-1">
                                 <input
@@ -198,10 +191,10 @@ export const AcceptInvitation = () => {
                             >
                                 {isSubmitting ? (
                                     <span className="flex items-center">
-                                        <LucideLoader2 className="w-4 h-4 mr-2 animate-spin" /> Creando Cuenta...
+                                        <LucideLoader2 className="w-4 h-4 mr-2 animate-spin" /> {isExistingUser ? 'Verificando...' : 'Creando Cuenta...'}
                                     </span>
                                 ) : (
-                                    'Aceptar Invitación'
+                                    isExistingUser ? 'Iniciar Sesión y Aceptar' : 'Crear Cuenta y Aceptar'
                                 )}
                             </button>
                         </div>
