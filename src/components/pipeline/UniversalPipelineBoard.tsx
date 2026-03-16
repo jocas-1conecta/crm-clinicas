@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
+import { LeadDetail } from '../../core/leads/LeadDetail'
 import { LucidePhone, LucideMessageCircle, LucideArrowRight, LucideCheck, LucideAlertTriangle, LucideClock, LucideX, LucideUser, LucideCalendar } from 'lucide-react'
 
 export interface UniversalPipelineBoardProps {
@@ -21,6 +22,7 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
     const [gatekeepingModal, setGatekeepingModal] = useState<{ record: any, nextStage: any, rules: string[] } | null>(null)
     const [gatekeepingForm, setGatekeepingForm] = useState<any>({})
     const [prioritizeSLA, setPrioritizeSLA] = useState(false)
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
     const { data: stages = [], isLoading: loadingStages } = useQuery({
         queryKey: ['pipeline_stages', clinicaId, boardType],
@@ -195,6 +197,7 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                             convertLeadToPatient={(r: any) => convertLeadMutation.mutate(r)} 
                             prioritizeSLA={prioritizeSLA}
                             boardType={boardType}
+                            onCardClick={(id: string) => boardType === 'leads' ? setSelectedLeadId(id) : null}
                         />
                     </div>
                 ))}
@@ -283,11 +286,16 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                     </div>
                 </div>
             )}
+
+            {/* Lead Detail Modal */}
+            {selectedLeadId && boardType === 'leads' && (
+                <LeadDetail leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} />
+            )}
         </div>
     )
 }
 
-const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatient, prioritizeSLA, boardType }: { records: any[], col: any, substages: any[], handleMove: any, convertLeadToPatient: any, prioritizeSLA: boolean, boardType: string }) => {
+const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatient, prioritizeSLA, boardType, onCardClick }: { records: any[], col: any, substages: any[], handleMove: any, convertLeadToPatient: any, prioritizeSLA: boolean, boardType: string, onCardClick: (id: string) => void }) => {
     const parentRef = useRef<HTMLDivElement>(null)
 
     const sortedRecords = useMemo(() => {
@@ -344,6 +352,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                     return (
                         <div
                             key={record.id}
+                            onClick={() => onCardClick(record.id)}
                             style={{
                                 position: 'absolute',
                                 top: 0,
@@ -352,7 +361,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                                 height: `${virtualRow.size - 12}px`, 
                                 transform: `translateY(${virtualRow.start}px)`,
                             }}
-                            className={`bg-white p-4 rounded-xl shadow-sm border ${isStagnant ? 'border-red-400 shadow-red-100/50' : 'border-gray-100'} hover:shadow-md transition-shadow flex flex-col`}
+                            className={`bg-white p-4 rounded-xl shadow-sm border ${isStagnant ? 'border-red-400 shadow-red-100/50' : 'border-gray-100'} hover:shadow-md transition-shadow flex flex-col cursor-pointer`}
                         >
                             {isStagnant && (
                                 <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg" title="¡SLA Vencido! Estancado">
@@ -403,7 +412,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                             <div className="flex gap-2 pt-3 border-t border-gray-50 mt-auto">
                                 {col.resolution_type === 'open' && (
                                     <button
-                                        onClick={() => handleMove(record)}
+                                        onClick={(e) => { e.stopPropagation(); handleMove(record); }}
                                         className="flex-1 py-1.5 bg-gray-50 hover:bg-clinical-50 border border-gray-100 text-gray-600 hover:text-clinical-600 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                                     >
                                         <span>Avanzar</span>
@@ -413,7 +422,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
 
                                 {col.resolution_type === 'won' && boardType === 'leads' && (
                                     <button
-                                        onClick={() => convertLeadToPatient(record)}
+                                        onClick={(e) => { e.stopPropagation(); convertLeadToPatient(record); }}
                                         className="flex-1 py-1.5 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                                     >
                                         <LucideCheck className="w-3.5 h-3.5" />

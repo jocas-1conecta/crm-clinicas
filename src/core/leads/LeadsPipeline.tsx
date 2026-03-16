@@ -7,16 +7,24 @@ import { UniversalPipelineBoard } from '../../components/pipeline/UniversalPipel
 export const LeadsPipeline = () => {
     const { currentUser } = useStore()
     const branchId = currentUser?.sucursal_id
+    const clinicaId = currentUser?.clinica_id
 
     const { data: dbLeads = [], isLoading: loadingLeads } = useQuery({
-        queryKey: ['leads', branchId],
+        queryKey: ['leads', branchId || clinicaId],
         queryFn: async () => {
-            if (!branchId) return [];
-            const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
-            if (error) throw error;
-            return data;
+            // Super_Admin has no sucursal_id — query all leads for their clinic instead
+            if (branchId) {
+                const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+                if (error) throw error;
+                return data;
+            } else if (clinicaId) {
+                const { data, error } = await supabase.from('leads').select('*').eq('clinica_id', clinicaId);
+                if (error) throw error;
+                return data;
+            }
+            return [];
         },
-        enabled: !!branchId,
+        enabled: !!(branchId || clinicaId),
     })
 
     if (loadingLeads) {
@@ -28,7 +36,7 @@ export const LeadsPipeline = () => {
             boardType="leads" 
             tableName="leads" 
             records={dbLeads} 
-            queryKeyToInvalidate={['leads', branchId]} 
+            queryKeyToInvalidate={['leads', branchId || clinicaId]} 
         />
     )
 }
