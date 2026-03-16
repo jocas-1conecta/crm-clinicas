@@ -101,9 +101,13 @@ export const Login = () => {
                 if (error) throw error;
 
                 if (foundSlug) {
-                    // Navegar forzosamente inyectando el email. 
-                    // El effect arriba cambiará automáticamente a Step 2.
-                    navigate(`/${foundSlug}/login?email=${encodeURIComponent(plainEmail)}`)
+                    if (foundSlug === 'system') {
+                         // Es el Platform Owner, lo enrutamos al login global inyectando el email
+                         setStep(2);
+                    } else {
+                         // Navegar forzosamente inyectando el email al tenant. 
+                         navigate(`/${foundSlug}/login?email=${encodeURIComponent(plainEmail)}`)
+                    }
                 } else {
                     setError('No encontramos ninguna cuenta corporativa asociada a este correo.')
                 }
