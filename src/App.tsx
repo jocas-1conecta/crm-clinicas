@@ -62,27 +62,51 @@ function App() {
 
     const fetchProfileAndSetUser = async (user: any) => {
         try {
+            // Step 1: Fetch the profile WITHOUT joining clinicas.
+            // This avoids the infinite RLS recursion for Platform_Owner who has no clinic.
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*, clinicas ( slug, active_modules )')
+                .select('*')
                 .eq('id', user.id)
                 .single()
 
             if (error) {
                 console.error("Error fetching profile:", error)
-            } else if (data) {
-                setCurrentUser({
-                    id: data.id,
-                    name: data.name,
-                    email: data.email,
-                    role: data.role as 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal',
-                    avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${data.name}`,
-                    clinica_id: data.clinica_id,
-                    sucursal_id: data.sucursal_id,
-                    clinica_slug: data.clinicas?.slug,
-                    active_modules: data.clinicas?.active_modules || []
-                })
+                setIsAuthLoading(false)
+                return
             }
+
+            if (!data) {
+                setIsAuthLoading(false)
+                return
+            }
+
+            // Step 2: If user belongs to a clinic, fetch slug and modules separately.
+            let clinica_slug: string | undefined = undefined
+            let active_modules: string[] = []
+
+            if (data.clinica_id) {
+                const { data: clinicData } = await supabase
+                    .from('clinicas')
+                    .select('slug, active_modules')
+                    .eq('id', data.clinica_id)
+                    .single()
+                
+                clinica_slug = clinicData?.slug
+                active_modules = clinicData?.active_modules || []
+            }
+
+            setCurrentUser({
+                id: data.id,
+                name: data.name,
+                email: data.email,
+                role: data.role as 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal',
+                avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${data.name}`,
+                clinica_id: data.clinica_id,
+                sucursal_id: data.sucursal_id,
+                clinica_slug,
+                active_modules
+            })
         } catch (err) {
             console.error("Error setting user:", err)
         } finally {
