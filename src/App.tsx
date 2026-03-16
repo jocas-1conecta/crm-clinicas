@@ -62,13 +62,9 @@ function App() {
 
     const fetchProfileAndSetUser = async (user: any) => {
         try {
-            // Step 1: Fetch the profile WITHOUT joining clinicas.
-            // This avoids the infinite RLS recursion for Platform_Owner who has no clinic.
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single()
+            // Use the SECURITY DEFINER RPC to bypass all RLS policies.
+            // This prevents infinite recursion during login for all roles.
+            const { data, error } = await supabase.rpc('get_my_profile')
 
             if (error) {
                 console.error("Error fetching profile:", error)
@@ -81,7 +77,7 @@ function App() {
                 return
             }
 
-            // Step 2: If user belongs to a clinic, fetch slug and modules separately.
+            // Only fetch clinic data if user belongs to a clinic (Platform Owner has none)
             let clinica_slug: string | undefined = undefined
             let active_modules: string[] = []
 
@@ -91,7 +87,7 @@ function App() {
                     .select('slug, active_modules')
                     .eq('id', data.clinica_id)
                     .single()
-                
+
                 clinica_slug = clinicData?.slug
                 active_modules = clinicData?.active_modules || []
             }
