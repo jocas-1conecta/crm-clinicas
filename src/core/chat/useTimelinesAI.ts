@@ -50,7 +50,7 @@ export function useChatRealtime(chatId: string | null) {
                     table: 'chat_webhook_events',
                     filter: `chat_id=eq.${chatId}`,
                 },
-                () => {
+                (payload) => {
                     // Immediately refresh messages when a real-time event arrives
                     queryClient.invalidateQueries({
                         queryKey: ['timelines_messages', apiKey, chatId],
@@ -59,6 +59,12 @@ export function useChatRealtime(chatId: string | null) {
                     queryClient.invalidateQueries({
                         queryKey: ['timelines_chats'],
                     })
+
+                    // Play a soft notification sound only for incoming messages
+                    const eventType = (payload?.new as Record<string, unknown>)?.event_type
+                    if (eventType === 'message:received:new') {
+                        playNotificationSound()
+                    }
                 }
             )
             .subscribe()
@@ -67,6 +73,30 @@ export function useChatRealtime(chatId: string | null) {
             supabase.removeChannel(channel)
         }
     }, [chatId, apiKey, queryClient])
+}
+
+/** Play a soft two-tone notification using the Web Audio API */
+function playNotificationSound() {
+    try {
+        const ctx = new AudioContext()
+        const notes = [880, 1100] // A5 → C#6 (pleasant two-tone chime)
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.type = 'sine'
+            osc.frequency.value = freq
+            const start = ctx.currentTime + i * 0.12
+            gain.gain.setValueAtTime(0, start)
+            gain.gain.linearRampToValueAtTime(0.18, start + 0.02)
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35)
+            osc.start(start)
+            osc.stop(start + 0.35)
+        })
+    } catch {
+        // AudioContext blocked or not supported — silently ignore
+    }
 }
 
 /** Hook to fetch and paginate chats with filters */
