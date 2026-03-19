@@ -23,17 +23,64 @@ function useApiKey() {
     })
 }
 
-/** Fetch all chats from Timelines AI */
-export function useChats() {
-    const { data: apiKey } = useApiKey()
+import { useState, useCallback } from 'react'
 
-    return useQuery({
-        queryKey: ['timelines_chats', apiKey],
-        queryFn: () => api.getChats(apiKey!),
+/** Hook to fetch and paginate chats with filters */
+export function useChats(options: {
+    status?: api.ChatStatusFilter
+    chatType?: api.ChatTypeFilter
+} = {}) {
+    const { data: apiKey } = useApiKey()
+    const [page, setPage] = useState(1)
+    const [accumulatedChats, setAccumulatedChats] = useState<api.TimelinesChat[]>([])
+    const [hasMore, setHasMore] = useState(false)
+
+    const queryKey = ['timelines_chats', apiKey, options.status, options.chatType, page]
+
+    const query = useQuery({
+        queryKey,
+        queryFn: async () => {
+            const result = await api.getChats(apiKey!, {
+                status: options.status,
+                chatType: options.chatType,
+                page,
+            })
+            setHasMore(result.hasMore)
+            if (page === 1) {
+                setAccumulatedChats(result.chats)
+            } else {
+                setAccumulatedChats(prev => {
+                    // Merge: avoid duplicates by id
+                    const existingIds = new Set(prev.map(c => c.id))
+                    const newChats = result.chats.filter(c => !existingIds.has(c.id))
+                    return [...prev, ...newChats]
+                })
+            }
+            return result
+        },
         enabled: !!apiKey,
-        refetchInterval: 60_000, // Poll every 60s
+        refetchInterval: 60_000,
         retry: 1,
     })
+
+    const loadMore = useCallback(() => {
+        if (hasMore && !query.isFetching) setPage(p => p + 1)
+    }, [hasMore, query.isFetching])
+
+    // Reset to page 1 when filters change
+    const resetAndRefetch = useCallback(() => {
+        setPage(1)
+        setAccumulatedChats([])
+        setHasMore(false)
+    }, [])
+
+    return {
+        ...query,
+        data: accumulatedChats,
+        hasMore,
+        loadMore,
+        resetAndRefetch,
+    }
 }
 
 /** Fetch messages for a specific chat */

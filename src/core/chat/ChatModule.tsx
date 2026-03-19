@@ -54,6 +54,18 @@ const EmptyState = ({ icon: Icon, title, subtitle, action }: {
 
 // ─── Chat List Panel ─────────────────────────────────────────────────────────
 
+const STATUS_TABS = [
+    { key: 'all',    label: 'Todos' },
+    { key: 'open',   label: 'Abiertos' },
+    { key: 'closed', label: 'Cerrados' },
+] as const
+
+const TYPE_PILLS = [
+    { key: 'all',    label: 'Todos' },
+    { key: 'direct', label: 'Directos' },
+    { key: 'group',  label: 'Grupos' },
+] as const
+
 const ChatListPanel = ({
     chats,
     selectedId,
@@ -62,6 +74,12 @@ const ChatListPanel = ({
     isError,
     onRefresh,
     slugPrefix,
+    hasMore,
+    onLoadMore,
+    statusFilter,
+    typeFilter,
+    onStatusChange,
+    onTypeChange,
 }: {
     chats: TimelinesChat[]
     selectedId: string | null
@@ -70,6 +88,12 @@ const ChatListPanel = ({
     isError: boolean
     onRefresh: () => void
     slugPrefix: string
+    hasMore: boolean
+    onLoadMore: () => void
+    statusFilter: 'all' | 'open' | 'closed'
+    typeFilter: 'all' | 'direct' | 'group'
+    onStatusChange: (v: 'all' | 'open' | 'closed') => void
+    onTypeChange: (v: 'all' | 'direct' | 'group') => void
 }) => {
     const [search, setSearch] = useState('')
 
@@ -81,8 +105,8 @@ const ChatListPanel = ({
     return (
         <div className="w-80 flex flex-col bg-[#1a1f2e] text-white border-r border-white/5 shrink-0">
             {/* Header */}
-            <div className="px-5 py-5 border-b border-white/10">
-                <div className="flex items-center justify-between mb-4">
+            <div className="px-5 pt-5 pb-3 border-b border-white/10">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
                             <LucideMessageSquare className="w-4 h-4 text-white" />
@@ -99,7 +123,7 @@ const ChatListPanel = ({
                 </div>
 
                 {/* Search */}
-                <div className="relative">
+                <div className="relative mb-3">
                     <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
                         type="text"
@@ -108,6 +132,40 @@ const ChatListPanel = ({
                         onChange={e => setSearch(e.target.value)}
                         className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500 transition-all"
                     />
+                </div>
+
+                {/* Status tabs: Todos / Abiertos / Cerrados */}
+                <div className="flex gap-1 mb-2">
+                    {STATUS_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => onStatusChange(tab.key)}
+                            className={`flex-1 text-xs py-1.5 rounded-lg font-medium transition-colors ${
+                                statusFilter === tab.key
+                                    ? 'bg-green-500 text-white'
+                                    : 'text-gray-400 hover:bg-white/10'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Type pills: Todos / Directos / Grupos */}
+                <div className="flex gap-1">
+                    {TYPE_PILLS.map(pill => (
+                        <button
+                            key={pill.key}
+                            onClick={() => onTypeChange(pill.key)}
+                            className={`flex-1 text-[11px] py-1 rounded-lg transition-colors ${
+                                typeFilter === pill.key
+                                    ? 'bg-white/20 text-white'
+                                    : 'text-gray-500 hover:bg-white/10'
+                            }`}
+                        >
+                            {pill.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -163,6 +221,20 @@ const ChatListPanel = ({
                         </div>
                     </button>
                 ))}
+
+                {/* Load more button */}
+                {hasMore && (
+                    <button
+                        onClick={onLoadMore}
+                        disabled={isLoading}
+                        className="w-full py-3 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center gap-2 border-t border-white/5"
+                    >
+                        {isLoading
+                            ? <><LucideLoader2 className="w-3 h-3 animate-spin" /> Cargando...</>
+                            : 'Cargar más conversaciones'
+                        }
+                    </button>
+                )}
             </div>
         </div>
     )
@@ -447,12 +519,36 @@ export const ChatModule: React.FC = () => {
     const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : ''
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
-    const { data: chats = [], isLoading: chatsLoading, isError, refetch } = useChats()
+
+    // Filter state
+    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
+    const [typeFilter, setTypeFilter]     = useState<'all' | 'direct' | 'group'>('all')
+
+    const {
+        data: chats,
+        isLoading: chatsLoading,
+        isError,
+        refetch,
+        hasMore,
+        loadMore,
+        resetAndRefetch,
+    } = useChats({ status: statusFilter, chatType: typeFilter })
 
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
 
-    // Loading state while fetching the API key
+    const handleStatusChange = (v: 'all' | 'open' | 'closed') => {
+        setStatusFilter(v)
+        setSelectedChat(null)
+        resetAndRefetch()
+    }
+
+    const handleTypeChange = (v: 'all' | 'direct' | 'group') => {
+        setTypeFilter(v)
+        setSelectedChat(null)
+        resetAndRefetch()
+    }
+
     if (keyLoading) {
         return (
             <div className="flex-1 flex items-center justify-center">
@@ -461,7 +557,6 @@ export const ChatModule: React.FC = () => {
         )
     }
 
-    // No API key configured — show setup CTA
     if (!apiKey) {
         return (
             <div className="flex-1 flex flex-col bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
@@ -475,28 +570,26 @@ export const ChatModule: React.FC = () => {
             className="flex bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
             style={{ height: 'calc(100vh - 128px)' }}
         >
-            {/* Left: Chat List */}
             <ChatListPanel
                 chats={chats}
                 selectedId={selectedChat?.id ?? null}
-                onSelect={(chat) => {
-                    setSelectedChat(chat)
-                    setShowInfo(false)
-                }}
+                onSelect={(chat) => { setSelectedChat(chat); setShowInfo(false) }}
                 isLoading={chatsLoading}
                 isError={isError}
                 onRefresh={refetch}
                 slugPrefix={slugPrefix}
+                hasMore={hasMore}
+                onLoadMore={loadMore}
+                statusFilter={statusFilter}
+                typeFilter={typeFilter}
+                onStatusChange={handleStatusChange}
+                onTypeChange={handleTypeChange}
             />
-
-            {/* Center: Conversation */}
             <ConversationPanel
                 chat={selectedChat}
                 onShowInfo={() => setShowInfo(v => !v)}
                 showInfo={showInfo}
             />
-
-            {/* Right: Contact Info (toggleable) */}
             {showInfo && selectedChat && (
                 <ContactInfoPanel chat={selectedChat} onClose={() => setShowInfo(false)} />
             )}

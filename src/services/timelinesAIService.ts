@@ -123,43 +123,69 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
 
 // ─── API Functions ────────────────────────────────────────────────────────────
 
-/** Fetch all chats from Timelines AI — filters open chats and sorts by most recent */
-export async function getChats(apiKey: string, maxPages = 3): Promise<TimelinesChat[]> {
-  const allChats: TimelinesChat[] = []
+// ── Filter types ──────────────────────────────────────────────────────────────
+export type ChatStatusFilter = 'all' | 'open' | 'closed'
+export type ChatTypeFilter   = 'all' | 'direct' | 'group'
 
-  for (let page = 1; page <= maxPages; page++) {
-    // read=false: only unread chats (these have actual WhatsApp messages)
-    // group=false: direct person-to-clinic chats only (skip @g.us groups)
-    const url = `${BASE_URL}/chats?read=false&group=false&page=${page}`
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: authHeaders(apiKey),
-    })
+export interface GetChatsOptions {
+  status?: ChatStatusFilter  // 'all' | 'open' | 'closed'
+  chatType?: ChatTypeFilter  // 'all' | 'direct' | 'group'
+  page?: number              // 1-indexed, 50 chats per page
+}
 
-    if (!response.ok) {
-      if (page === 1) throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
-      break // Stop pagination on error after first page
-    }
+export interface GetChatsResult {
+  chats: TimelinesChat[]
+  hasMore: boolean
+  page: number
+}
 
-    const json = await response.json()
-    // Real response: { status: "ok", data: { has_more_pages: bool, chats: [...] } }
-    const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-    const chats = raw.map(normaliseChat)
-    allChats.push(...chats)
+/** Fetch a single page of chats with optional filters */
+export async function getChats(
+  apiKey: string,
+  options: GetChatsOptions = {}
+): Promise<GetChatsResult> {
+  const { status = 'all', chatType = 'all', page = 1 } = options
 
-    // Stop early if no more pages
-    const hasMore = json?.data?.has_more_pages === true
-    if (!hasMore || chats.length === 0) break
+  const params = new URLSearchParams({ page: String(page) })
+
+  // Status filter: all = no filter, open = closed=false, closed = closed=true
+  if (status === 'open')   params.set('closed', 'false')
+  if (status === 'closed') params.set('closed', 'true')
+
+  // Type filter: all = unread only (to get active chats), direct/group = explicit
+  if (chatType === 'direct') params.set('group', 'false')
+  if (chatType === 'group')  params.set('group', 'true')
+
+  // Default behaviour when "all" status: fetch unread chats to get recent activity
+  if (status === 'all' && chatType === 'all') params.set('read', 'false')
+  if (status === 'open')   params.set('read', 'false')
+
+  const url = `${BASE_URL}/chats?${params.toString()}`
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
   }
 
-  // Sort by most recent message descending (same order as Timelines AI UI)
-  allChats.sort((a, b) => {
+  const json = await response.json()
+  const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
+  const chats = raw.map(normaliseChat)
+
+  // Sort by most recent message descending
+  chats.sort((a, b) => {
     const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
     const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
     return tb - ta
   })
 
-  return allChats
+  return {
+    chats,
+    hasMore: json?.data?.has_more_pages === true,
+    page,
+  }
 }
 
 /** Fetch messages for a specific chat */
