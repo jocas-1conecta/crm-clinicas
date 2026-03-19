@@ -179,21 +179,17 @@ export async function getChatMessages(apiKey: string, chatId: string): Promise<T
   return raw.map(normaliseMessage)
 }
 
-/** Send a text message via Timelines AI */
+/** Send a text message within a specific chat (POST /chats/{chatId}/messages) */
 export async function sendMessage(
   apiKey: string,
-  phone: string,
-  whatsappAccountPhone: string,
+  chatId: string,
   text: string
 ): Promise<void> {
-  const response = await fetch(`${BASE_URL}/messages`, {
+  // Use the chat-specific endpoint so the message appears in GET /chats/{id}/messages
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
     method: 'POST',
     headers: authHeaders(apiKey),
-    body: JSON.stringify({
-      phone,
-      whatsapp_account_id: whatsappAccountPhone,
-      text,
-    }),
+    body: JSON.stringify({ text }),
   })
 
   if (!response.ok) {

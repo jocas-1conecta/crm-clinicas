@@ -196,8 +196,7 @@ const ConversationPanel = ({
         if (!draft.trim() || !chat) return
         const textToSend = draft.trim()
         sendMutation.mutate({
-            phone: chat.phone,
-            whatsappAccountPhone: chat.whatsapp_account_phone || '',
+            chatId: chat.id,
             text: textToSend,
         }, {
             onSuccess: () => {

@@ -49,21 +49,20 @@ export function useChatMessages(chatId: string | null) {
     })
 }
 
-/** Send a WhatsApp message */
+/** Send a WhatsApp message within a specific chat */
 export function useSendMessage() {
     const { data: apiKey } = useApiKey()
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ phone, whatsappAccountPhone, text }: {
-            phone: string
-            whatsappAccountPhone: string
+        mutationFn: async ({ chatId, text }: {
+            chatId: string
             text: string
         }) => {
             if (!apiKey) throw new Error('No API Key configurada')
-            return api.sendMessage(apiKey, phone, whatsappAccountPhone, text)
+            return api.sendMessage(apiKey, chatId, text)
         },
-        onSuccess: (_, variables) => {
+        onSuccess: () => {
             // Invalidate the messages query to trigger a refresh
             queryClient.invalidateQueries({ queryKey: ['timelines_messages'] })
         },
