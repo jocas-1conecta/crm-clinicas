@@ -67,9 +67,7 @@ export function useSendMessage() {
         onMutate: async ({ chatId, text }) => {
             const queryKey = ['timelines_messages', apiKey, chatId]
 
-            // Cancel any in-flight refetches so they don't overwrite the optimistic data
-            await queryClient.cancelQueries({ queryKey })
-
+            // NOTE: we do NOT cancel queries here — cancelling kills the 15s polling interval
             // Snapshot previous messages in case we need to roll back
             const previousMessages = queryClient.getQueryData<api.TimelinesMessage[]>(queryKey)
 
@@ -100,12 +98,19 @@ export function useSendMessage() {
             }
         },
 
-        // ── Confirm with real data from API after a short delay ────────────
+        // ── Confirm with real data after a delay; always restart polling ───
         onSuccess: (_data, { chatId }) => {
             const queryKey = ['timelines_messages', apiKey, chatId]
-            // Timelines AI indexes the sent message asynchronously — wait before refetching
             setTimeout(() => queryClient.invalidateQueries({ queryKey }), 2000)
             setTimeout(() => queryClient.invalidateQueries({ queryKey }), 4000)
+        },
+
+        // ── Always re-enable polling after mutation settles ────────────────
+        onSettled: (_data, _err, { chatId }) => {
+            const queryKey = ['timelines_messages', apiKey, chatId]
+            queryClient.resumePausedMutations()
+            // Ensure the individual query is not left in a cancelled/paused state
+            queryClient.invalidateQueries({ queryKey })
         },
     })
 }
