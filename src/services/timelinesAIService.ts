@@ -124,21 +124,42 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
 
 // ─── API Functions ────────────────────────────────────────────────────────────
 
-/** Fetch all chats from Timelines AI */
-export async function getChats(apiKey: string): Promise<TimelinesChat[]> {
-  const response = await fetch(`${BASE_URL}/chats`, {
-    method: 'GET',
-    headers: authHeaders(apiKey),
-  })
+/** Fetch all chats from Timelines AI — filters open chats and sorts by most recent */
+export async function getChats(apiKey: string, maxPages = 3): Promise<TimelinesChat[]> {
+  const allChats: TimelinesChat[] = []
 
-  if (!response.ok) {
-    throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
+  for (let page = 1; page <= maxPages; page++) {
+    // closed=false → only open/active chats, sorted by most recent on Timelines side
+    const url = `${BASE_URL}/chats?closed=false&page=${page}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: authHeaders(apiKey),
+    })
+
+    if (!response.ok) {
+      if (page === 1) throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
+      break // Stop pagination on error after first page
+    }
+
+    const json = await response.json()
+    // Real response: { status: "ok", data: { has_more_pages: bool, chats: [...] } }
+    const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
+    const chats = raw.map(normaliseChat)
+    allChats.push(...chats)
+
+    // Stop early if no more pages
+    const hasMore = json?.data?.has_more_pages === true
+    if (!hasMore || chats.length === 0) break
   }
 
-  const json = await response.json()
-  // Real response: { status: "ok", data: { has_more_pages: bool, chats: [...] } }
-  const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-  return raw.map(normaliseChat)
+  // Sort by most recent message descending (same order as Timelines AI UI)
+  allChats.sort((a, b) => {
+    const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+    const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+    return tb - ta
+  })
+
+  return allChats
 }
 
 /** Fetch messages for a specific chat */
