@@ -305,5 +305,23 @@ export function useTemplates() {
     })
 }
 
+/** Start a new WhatsApp conversation with a phone number */
+export function useCreateNewConversation() {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ phone, text }: { phone: string; text: string }) => {
+            if (!apiKey) throw new Error('No API Key configurada')
+            return api.createNewConversation(apiKey, phone, text)
+        },
+        onSuccess: () => {
+            // Refresh chat list so the new conversation appears
+            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['timelines_chats'] }), 2000)
+            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['timelines_chats'] }), 5000)
+        },
+    })
+}
+
 export { useApiKey }
 

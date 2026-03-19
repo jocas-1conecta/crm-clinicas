@@ -232,6 +232,31 @@ export async function sendMessage(
   }
 }
 
+/**
+ * Start a new WhatsApp conversation with a phone number.
+ * Uses POST /messages with a phone field — Timelines AI creates the chat automatically.
+ * Returns the new message_uid.
+ */
+export async function createNewConversation(
+  apiKey: string,
+  phone: string,
+  text: string
+): Promise<string> {
+  const response = await fetch(`${BASE_URL}/messages`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ phone, text }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error iniciando conversación ${response.status}: ${response.statusText}`)
+  }
+
+  const json = await response.json()
+  return String(json?.data?.message_uid ?? json?.message_uid ?? '')
+}
+
+
 /** Verify an API key by trying to fetch chats. Returns true if valid. */
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
   try {

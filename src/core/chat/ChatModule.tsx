@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation } from './useTimelinesAI'
 import { TimelinesChat } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -22,6 +22,7 @@ import {
     LucidePaperclip,
     LucideZap,
     LucideFileText,
+    LucidePlus,
 } from 'lucide-react'
 
 // ─── Util ────────────────────────────────────────────────────────────────────
@@ -102,6 +103,25 @@ const ChatListPanel = ({
     onTypeChange: (v: 'all' | 'direct' | 'group') => void
 }) => {
     const [search, setSearch] = useState('')
+    const [showNewChat, setShowNewChat] = useState(false)
+    const [newPhone, setNewPhone] = useState('')
+    const [newText, setNewText] = useState('')
+    const createMutation = useCreateNewConversation()
+
+    const handleCreateChat = () => {
+        if (!newPhone.trim() || !newText.trim()) return
+        createMutation.mutate(
+            { phone: newPhone.trim(), text: newText.trim() },
+            {
+                onSuccess: () => {
+                    setShowNewChat(false)
+                    setNewPhone('')
+                    setNewText('')
+                    setTimeout(onRefresh, 2500)
+                },
+            }
+        )
+    }
 
     const filtered = chats.filter(c =>
         c.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -119,14 +139,69 @@ const ChatListPanel = ({
                         </div>
                         <h2 className="text-base font-bold">Chat</h2>
                     </div>
-                    <button
-                        onClick={onRefresh}
-                        className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
-                        title="Actualizar"
-                    >
-                        <LucideRefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setShowNewChat(v => !v)}
+                            className="p-1.5 rounded-lg hover:bg-green-500/20 transition-colors text-green-400 hover:text-green-300"
+                            title="Nueva conversación"
+                        >
+                            <LucidePlus className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={onRefresh}
+                            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+                            title="Actualizar"
+                        >
+                            <LucideRefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
+
+                {/* New conversation form */}
+                {showNewChat && (
+                    <div className="mb-3 p-3 bg-white/5 rounded-xl border border-white/10 space-y-2">
+                        <p className="text-xs font-semibold text-green-400 mb-1">Nueva conversación</p>
+                        <input
+                            type="tel"
+                            placeholder="Número (+51987654321)"
+                            value={newPhone}
+                            onChange={e => setNewPhone(e.target.value)}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                        <textarea
+                            placeholder="Mensaje inicial..."
+                            value={newText}
+                            onChange={e => setNewText(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleCreateChat}
+                                disabled={!newPhone.trim() || !newText.trim() || createMutation.isPending}
+                                className="flex-1 py-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
+                            >
+                                {createMutation.isPending
+                                    ? <LucideLoader2 className="w-3 h-3 animate-spin" />
+                                    : <LucideSend className="w-3 h-3" />
+                                }
+                                Enviar
+                            </button>
+                            <button
+                                onClick={() => { setShowNewChat(false); setNewPhone(''); setNewText('') }}
+                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-gray-300 text-xs rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                        {createMutation.isError && (
+                            <p className="text-xs text-red-400">{String((createMutation.error as Error)?.message ?? 'Error al crear conversación')}</p>
+                        )}
+                        {createMutation.isSuccess && (
+                            <p className="text-xs text-green-400">✓ Mensaje enviado — la conversación aparecerá en segundos</p>
+                        )}
+                    </div>
+                )}
 
                 {/* Search */}
                 <div className="relative mb-3">
