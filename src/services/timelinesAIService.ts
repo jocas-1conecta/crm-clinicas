@@ -58,8 +58,28 @@ export async function getChats(apiKey: string): Promise<TimelinesChat[]> {
     throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
   }
 
-  const json: TimelinesChatsResponse = await response.json()
-  return json.data ?? []
+  const json = await response.json()
+
+  // Handle multiple possible response shapes from Timelines AI:
+  // Shape A: { data: [...] }  (documented API)
+  // Shape B: [...] (raw array)
+  // Shape C: anything else → return empty
+  let chats: TimelinesChat[]
+  if (Array.isArray(json)) {
+    chats = json as TimelinesChat[]
+  } else if (json && Array.isArray(json.data)) {
+    chats = json.data as TimelinesChat[]
+  } else if (json && Array.isArray(json.results)) {
+    chats = json.results as TimelinesChat[]
+  } else {
+    chats = []
+  }
+
+  // Normalise: ensure labels is always an array
+  return chats.map(c => ({
+    ...c,
+    labels: Array.isArray(c.labels) ? c.labels : [],
+  }))
 }
 
 /** Fetch messages for a specific chat */
@@ -73,8 +93,13 @@ export async function getChatMessages(apiKey: string, chatId: string): Promise<T
     throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
   }
 
-  const json: TimelinesMessagesResponse = await response.json()
-  return json.data ?? []
+  const json = await response.json()
+
+  // Same defensive multi-shape handling
+  if (Array.isArray(json)) return json as TimelinesMessage[]
+  if (json && Array.isArray(json.data)) return json.data as TimelinesMessage[]
+  if (json && Array.isArray(json.results)) return json.results as TimelinesMessage[]
+  return []
 }
 
 /** Send a text message via Timelines AI */
