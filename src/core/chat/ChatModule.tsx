@@ -192,11 +192,19 @@ const ConversationPanel = ({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
+    const lastFailedText = useRef<string>('')
+
     const handleSend = () => {
         if (!draft.trim() || !chat) return
         const textToSend = draft.trim()
+        lastFailedText.current = textToSend
         setDraft('') // Clear input immediately for better UX
         sendMutation.mutate({ chatId: chat.id, text: textToSend })
+    }
+
+    const handleRetry = () => {
+        if (!chat || !lastFailedText.current) return
+        sendMutation.mutate({ chatId: chat.id, text: lastFailedText.current })
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -260,18 +268,54 @@ const ConversationPanel = ({
 
                 {messages?.map((msg) => {
                     const isMine = msg.from_me
+                    const isTemp = msg.uid?.startsWith('temp-')
+                    const isFailed = isTemp && sendMutation.isError
+                    const isSending = isTemp && sendMutation.isPending
                     return (
-                        <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        <div key={msg.uid || msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-sm lg:max-w-md group`}>
                                 <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
                                     isMine
-                                        ? 'bg-clinical-600 text-white rounded-br-sm'
+                                        ? isFailed
+                                            ? 'bg-red-100 text-red-800 rounded-br-sm border border-red-200'
+                                            : 'bg-clinical-600 text-white rounded-br-sm'
                                         : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100'
                                 }`}>
                                     {msg.text}
                                 </div>
-                                <div className={`text-[10px] text-gray-400 mt-1 px-1 ${isMine ? 'text-right' : 'text-left'}`}>
-                                    {formatTime(msg.timestamp)}
+                                {/* Per-message status indicator */}
+                                <div className={`text-[10px] mt-1 px-1 flex items-center gap-1 ${
+                                    isMine ? 'justify-end' : 'justify-start'
+                                } ${
+                                    isFailed ? 'text-red-500' : 'text-gray-400'
+                                }`}>
+                                    {isSending && (
+                                        <>
+                                            <LucideLoader2 className="w-3 h-3 animate-spin" />
+                                            <span>Enviando...</span>
+                                        </>
+                                    )}
+                                    {isFailed && (
+                                        <>
+                                            <LucideAlertTriangle className="w-3 h-3" />
+                                            <span>Error al enviar</span>
+                                            <button
+                                                onClick={handleRetry}
+                                                className="underline font-medium hover:text-red-700 transition-colors ml-1"
+                                            >
+                                                · Reintentar
+                                            </button>
+                                        </>
+                                    )}
+                                    {!isTemp && isMine && (
+                                        <>
+                                            <span>{formatTime(msg.timestamp)}</span>
+                                            <span className="text-clinical-400">✓</span>
+                                        </>
+                                    )}
+                                    {!isMine && (
+                                        <span>{formatTime(msg.timestamp)}</span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -282,12 +326,6 @@ const ConversationPanel = ({
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 p-4 shrink-0">
-                {sendMutation.isError && (
-                    <div className="mb-2 text-xs text-red-500 flex items-center gap-1">
-                        <LucideAlertTriangle className="w-3 h-3" />
-                        {(sendMutation.error as Error)?.message}
-                    </div>
-                )}
                 <div className="flex items-end gap-3">
                     <textarea
                         value={draft}
