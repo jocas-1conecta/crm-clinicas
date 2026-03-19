@@ -196,5 +196,40 @@ export function useWorkspaceMembers() {
     })
 }
 
+/** Upload a file and send it as a message in a chat */
+export function useUploadAndSendFile() {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({ chatId, file, caption }: {
+            chatId: string
+            file: File
+            caption?: string
+        }) => {
+            if (!apiKey) throw new Error('No API Key configurada')
+            const fileId = await api.uploadFile(apiKey, file)
+            await api.sendFileMessage(apiKey, chatId, fileId, caption)
+        },
+        onSuccess: (_data, { chatId }) => {
+            setTimeout(() => queryClient.invalidateQueries({
+                queryKey: ['timelines_messages', apiKey, chatId]
+            }), 2000)
+        },
+    })
+}
+
+/** Fetch message templates from Timelines AI */
+export function useTemplates() {
+    const { data: apiKey } = useApiKey()
+
+    return useQuery({
+        queryKey: ['timelines_templates', apiKey],
+        queryFn: () => api.getTemplates(apiKey!),
+        enabled: !!apiKey,
+        staleTime: 5 * 60 * 1000,
+    })
+}
+
 export { useApiKey }
 

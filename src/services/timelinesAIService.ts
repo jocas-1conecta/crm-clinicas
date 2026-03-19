@@ -49,6 +49,15 @@ export interface TimelinesMessage {
   author_name?: string
 }
 
+export interface TimelinesTemplate {
+  id: string
+  name: string
+  body: string
+  language?: string
+  category?: string
+}
+
+
 function authHeaders(apiKey: string) {
   return {
     'Content-Type': 'application/json',
@@ -232,6 +241,62 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
     return false
   }
 }
+
+/** Upload a file to Timelines AI and return its file_id */
+export async function uploadFile(apiKey: string, file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${BASE_URL}/files`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` }, // No Content-Type: browser sets multipart boundary
+    body: formData,
+  })
+  if (!response.ok) {
+    throw new Error(`Error subiendo archivo ${response.status}: ${response.statusText}`)
+  }
+  const json = await response.json()
+  // Response: { status: "ok", data: { file_id: "..." } } or { file_id: "..." }
+  const fileId = json?.data?.file_id ?? json?.file_id ?? json?.id
+  if (!fileId) throw new Error('No se recibió file_id de Timelines AI')
+  return String(fileId)
+}
+
+/** Send a file message using a pre-uploaded file_id */
+export async function sendFileMessage(
+  apiKey: string,
+  chatId: string,
+  fileId: string,
+  caption?: string
+): Promise<void> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ file_id: fileId, text: caption ?? '' }),
+  })
+  if (!response.ok) {
+    throw new Error(`Error enviando archivo ${response.status}: ${response.statusText}`)
+  }
+}
+
+/** Fetch message templates from Timelines AI workspace */
+export async function getTemplates(apiKey: string): Promise<TimelinesTemplate[]> {
+  const response = await fetch(`${BASE_URL}/templates`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+  if (!response.ok) return []
+  const json = await response.json()
+  const raw = extractArray<Record<string, unknown>>(json, 'templates', 'data', 'results')
+  return raw.map(t => ({
+    id: String(t.id ?? t.name ?? ''),
+    name: String(t.name ?? t.title ?? ''),
+    body: String(t.body ?? t.content ?? t.text ?? ''),
+    language: String(t.language ?? ''),
+    category: String(t.category ?? ''),
+  }))
+}
+
 
 /** Update a chat — close/reopen or assign responsible */
 export async function updateChat(

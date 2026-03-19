@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates } from './useTimelinesAI'
 import { TimelinesChat } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -19,6 +19,9 @@ import {
     LucideArchive,
     LucideInbox,
     LucideUserCheck,
+    LucidePaperclip,
+    LucideZap,
+    LucideFileText,
 } from 'lucide-react'
 
 // ─── Util ────────────────────────────────────────────────────────────────────
@@ -256,11 +259,16 @@ const ConversationPanel = ({
 }) => {
     const [draft, setDraft] = useState('')
     const [showAssign, setShowAssign] = useState(false)
+    const [showTemplates, setShowTemplates] = useState(false)
+    const [pendingFile, setPendingFile] = useState<File | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { data: messages, isLoading } = useChatMessages(chat?.id ?? null)
     const sendMutation = useSendMessage()
     const updateMutation = useUpdateChat()
     const { data: members = [] } = useWorkspaceMembers()
+    const uploadMutation = useUploadAndSendFile()
+    const { data: templates = [] } = useTemplates()
 
     useEffect(() => {
         setDraft('')
@@ -473,22 +481,94 @@ const ConversationPanel = ({
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 p-4 shrink-0">
-                <div className="flex items-end gap-3">
+                {/* File preview */}
+                {pendingFile && (
+                    <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
+                        <LucideFileText className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="flex-1 truncate">{pendingFile.name}</span>
+                        <button onClick={() => setPendingFile(null)} className="text-gray-400 hover:text-gray-600">
+                            <LucideX className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Templates dropdown */}
+                {showTemplates && templates.length > 0 && (
+                    <div className="mb-2 max-h-48 overflow-y-auto border border-gray-200 rounded-xl bg-white shadow-lg">
+                        {templates.map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => {
+                                    setDraft(t.body)
+                                    setShowTemplates(false)
+                                }}
+                                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                            >
+                                <p className="text-xs font-semibold text-gray-700">{t.name}</p>
+                                <p className="text-xs text-gray-400 truncate mt-0.5">{t.body}</p>
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {showTemplates && templates.length === 0 && (
+                    <p className="mb-2 text-xs text-gray-400 text-center py-2">No hay plantillas configuradas en Timelines AI</p>
+                )}
+
+                <div className="flex items-end gap-2">
+                    {/* Attach file button */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                        onChange={e => {
+                            const f = e.target.files?.[0]
+                            if (f) { setPendingFile(f); setDraft('') }
+                            e.target.value = ''
+                        }}
+                    />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+                        title="Adjuntar archivo"
+                    >
+                        <LucidePaperclip className="w-4 h-4" />
+                    </button>
+
+                    {/* Templates button */}
+                    <button
+                        onClick={() => setShowTemplates(v => !v)}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors shrink-0 ${
+                            showTemplates ? 'bg-clinical-50 text-clinical-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                        }`}
+                        title="Plantillas de mensaje"
+                    >
+                        <LucideZap className="w-4 h-4" />
+                    </button>
+
                     <textarea
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Escribe un mensaje... (Enter para enviar)"
+                        placeholder={pendingFile ? 'Escribe un pie de foto (opcional)...' : 'Escribe un mensaje... (Enter para enviar)'}
                         rows={1}
+                        disabled={!!pendingFile && uploadMutation.isPending}
                         className="flex-1 resize-none px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-clinical-400 focus:border-transparent transition-all placeholder-gray-400"
                         style={{ minHeight: '42px', maxHeight: '120px' }}
                     />
                     <button
-                        onClick={handleSend}
-                        disabled={!draft.trim() || sendMutation.isPending}
+                        onClick={() => {
+                            if (pendingFile && chat) {
+                                uploadMutation.mutate({ chatId: chat.id, file: pendingFile, caption: draft || undefined },
+                                    { onSuccess: () => { setPendingFile(null); setDraft('') } })
+                            } else {
+                                handleSend()
+                            }
+                        }}
+                        disabled={(!draft.trim() && !pendingFile) || sendMutation.isPending || uploadMutation.isPending}
                         className="w-10 h-10 bg-clinical-600 hover:bg-clinical-700 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
-                        {sendMutation.isPending
+                        {(sendMutation.isPending || uploadMutation.isPending)
                             ? <LucideLoader2 className="w-4 h-4 animate-spin" />
                             : <LucideSend className="w-4 h-4" />
                         }
