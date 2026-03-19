@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime } from './useTimelinesAI'
 import { TimelinesChat } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -269,6 +269,9 @@ const ConversationPanel = ({
     const { data: members = [] } = useWorkspaceMembers()
     const uploadMutation = useUploadAndSendFile()
     const { data: templates = [] } = useTemplates()
+
+    // Real-time: instantly reload messages when a webhook event arrives
+    useChatRealtime(chat?.id ?? null)
 
     useEffect(() => {
         setDraft('')

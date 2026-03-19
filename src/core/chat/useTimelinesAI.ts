@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
 import * as api from '../../services/timelinesAIService'
 
-/** Fetch the clinic's stored Timelines AI API key */
+// ── API Key ───────────────────────────────────────────────────────────────────
+
 function useApiKey() {
     const { currentUser } = useStore()
     return useQuery({
@@ -19,11 +21,53 @@ function useApiKey() {
             return (data?.timelines_ai_api_key as string | null) ?? null
         },
         enabled: !!currentUser?.clinica_id,
-        staleTime: 5 * 60 * 1000, // 5 min
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-import { useState, useCallback } from 'react'
+// ── Realtime: subscribe to webhook events ────────────────────────────────────
+
+/**
+ * Subscribes to Supabase Realtime on `chat_webhook_events`.
+ * When an event for the active chatId arrives, invalidates the messages query
+ * immediately — giving instant updates instead of waiting for the 15s poll.
+ * Falls back gracefully if Realtime is not configured yet.
+ */
+export function useChatRealtime(chatId: string | null) {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+
+    useEffect(() => {
+        if (!chatId || !apiKey) return
+
+        const channel = supabase
+            .channel(`chat-events-${chatId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'chat_webhook_events',
+                    filter: `chat_id=eq.${chatId}`,
+                },
+                () => {
+                    // Immediately refresh messages when a real-time event arrives
+                    queryClient.invalidateQueries({
+                        queryKey: ['timelines_messages', apiKey, chatId],
+                    })
+                    // Also refresh the chat list so last_message updates
+                    queryClient.invalidateQueries({
+                        queryKey: ['timelines_chats'],
+                    })
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [chatId, apiKey, queryClient])
+}
 
 /** Hook to fetch and paginate chats with filters */
 export function useChats(options: {
