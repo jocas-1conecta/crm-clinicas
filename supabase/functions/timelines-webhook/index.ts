@@ -46,14 +46,22 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    await supabase.from('chat_webhook_events').insert({
+    const { error: insertError } = await supabase.from('chat_webhook_events').insert({
       event_type: eventType,
       chat_id: chatId,
       message_uid: messageUid || null,
       payload: payload,
     })
 
-    return new Response(JSON.stringify({ ok: true }), {
+    if (insertError) {
+      console.error('Insert error:', JSON.stringify(insertError))
+      // Still return 200 to Timelines AI so it doesn't retry — but log the error
+      return new Response(JSON.stringify({ ok: false, error: insertError.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response(JSON.stringify({ ok: true, chat_id: chatId, event_type: eventType }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {

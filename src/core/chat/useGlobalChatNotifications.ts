@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../services/supabase'
 import { useApiKey } from './useTimelinesAI'
 
-// ─── Notification sound (two-tone chime) ─────────────────────────────────────
+// ─── Notification sound ───────────────────────────────────────────────────────
 
 function playChime() {
     try {
@@ -25,13 +25,13 @@ function playChime() {
             osc.stop(start + 0.35)
         })
     } catch {
-        // Blocked by browser autoplay policy — silently ignore
+        // Autoplay blocked — silently ignore
     }
 }
 
-// ─── Browser notification helper ─────────────────────────────────────────────
+// ─── Browser notification ─────────────────────────────────────────────────────
 
-async function requestNotificationPermission() {
+async function ensureNotificationPermission() {
     if (!('Notification' in window)) return false
     if (Notification.permission === 'granted') return true
     if (Notification.permission === 'denied') return false
@@ -46,108 +46,104 @@ function showBrowserNotification(
     navigate: (path: string) => void
 ) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
-
-    const notification = new Notification(title, {
+    const n = new Notification(title, {
         body,
         icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        tag: `chat-${chatId}`, // Replaces duplicate notifications for same chat
+        tag: `chat-${chatId}`,
     })
-
-    notification.onclick = () => {
-        window.focus()
-        navigate('/chat')
-        notification.close()
-    }
-
-    // Auto-close after 6 seconds
-    setTimeout(() => notification.close(), 6000)
+    n.onclick = () => { window.focus(); navigate('/chat'); n.close() }
+    setTimeout(() => n.close(), 8000)
 }
 
 // ─── Global hook ─────────────────────────────────────────────────────────────
 
+const POLL_INTERVAL_MS = 5_000 // Check every 5s
+
 /**
- * Global real-time listener for incoming WhatsApp messages.
- * Subscribes to ALL events in `chat_webhook_events` (not filtered by chat_id)
- * so it works from any route — not just when the ChatModule is mounted.
+ * Polls the `chat_webhook_events` table every 5s for new incoming messages.
+ * Works from any route — not just the Chat module.
  *
- * Features:
+ * On new `message:received:new` event:
  * - Plays a notification chime
- * - Shows a browser/OS notification with sender name + message preview
- * - Clicking the notification navigates to /chat
- * - Invalidates React Query caches so the chat list updates immediately
+ * - Shows a browser OS notification (if permission granted)
+ * - Invalidates React Query caches so any open chat refreshes
  */
 export function useGlobalChatNotifications() {
     const { data: apiKey } = useApiKey()
     const queryClient = useQueryClient()
     const navigate = useNavigate()
-    const permissionRequested = useRef(false)
+    const lastSeenIdRef = useRef<number | null>(null)
+    const initializedRef = useRef(false)
 
-    // Request permission on first mount (after user interaction is likely to have occurred)
+    // Request browser notification permission on first mount
     useEffect(() => {
-        if (!permissionRequested.current) {
-            permissionRequested.current = true
-            requestNotificationPermission()
-        }
+        ensureNotificationPermission()
     }, [])
 
     useEffect(() => {
         if (!apiKey) return
 
-        const channel = supabase
-            .channel('global-chat-events')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'chat_webhook_events',
-                },
-                (realtimePayload) => {
-                    const row = realtimePayload?.new as Record<string, unknown>
-                    const eventType = String(row?.event_type ?? '')
-                    const chatId = String(row?.chat_id ?? '')
-                    const payload = row?.payload as Record<string, unknown> | null
+        const poll = async () => {
+            // On the very first run, just record the current max ID as baseline
+            // so we don't fire notifications for old events on page load
+            const { data, error } = await supabase
+                .from('chat_webhook_events')
+                .select('id, event_type, chat_id, payload')
+                .order('id', { ascending: false })
+                .limit(10)
 
-                    // Invalidate queries so any open chat list updates
-                    queryClient.invalidateQueries({ queryKey: ['timelines_chats'] })
-                    if (chatId) {
-                        queryClient.invalidateQueries({
-                            queryKey: ['timelines_messages', apiKey, chatId],
-                        })
-                    }
+            if (error || !data) return
 
-                    // Only notify for received messages
-                    if (eventType !== 'message:received:new') return
+            if (!initializedRef.current) {
+                // Set baseline to the latest event ID — don't notify for old events
+                lastSeenIdRef.current = data.length > 0 ? data[0].id : 0
+                initializedRef.current = true
+                return
+            }
 
-                    // Extract sender info from the Timelines AI webhook payload
-                    const chat = payload?.chat as Record<string, unknown> | null
-                    const message = payload?.message as Record<string, unknown> | null
-                    const senderName =
-                        String(chat?.full_name ?? chat?.phone ?? 'WhatsApp')
-                    const messageText =
-                        String(message?.text ?? '📎 Archivo adjunto')
-                    const preview =
-                        messageText.length > 80
-                            ? messageText.slice(0, 80) + '…'
-                            : messageText
-
-                    // Sound
-                    playChime()
-
-                    // Browser notification
-                    showBrowserNotification(
-                        `💬 ${senderName}`,
-                        preview,
-                        chatId,
-                        navigate
-                    )
-                }
+            // Find events newer than our last seen ID
+            const newEvents = data.filter(
+                row => row.id > (lastSeenIdRef.current ?? 0)
             )
-            .subscribe()
 
-        return () => {
-            supabase.removeChannel(channel)
+            if (newEvents.length === 0) return
+
+            // Update the baseline
+            lastSeenIdRef.current = newEvents[0].id
+
+            // Process incoming message events
+            const receivedMessages = newEvents.filter(
+                e => e.event_type === 'message:received:new'
+            )
+
+            if (receivedMessages.length === 0) return
+
+            // Invalidate queries so any open chat list/messages update
+            queryClient.invalidateQueries({ queryKey: ['timelines_chats'] })
+            for (const evt of receivedMessages) {
+                if (evt.chat_id) {
+                    queryClient.invalidateQueries({
+                        queryKey: ['timelines_messages', apiKey, String(evt.chat_id)],
+                    })
+                }
+            }
+
+            // Notify for the most recent incoming message
+            const latest = receivedMessages[0]
+            const payload = latest.payload as Record<string, unknown> | null
+            const chat = payload?.chat as Record<string, unknown> | null
+            const message = payload?.message as Record<string, unknown> | null
+            const senderName = String(chat?.full_name ?? chat?.phone ?? 'WhatsApp')
+            const text = String(message?.text ?? '📎 Archivo adjunto')
+            const preview = text.length > 80 ? text.slice(0, 80) + '…' : text
+
+            playChime()
+            showBrowserNotification(`💬 ${senderName}`, preview, String(latest.chat_id), navigate)
         }
+
+        // Start polling
+        const interval = setInterval(poll, POLL_INTERVAL_MS)
+
+        return () => clearInterval(interval)
     }, [apiKey, queryClient, navigate])
 }
