@@ -105,10 +105,8 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
 /** Normalise a raw message object to our TimelinesMessage shape */
 function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
   const text = String(raw.text ?? raw.body ?? raw.caption ?? '')
-  const fromMe =
-    raw.from_me === true ||
-    raw.direction === 'sent' ||
-    (raw.sender as Record<string, unknown>)?.phone === (raw.recipient as Record<string, unknown>)?.phone
+  // from_me is directly provided by the API (bool)
+  const fromMe = raw.from_me === true || raw.direction === 'sent'
 
   return {
     ...(raw as unknown as TimelinesMessage),
@@ -117,8 +115,9 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
     chat_id: String(raw.chat_id ?? ''),
     text,
     timestamp: String(raw.timestamp ?? ''),
-    from_me: !!fromMe,
+    from_me: fromMe,
     message_type: String(raw.message_type ?? raw.type ?? 'text'),
+    author_name: String(raw.sender_name ?? raw.author_name ?? ''),
   }
 }
 
@@ -129,9 +128,9 @@ export async function getChats(apiKey: string, maxPages = 3): Promise<TimelinesC
   const allChats: TimelinesChat[] = []
 
   for (let page = 1; page <= maxPages; page++) {
-    // closed=false → only open/active chats, sorted by most recent on Timelines side
-    // closed=false: open chats only | group=false: direct chats only (skip @g.us group chats)
-    const url = `${BASE_URL}/chats?closed=false&group=false&page=${page}`
+    // read=false: only unread chats (these have actual WhatsApp messages)
+    // group=false: direct person-to-clinic chats only (skip @g.us groups)
+    const url = `${BASE_URL}/chats?read=false&group=false&page=${page}`
     const response = await fetch(url, {
       method: 'GET',
       headers: authHeaders(apiKey),
