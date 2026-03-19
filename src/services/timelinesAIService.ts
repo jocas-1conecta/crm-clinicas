@@ -130,7 +130,8 @@ export async function getChats(apiKey: string, maxPages = 3): Promise<TimelinesC
 
   for (let page = 1; page <= maxPages; page++) {
     // closed=false → only open/active chats, sorted by most recent on Timelines side
-    const url = `${BASE_URL}/chats?closed=false&page=${page}`
+    // closed=false: open chats only | group=false: direct chats only (skip @g.us group chats)
+    const url = `${BASE_URL}/chats?closed=false&group=false&page=${page}`
     const response = await fetch(url, {
       method: 'GET',
       headers: authHeaders(apiKey),
