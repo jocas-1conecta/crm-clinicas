@@ -31,6 +31,13 @@ import { ReportsDashboard } from './core/analytics/ReportsDashboard'
 import { CalendarTasks } from './core/calendar/CalendarTasks'
 import { ChatModule } from './core/chat/ChatModule'
 import { IntegrationsSettings } from './core/settings/IntegrationsSettings'
+import { useGlobalChatNotifications } from './core/chat/useGlobalChatNotifications'
+
+/** Mounts the global real-time chat notification listener for all authenticated routes */
+function GlobalNotificationsMount() {
+    useGlobalChatNotifications()
+    return null
+}
 
 const queryClient = new QueryClient()
 
@@ -155,6 +162,7 @@ function App() {
 
     return (
         <QueryClientProvider client={queryClient}>
+        <GlobalNotificationsMount />
         <Layout>
             <Suspense fallback={<div className="p-10 flex justify-center text-gray-400">Cargando módulo...</div>}>
                 <Routes>
