@@ -194,14 +194,18 @@ const ConversationPanel = ({
 
     const handleSend = () => {
         if (!draft.trim() || !chat) return
+        const textToSend = draft.trim()
         sendMutation.mutate({
             phone: chat.phone,
             whatsappAccountPhone: chat.whatsapp_account_phone || '',
-            text: draft.trim(),
+            text: textToSend,
         }, {
             onSuccess: () => {
                 setDraft('')
-                refetch()
+                // Timelines AI indexes the sent message asynchronously.
+                // Refetch after 1.5s and again at 3.5s to ensure it appears.
+                setTimeout(() => refetch(), 1500)
+                setTimeout(() => refetch(), 3500)
             },
         })
     }
