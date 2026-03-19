@@ -62,11 +62,53 @@ export function useSendMessage() {
             if (!apiKey) throw new Error('No API Key configurada')
             return api.sendMessage(apiKey, chatId, text)
         },
-        onSuccess: () => {
-            // Invalidate the messages query to trigger a refresh
-            queryClient.invalidateQueries({ queryKey: ['timelines_messages'] })
+
+        // ── Optimistic update: show the message instantly ──────────────────
+        onMutate: async ({ chatId, text }) => {
+            const queryKey = ['timelines_messages', apiKey, chatId]
+
+            // Cancel any in-flight refetches so they don't overwrite the optimistic data
+            await queryClient.cancelQueries({ queryKey })
+
+            // Snapshot previous messages in case we need to roll back
+            const previousMessages = queryClient.getQueryData<api.TimelinesMessage[]>(queryKey)
+
+            // Build a temporary message that looks like a real one
+            const optimistic: api.TimelinesMessage = {
+                uid: `temp-${Date.now()}`,
+                id: `temp-${Date.now()}`,
+                chat_id: chatId,
+                text,
+                from_me: true,
+                timestamp: new Date().toISOString(),
+                message_type: 'text',
+                author_name: '',
+            }
+
+            queryClient.setQueryData(queryKey, [
+                ...(previousMessages ?? []),
+                optimistic,
+            ])
+
+            return { previousMessages, queryKey }
+        },
+
+        // ── Roll back on error ─────────────────────────────────────────────
+        onError: (_err, _vars, context) => {
+            if (context?.previousMessages !== undefined) {
+                queryClient.setQueryData(context.queryKey, context.previousMessages)
+            }
+        },
+
+        // ── Confirm with real data from API after a short delay ────────────
+        onSuccess: (_data, { chatId }) => {
+            const queryKey = ['timelines_messages', apiKey, chatId]
+            // Timelines AI indexes the sent message asynchronously — wait before refetching
+            setTimeout(() => queryClient.invalidateQueries({ queryKey }), 2000)
+            setTimeout(() => queryClient.invalidateQueries({ queryKey }), 4000)
         },
     })
 }
 
 export { useApiKey }
+
