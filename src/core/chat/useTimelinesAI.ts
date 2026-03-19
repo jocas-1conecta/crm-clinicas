@@ -156,9 +156,43 @@ export function useSendMessage() {
         onSettled: (_data, _err, { chatId }) => {
             const queryKey = ['timelines_messages', apiKey, chatId]
             queryClient.resumePausedMutations()
-            // Ensure the individual query is not left in a cancelled/paused state
             queryClient.invalidateQueries({ queryKey })
         },
+    })
+}
+
+/** Update a chat (close/reopen or assign responsible) */
+export function useUpdateChat() {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async ({
+            chatId,
+            payload,
+        }: {
+            chatId: string
+            payload: { closed?: boolean; responsible_id?: string | null }
+        }) => {
+            if (!apiKey) throw new Error('No API Key configurada')
+            return api.updateChat(apiKey, chatId, payload)
+        },
+        onSuccess: () => {
+            // Refresh the chat list so closed status is reflected
+            queryClient.invalidateQueries({ queryKey: ['timelines_chats'] })
+        },
+    })
+}
+
+/** Fetch workspace members from Timelines AI for the assign dropdown */
+export function useWorkspaceMembers() {
+    const { data: apiKey } = useApiKey()
+
+    return useQuery({
+        queryKey: ['timelines_members', apiKey],
+        queryFn: () => api.getWorkspaceMembers(apiKey!),
+        enabled: !!apiKey,
+        staleTime: 5 * 60 * 1000, // Members don't change often
     })
 }
 

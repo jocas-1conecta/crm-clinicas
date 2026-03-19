@@ -233,6 +233,45 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
   }
 }
 
+/** Update a chat — close/reopen or assign responsible */
+export async function updateChat(
+  apiKey: string,
+  chatId: string,
+  payload: { closed?: boolean; responsible_id?: string | null }
+): Promise<void> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}`, {
+    method: 'PATCH',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    throw new Error(`Error actualizando chat ${response.status}: ${response.statusText}`)
+  }
+}
+
+export interface WorkspaceMember {
+  id: string
+  name: string
+  email: string
+}
+
+/** Get list of members/users in the Timelines AI workspace */
+export async function getWorkspaceMembers(apiKey: string): Promise<WorkspaceMember[]> {
+  const response = await fetch(`${BASE_URL}/users`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+  if (!response.ok) return []
+  const json = await response.json()
+  const raw = extractArray<Record<string, unknown>>(json, 'users', 'data', 'results')
+  return raw.map(u => ({
+    id: String(u.id ?? u.email ?? ''),
+    name: String(u.name ?? u.full_name ?? u.email ?? ''),
+    email: String(u.email ?? ''),
+  }))
+}
+
+
 // ─── Webhook registration ─────────────────────────────────────────────────────
 
 /** Register a webhook URL to receive real-time events from Timelines AI */

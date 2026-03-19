@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers } from './useTimelinesAI'
 import { TimelinesChat } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -16,6 +16,9 @@ import {
     LucideAlertTriangle,
     LucideInfo,
     LucideX,
+    LucideArchive,
+    LucideInbox,
+    LucideUserCheck,
 } from 'lucide-react'
 
 // ─── Util ────────────────────────────────────────────────────────────────────
@@ -252,9 +255,12 @@ const ConversationPanel = ({
     showInfo: boolean
 }) => {
     const [draft, setDraft] = useState('')
+    const [showAssign, setShowAssign] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const { data: messages, isLoading, refetch } = useChatMessages(chat?.id ?? null)
+    const { data: messages, isLoading } = useChatMessages(chat?.id ?? null)
     const sendMutation = useSendMessage()
+    const updateMutation = useUpdateChat()
+    const { data: members = [] } = useWorkspaceMembers()
 
     useEffect(() => {
         setDraft('')
@@ -301,7 +307,7 @@ const ConversationPanel = ({
     return (
         <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
             {/* Conversation Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0">
+            <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold">
                         {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
@@ -314,13 +320,82 @@ const ConversationPanel = ({
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={onShowInfo}
-                    className={`p-2 rounded-xl transition-colors ${showInfo ? 'bg-clinical-50 text-clinical-600' : 'text-gray-400 hover:bg-gray-100'}`}
-                    title="Info del contacto"
-                >
-                    <LucideInfo className="w-5 h-5" />
-                </button>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1">
+                    {/* Close / Reopen */}
+                    <button
+                        onClick={() => updateMutation.mutate({
+                            chatId: chat.id,
+                            payload: { closed: !chat.chat_status?.includes('closed') },
+                        })}
+                        disabled={updateMutation.isPending}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            chat.chat_status === 'closed'
+                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={chat.chat_status === 'closed' ? 'Reabrir chat' : 'Cerrar chat'}
+                    >
+                        {updateMutation.isPending
+                            ? <LucideLoader2 className="w-3.5 h-3.5 animate-spin" />
+                            : chat.chat_status === 'closed'
+                                ? <><LucideInbox className="w-3.5 h-3.5" /> Reabrir</>
+                                : <><LucideArchive className="w-3.5 h-3.5" /> Cerrar</>
+                        }
+                    </button>
+
+                    {/* Assign to member */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowAssign(v => !v)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                            title="Asignar asesor"
+                        >
+                            <LucideUserCheck className="w-3.5 h-3.5" />
+                            {chat.chat_assignee ? chat.chat_assignee.split('@')[0] : 'Asignar'}
+                        </button>
+                        {showAssign && (
+                            <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-gray-100 z-20 overflow-hidden">
+                                <div className="py-1">
+                                    <button
+                                        onClick={() => {
+                                            updateMutation.mutate({ chatId: chat.id, payload: { responsible_id: null } })
+                                            setShowAssign(false)
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Sin asignar
+                                    </button>
+                                    {members.map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => {
+                                                updateMutation.mutate({ chatId: chat.id, payload: { responsible_id: m.email } })
+                                                setShowAssign(false)
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-xs text-gray-800 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <div className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                                {m.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="truncate">{m.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Info */}
+                    <button
+                        onClick={onShowInfo}
+                        className={`p-2 rounded-xl transition-colors ${showInfo ? 'bg-clinical-50 text-clinical-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                        title="Info del contacto"
+                    >
+                        <LucideInfo className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
 
             {/* Messages */}
