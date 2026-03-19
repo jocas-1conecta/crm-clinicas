@@ -30,10 +30,11 @@ serve(async (req: Request) => {
 
     const payload = await req.json()
 
-    // Extract the key fields Timelines AI sends
-    const eventType: string  = payload?.event ?? payload?.type ?? 'unknown'
-    const chatId:    string  = String(payload?.data?.chat_id ?? payload?.chat_id ?? '')
-    const messageUid: string = String(payload?.data?.uid ?? payload?.data?.message_uid ?? '')
+    // Timelines AI payload structure:
+    // { event_type: "message:received:new", chat: { chat_id: 123 }, message: { message_uid: "..." } }
+    const eventType:   string = payload?.event_type ?? 'unknown'
+    const chatId:      string = String(payload?.chat?.chat_id ?? '')
+    const messageUid:  string = String(payload?.message?.message_uid ?? '')
 
     if (!chatId) {
       return new Response('OK - no chat_id', { status: 200 })
