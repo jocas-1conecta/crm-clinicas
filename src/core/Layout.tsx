@@ -17,7 +17,8 @@ import {
     LucideActivity,
     LucideBarChart3,
     LucideCheckSquare,
-    LucideWaypoints
+    LucideWaypoints,
+    LucideMessageSquare
 } from 'lucide-react'
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -61,6 +62,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Operating Roles (Super Admin, Admin & Asesor)
         { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+        { name: 'Chat', path: `${slugPrefix}/chat`, icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ...(hasClinicModule ? [
             { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
             { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },

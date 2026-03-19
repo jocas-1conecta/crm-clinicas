@@ -5,7 +5,8 @@ import {
     LucideUser, 
     LucideShieldCheck, 
     LucideBuilding, 
-    LucideUsers 
+    LucideUsers,
+    LucidePlugZap
 } from 'lucide-react'
 
 export const SettingsLayout: React.FC = () => {
@@ -45,6 +46,12 @@ export const SettingsLayout: React.FC = () => {
             path: `${prefix}/configuracion/equipo`,
             icon: LucideUsers,
             description: 'Gestión de asesores y doctores'
+        })
+        menuItems.push({
+            title: 'Integraciones',
+            path: `${prefix}/configuracion/integraciones`,
+            icon: LucidePlugZap,
+            description: 'Timelines AI, WhatsApp y más'
         })
     }
 

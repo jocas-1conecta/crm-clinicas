@@ -29,6 +29,8 @@ import { LeadsPipeline } from './core/leads/LeadsPipeline'
 import { PatientsDirectory } from './modules/clinic/patients/PatientsDirectory'
 import { ReportsDashboard } from './core/analytics/ReportsDashboard'
 import { CalendarTasks } from './core/calendar/CalendarTasks'
+import { ChatModule } from './core/chat/ChatModule'
+import { IntegrationsSettings } from './core/settings/IntegrationsSettings'
 
 const queryClient = new QueryClient()
 
@@ -173,6 +175,7 @@ function App() {
                     {/* Operation Roles (Super Admin, Admin & Asesor) */}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/tareas', '/:slug/tareas'].map(p => <Route key={p} path={p} element={<CalendarTasks />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/chat', '/:slug/chat'].map(p => <Route key={p} path={p} element={<ChatModule />} />)}
 
                     {/* Protected Clinic Modules */}
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
@@ -193,6 +196,7 @@ function App() {
                             <Route path="seguridad" element={<SecuritySettings />} />
                             <Route path="empresa" element={<WorkspaceSettings />} />
                             <Route path="equipo" element={<TeamManagement />} />
+                            <Route path="integraciones" element={<IntegrationsSettings />} />
                         </Route>
                     ))}
                     
