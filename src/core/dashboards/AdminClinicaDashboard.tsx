@@ -13,10 +13,12 @@ export const AdminClinicaDashboard: React.FC = () => {
     const { data: leads = [] } = useQuery({
         queryKey: ['leads-admin', clinicaId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('leads').select('id, name, status, phone, email, assigned_to, service, source, sucursal_id, created_at').eq('clinica_id', clinicaId).order('created_at', { ascending: false }).limit(500);
             if (error) throw error;
             return data;
-        }
+        },
+        enabled: !!clinicaId
     })
 
     const { data: stages = [] } = useQuery({
@@ -32,10 +34,12 @@ export const AdminClinicaDashboard: React.FC = () => {
     const { data: appointments = [] } = useQuery({
         queryKey: ['appointments-admin', clinicaId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('appointments').select('*');
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('appointments').select('id, patientName, doctorName, date, time, status, sucursal_id, assigned_to').eq('clinica_id', clinicaId).limit(500);
             if (error) throw error;
             return data;
-        }
+        },
+        enabled: !!clinicaId
     })
 
     const { data: services = [] } = useQuery({

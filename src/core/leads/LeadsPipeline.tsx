@@ -14,11 +14,11 @@ export const LeadsPipeline = () => {
         queryFn: async () => {
             // Super_Admin has no sucursal_id — query all leads for their clinic instead
             if (branchId) {
-                const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+                const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId).order('created_at', { ascending: false }).limit(500);
                 if (error) throw error;
                 return data;
             } else if (clinicaId) {
-                const { data, error } = await supabase.from('leads').select('*').eq('clinica_id', clinicaId);
+                const { data, error } = await supabase.from('leads').select('*').eq('clinica_id', clinicaId).order('created_at', { ascending: false }).limit(500);
                 if (error) throw error;
                 return data;
             }

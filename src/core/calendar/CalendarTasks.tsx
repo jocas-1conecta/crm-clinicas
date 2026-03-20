@@ -19,7 +19,7 @@ export const CalendarTasks = () => {
             } else {
                 q = q.eq('assigned_to', currentUser?.id);
             }
-            const { data, error } = await q.order('task_date', { ascending: true });
+            const { data, error } = await q.order('task_date', { ascending: true }).limit(500);
             if (error) throw error;
             return data;
         },

@@ -14,7 +14,7 @@ export const AppointmentsPipeline = () => {
         queryFn: async () => {
             if (!branchId) return [];
             // Assuming appointments have their own 'status' legacy, but now uses 'stage_id' and 'substage_id' for pipelines
-            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId);
+            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId).limit(500);
             if (error) throw error;
             return data;
         },

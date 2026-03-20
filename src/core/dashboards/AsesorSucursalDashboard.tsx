@@ -14,7 +14,7 @@ export const AsesorSucursalDashboard: React.FC = () => {
         queryKey: ['leads', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+            const { data, error } = await supabase.from('leads').select('id, name, status, phone, assigned_to, sucursal_id, created_at').eq('sucursal_id', branchId).limit(500);
             if (error) throw error;
             return data;
         },
@@ -25,7 +25,7 @@ export const AsesorSucursalDashboard: React.FC = () => {
         queryKey: ['appointments', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId);
+            const { data, error } = await supabase.from('appointments').select('id, status, sucursal_id, assigned_to').eq('sucursal_id', branchId).limit(500);
             if (error) throw error;
             return data;
         },

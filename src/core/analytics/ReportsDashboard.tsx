@@ -117,19 +117,23 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: leads = [] } = useQuery({
         queryKey: ['leads-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('leads').select('*')
+            if (!clinicId) return [];
+            const { data, error } = await supabase.from('leads').select('id, name, status, assigned_to, sucursal_id, created_at').eq('clinica_id', clinicId).limit(1000)
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!clinicId
     })
 
     const { data: appointments = [] } = useQuery({
         queryKey: ['appointments-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('appointments').select('*')
+            if (!clinicId) return [];
+            const { data, error } = await supabase.from('appointments').select('id, status, sucursal_id, assigned_to').eq('clinica_id', clinicId).limit(1000)
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!clinicId
     })
 
     const { data: team = [] } = useQuery({
@@ -145,19 +149,23 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: patients = [] } = useQuery({
         queryKey: ['patients-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('patients').select('*')
+            if (!clinicId) return [];
+            const { data, error } = await supabase.from('patients').select('id, assigned_to').eq('clinica_id', clinicId).limit(1000)
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!clinicId
     })
 
     const { data: deals = [] } = useQuery({
         queryKey: ['deals-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('deals').select('*')
+            if (!clinicId) return [];
+            const { data, error } = await supabase.from('deals').select('id, status, estimated_value, patient_id').eq('clinica_id', clinicId).limit(1000)
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!clinicId
     })
 
     return (
