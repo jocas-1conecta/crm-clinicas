@@ -12,17 +12,17 @@ export const LeadsPipeline = () => {
     const { data: dbLeads = [], isLoading: loadingLeads } = useQuery({
         queryKey: ['leads', branchId || clinicaId],
         queryFn: async () => {
-            // Super_Admin has no sucursal_id — query all leads for their clinic instead
+            // Super_Admin has no sucursal_id — RLS already scopes to their clinic
             if (branchId) {
                 const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId).order('created_at', { ascending: false }).limit(500);
                 if (error) throw error;
                 return data;
-            } else if (clinicaId) {
-                const { data, error } = await supabase.from('leads').select('*').eq('clinica_id', clinicaId).order('created_at', { ascending: false }).limit(500);
+            } else {
+                // Admin/Super_Admin: RLS filters by clinic automatically
+                const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(500);
                 if (error) throw error;
                 return data;
             }
-            return [];
         },
         enabled: !!(branchId || clinicaId),
     })

@@ -13,12 +13,11 @@ export const AdminClinicaDashboard: React.FC = () => {
     const { data: leads = [] } = useQuery({
         queryKey: ['leads-admin', clinicaId],
         queryFn: async () => {
-            if (!clinicaId) return [];
-            const { data, error } = await supabase.from('leads').select('id, name, status, phone, email, assigned_to, service, source, sucursal_id, created_at').eq('clinica_id', clinicaId).order('created_at', { ascending: false }).limit(500);
+            // leads table has no clinica_id — RLS scopes by clinic automatically
+            const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(500);
             if (error) throw error;
             return data;
-        },
-        enabled: !!clinicaId
+        }
     })
 
     const { data: stages = [] } = useQuery({

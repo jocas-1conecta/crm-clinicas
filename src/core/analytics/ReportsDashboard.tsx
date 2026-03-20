@@ -117,12 +117,11 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: leads = [] } = useQuery({
         queryKey: ['leads-admin', clinicId],
         queryFn: async () => {
-            if (!clinicId) return [];
-            const { data, error } = await supabase.from('leads').select('id, name, status, assigned_to, sucursal_id, created_at').eq('clinica_id', clinicId).limit(1000)
+            // leads table has no clinica_id — RLS scopes by clinic automatically
+            const { data, error } = await supabase.from('leads').select('*').limit(1000)
             if (error) throw error
             return data
-        },
-        enabled: !!clinicId
+        }
     })
 
     const { data: appointments = [] } = useQuery({
