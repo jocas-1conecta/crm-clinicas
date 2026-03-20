@@ -6,7 +6,8 @@ import {
     LucideShieldCheck, 
     LucideBuilding, 
     LucideUsers,
-    LucidePlugZap
+    LucidePlugZap,
+    LucideMessageSquare
 } from 'lucide-react'
 
 export const SettingsLayout: React.FC = () => {
@@ -52,6 +53,12 @@ export const SettingsLayout: React.FC = () => {
             path: `${prefix}/configuracion/integraciones`,
             icon: LucidePlugZap,
             description: 'Timelines AI, WhatsApp y más'
+        })
+        menuItems.push({
+            title: 'Plantillas Chat',
+            path: `${prefix}/configuracion/plantillas-chat`,
+            icon: LucideMessageSquare,
+            description: 'Mensajes predefinidos de WhatsApp'
         })
     }
 

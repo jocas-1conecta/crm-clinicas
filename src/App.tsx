@@ -31,6 +31,7 @@ import { ReportsDashboard } from './core/analytics/ReportsDashboard'
 import { CalendarTasks } from './core/calendar/CalendarTasks'
 import { ChatModule } from './core/chat/ChatModule'
 import { IntegrationsSettings } from './core/settings/IntegrationsSettings'
+import { ChatTemplatesSettings } from './core/settings/ChatTemplatesSettings'
 import { useGlobalChatNotifications } from './core/chat/useGlobalChatNotifications'
 
 /** Mounts the global real-time chat notification listener for all authenticated routes */
@@ -205,6 +206,7 @@ function App() {
                             <Route path="empresa" element={<WorkspaceSettings />} />
                             <Route path="equipo" element={<TeamManagement />} />
                             <Route path="integraciones" element={<IntegrationsSettings />} />
+                            <Route path="plantillas-chat" element={<ChatTemplatesSettings />} />
                         </Route>
                     ))}
                     

@@ -423,69 +423,46 @@ export async function markChatAsRead(apiKey: string, chatId: string): Promise<vo
 
 // ─── Message Templates (local — Timelines AI has no templates API) ────────────
 
-/** Returns predefined quick-reply templates for clinical use */
+/** Fetch templates – tries Supabase DB first, falls back to hardcoded defaults */
 export async function getTemplates(_apiKey: string): Promise<TimelinesTemplate[]> {
+  // Try Supabase first
+  try {
+    const { supabase: sb } = await import('./supabase')
+    const { data: { user } } = await sb.auth.getUser()
+    if (user) {
+      const { data: profile } = await sb.from('users').select('clinica_id').eq('id', user.id).single()
+      if (profile?.clinica_id) {
+        const { data: dbTemplates } = await sb
+          .from('chat_templates')
+          .select('*')
+          .eq('clinica_id', profile.clinica_id)
+          .eq('is_active', true)
+          .order('sort_order')
+          .order('created_at', { ascending: false })
+        if (dbTemplates && dbTemplates.length > 0) {
+          return dbTemplates.map((t: Record<string, unknown>) => ({
+            id: String(t.id),
+            name: String(t.name),
+            body: String(t.body),
+            category: String(t.category ?? 'general'),
+          }))
+        }
+      }
+    }
+  } catch { /* fall through to defaults */ }
+
+  // Hardcoded defaults
   return [
-    {
-      id: 'saludo',
-      name: '👋 Saludo inicial',
-      body: '¡Hola! Soy parte del equipo de la Clínica Rangel Pereira. ¿En qué podemos ayudarte hoy?',
-      category: 'greeting',
-    },
-    {
-      id: 'bienvenida',
-      name: '🏥 Bienvenida paciente nuevo',
-      body: '¡Hola! Bienvenido/a a la Clínica Rangel Pereira. Qué bueno que nos escribes 😊 Me gustaría saber tu nombre, de qué ciudad nos escribes y tratamiento de interés para brindarte una mejor asesoría.',
-      category: 'greeting',
-    },
-    {
-      id: 'cita',
-      name: '📅 Confirmar cita',
-      body: 'Le confirmo su cita para el día _____ a las _____ con la Dra. Rosalinda Rangel Pereira. Por favor llegar 15 minutos antes. ¿Tiene alguna pregunta?',
-      category: 'appointment',
-    },
-    {
-      id: 'recordatorio',
-      name: '⏰ Recordatorio de cita',
-      body: 'Hola, le recordamos que tiene una cita programada mañana a las _____. Por favor confirmar asistencia. ¡Gracias!',
-      category: 'appointment',
-    },
-    {
-      id: 'seguimiento',
-      name: '💊 Seguimiento post-consulta',
-      body: 'Hola, ¿cómo se ha sentido después de su consulta? Queremos saber si tiene alguna duda o si necesita algo más. Estamos para ayudarle.',
-      category: 'follow-up',
-    },
-    {
-      id: 'resultados',
-      name: '📋 Resultados disponibles',
-      body: 'Hola, le informamos que sus resultados ya están disponibles. ¿Le gustaría agendar una cita de seguimiento para revisarlos?',
-      category: 'results',
-    },
-    {
-      id: 'pago',
-      name: '💳 Información de pago',
-      body: 'Para su comodidad, puede realizar el pago mediante transferencia bancaria. Le envío los datos en seguida. Si tiene alguna duda, estoy para ayudarle.',
-      category: 'billing',
-    },
-    {
-      id: 'reagendar',
-      name: '🔄 Reagendar cita',
-      body: 'Entendemos que necesita reagendar su cita. ¿Qué fecha y horario le convendría? Tenemos disponibilidad de lunes a viernes.',
-      category: 'appointment',
-    },
-    {
-      id: 'despedida',
-      name: '🙏 Despedida',
-      body: '¡Gracias por comunicarse con la Clínica Rangel Pereira! Si necesita algo más, no dude en escribirnos. ¡Que tenga un excelente día!',
-      category: 'closing',
-    },
-    {
-      id: 'fuera_horario',
-      name: '🌙 Fuera de horario',
-      body: 'Hola, en este momento estamos fuera de nuestro horario de atención. Le responderemos a primera hora mañana. ¡Gracias por su comprensión!',
-      category: 'auto',
-    },
+    { id: 'saludo', name: '👋 Saludo inicial', body: '¡Hola! Soy parte del equipo de la Clínica Rangel Pereira. ¿En qué podemos ayudarte hoy?', category: 'greeting' },
+    { id: 'bienvenida', name: '🏥 Bienvenida paciente nuevo', body: '¡Hola! Bienvenido/a a la Clínica Rangel Pereira. Qué bueno que nos escribes 😊 Me gustaría saber tu nombre, de qué ciudad nos escribes y tratamiento de interés para brindarte una mejor asesoría.', category: 'greeting' },
+    { id: 'cita', name: '📅 Confirmar cita', body: 'Le confirmo su cita para el día _____ a las _____ con la Dra. Rosalinda Rangel Pereira. Por favor llegar 15 minutos antes. ¿Tiene alguna pregunta?', category: 'appointment' },
+    { id: 'recordatorio', name: '⏰ Recordatorio de cita', body: 'Hola, le recordamos que tiene una cita programada mañana a las _____. Por favor confirmar asistencia. ¡Gracias!', category: 'appointment' },
+    { id: 'seguimiento', name: '💊 Seguimiento post-consulta', body: 'Hola, ¿cómo se ha sentido después de su consulta? Queremos saber si tiene alguna duda o si necesita algo más. Estamos para ayudarle.', category: 'follow-up' },
+    { id: 'resultados', name: '📋 Resultados disponibles', body: 'Hola, le informamos que sus resultados ya están disponibles. ¿Le gustaría agendar una cita de seguimiento para revisarlos?', category: 'results' },
+    { id: 'pago', name: '💳 Información de pago', body: 'Para su comodidad, puede realizar el pago mediante transferencia bancaria. Le envío los datos en seguida. Si tiene alguna duda, estoy para ayudarle.', category: 'billing' },
+    { id: 'reagendar', name: '🔄 Reagendar cita', body: 'Entendemos que necesita reagendar su cita. ¿Qué fecha y horario le convendría? Tenemos disponibilidad de lunes a viernes.', category: 'appointment' },
+    { id: 'despedida', name: '🙏 Despedida', body: '¡Gracias por comunicarse con la Clínica Rangel Pereira! Si necesita algo más, no dude en escribirnos. ¡Que tenga un excelente día!', category: 'closing' },
+    { id: 'fuera_horario', name: '🌙 Fuera de horario', body: 'Hola, en este momento estamos fuera de nuestro horario de atención. Le responderemos a primera hora mañana. ¡Gracias por su comprensión!', category: 'auto' },
   ]
 }
 
