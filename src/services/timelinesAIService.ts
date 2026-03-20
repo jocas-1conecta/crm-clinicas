@@ -204,7 +204,15 @@ export async function getChats(
         const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
         if (msgs.length > 0) {
           const latestMsg = msgs[0]
-          const text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
+          let text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
+          // If no text but has attachment, show a descriptive label
+          if (!text && latestMsg.has_attachment) {
+            const fn = String(latestMsg.attachment_filename ?? '').toLowerCase()
+            if (fn.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/)) text = '📷 Imagen'
+            else if (fn.match(/\.(mp3|ogg|opus|wav|m4a|aac|oga)$/)) text = '🎵 Audio'
+            else if (fn.match(/\.(mp4|webm|mov|avi|3gp)$/)) text = '🎬 Video'
+            else text = '📎 Archivo'
+          }
           chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
         }
       }
