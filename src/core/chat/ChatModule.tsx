@@ -996,9 +996,7 @@ const ContactInfoPanel = ({ chat, onClose }: { chat: TimelinesChat; onClose: () 
             <div className="space-y-3">
                 <InfoRow icon={LucideUser} label="Nombre" value={chat.name || '—'} />
                 <InfoRow icon={LucidePhone} label="Teléfono" value={chat.phone || '—'} />
-                {chat.whatsapp_account_phone && (
-                    <InfoRow icon={LucidePhone} label="Cuenta WA" value={chat.whatsapp_account_phone} />
-                )}
+                
                 {chat.chat_assignee && (
                     <InfoRow icon={LucideUser} label="Asignado a" value={chat.chat_assignee} />
                 )}
