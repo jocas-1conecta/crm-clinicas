@@ -34,12 +34,10 @@ export const AdminClinicaDashboard: React.FC = () => {
     const { data: appointments = [] } = useQuery({
         queryKey: ['appointments-admin', clinicaId],
         queryFn: async () => {
-            if (!clinicaId) return [];
-            const { data, error } = await supabase.from('appointments').select('id, patientName, doctorName, date, time, status, sucursal_id, assigned_to').eq('clinica_id', clinicaId).limit(500);
+            const { data, error } = await supabase.from('appointments').select('*').limit(500);
             if (error) throw error;
             return data;
-        },
-        enabled: !!clinicaId
+        }
     })
 
     const { data: services = [] } = useQuery({
