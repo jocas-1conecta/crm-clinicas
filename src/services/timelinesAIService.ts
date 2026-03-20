@@ -304,24 +304,6 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
     return false
   }
 }
-/** Fetch message templates from Timelines AI workspace */
-export async function getTemplates(apiKey: string): Promise<TimelinesTemplate[]> {
-  const response = await fetch(`${BASE_URL}/templates`, {
-    method: 'GET',
-    headers: authHeaders(apiKey),
-  })
-  if (!response.ok) return []
-  const json = await response.json()
-  const raw = extractArray<Record<string, unknown>>(json, 'templates', 'data', 'results')
-  return raw.map(t => ({
-    id: String(t.id ?? t.name ?? ''),
-    name: String(t.name ?? t.title ?? ''),
-    body: String(t.body ?? t.content ?? t.text ?? ''),
-    language: String(t.language ?? ''),
-    category: String(t.category ?? ''),
-  }))
-}
-
 
 /** Update a chat — close/reopen or assign responsible */
 export async function updateChat(
@@ -437,6 +419,74 @@ export async function markChatAsRead(apiKey: string, chatId: string): Promise<vo
   if (!response.ok) {
     console.warn(`Failed to mark chat ${chatId} as read: ${response.status}`)
   }
+}
+
+// ─── Message Templates (local — Timelines AI has no templates API) ────────────
+
+/** Returns predefined quick-reply templates for clinical use */
+export async function getTemplates(_apiKey: string): Promise<TimelinesTemplate[]> {
+  return [
+    {
+      id: 'saludo',
+      name: '👋 Saludo inicial',
+      body: '¡Hola! Soy parte del equipo de la Clínica Rangel Pereira. ¿En qué podemos ayudarte hoy?',
+      category: 'greeting',
+    },
+    {
+      id: 'bienvenida',
+      name: '🏥 Bienvenida paciente nuevo',
+      body: '¡Hola! Bienvenido/a a la Clínica Rangel Pereira. Qué bueno que nos escribes 😊 Me gustaría saber tu nombre, de qué ciudad nos escribes y tratamiento de interés para brindarte una mejor asesoría.',
+      category: 'greeting',
+    },
+    {
+      id: 'cita',
+      name: '📅 Confirmar cita',
+      body: 'Le confirmo su cita para el día _____ a las _____ con la Dra. Rosalinda Rangel Pereira. Por favor llegar 15 minutos antes. ¿Tiene alguna pregunta?',
+      category: 'appointment',
+    },
+    {
+      id: 'recordatorio',
+      name: '⏰ Recordatorio de cita',
+      body: 'Hola, le recordamos que tiene una cita programada mañana a las _____. Por favor confirmar asistencia. ¡Gracias!',
+      category: 'appointment',
+    },
+    {
+      id: 'seguimiento',
+      name: '💊 Seguimiento post-consulta',
+      body: 'Hola, ¿cómo se ha sentido después de su consulta? Queremos saber si tiene alguna duda o si necesita algo más. Estamos para ayudarle.',
+      category: 'follow-up',
+    },
+    {
+      id: 'resultados',
+      name: '📋 Resultados disponibles',
+      body: 'Hola, le informamos que sus resultados ya están disponibles. ¿Le gustaría agendar una cita de seguimiento para revisarlos?',
+      category: 'results',
+    },
+    {
+      id: 'pago',
+      name: '💳 Información de pago',
+      body: 'Para su comodidad, puede realizar el pago mediante transferencia bancaria. Le envío los datos en seguida. Si tiene alguna duda, estoy para ayudarle.',
+      category: 'billing',
+    },
+    {
+      id: 'reagendar',
+      name: '🔄 Reagendar cita',
+      body: 'Entendemos que necesita reagendar su cita. ¿Qué fecha y horario le convendría? Tenemos disponibilidad de lunes a viernes.',
+      category: 'appointment',
+    },
+    {
+      id: 'despedida',
+      name: '🙏 Despedida',
+      body: '¡Gracias por comunicarse con la Clínica Rangel Pereira! Si necesita algo más, no dude en escribirnos. ¡Que tenga un excelente día!',
+      category: 'closing',
+    },
+    {
+      id: 'fuera_horario',
+      name: '🌙 Fuera de horario',
+      body: 'Hola, en este momento estamos fuera de nuestro horario de atención. Le responderemos a primera hora mañana. ¡Gracias por su comprensión!',
+      category: 'auto',
+    },
+  ]
 }
 
 // ─── Labels ───────────────────────────────────────────────────────────────────
