@@ -1039,8 +1039,8 @@ export const ChatModule: React.FC = () => {
     const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : ''
     const markAsRead = useMarkChatAsRead()
 
-    // Admin roles should NOT mark chats as read when viewing
-    const isAdmin = ['Platform_Owner', 'Super_Admin'].includes(currentUser?.role ?? '')
+    // Admin/Director roles should NOT mark chats as read when viewing
+    const isAdmin = ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'].includes(currentUser?.role ?? '')
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
