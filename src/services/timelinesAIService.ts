@@ -211,11 +211,16 @@ export async function getChats(
   })
   await Promise.all(enrichPromises)
 
-  // Sort by most recent message descending
+  // Sort by most recent message descending — chats without timestamps go to the bottom
   chats.sort((a, b) => {
     const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
     const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
-    return tb - ta
+    // If both have timestamps, sort by most recent first
+    if (ta && tb) return tb - ta
+    // Chats with timestamps go before those without
+    if (ta && !tb) return -1
+    if (!ta && tb) return 1
+    return 0
   })
 
   return {
