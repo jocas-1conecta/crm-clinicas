@@ -635,12 +635,16 @@ const ConversationPanel = ({
                     return (
                         <div key={msg.uid || msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-sm lg:max-w-md group`}>
-                                <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                                    isMine
-                                        ? isFailed
-                                            ? 'bg-red-100 text-red-800 rounded-br-sm border border-red-200'
-                                            : 'bg-clinical-600 text-white rounded-br-sm'
-                                        : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100'
+                                <div className={`rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${
+                                    msg.has_attachment && msg.attachment_url
+                                        ? (isMine
+                                            ? 'bg-clinical-600 text-white rounded-br-sm p-1'
+                                            : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100 p-1')
+                                        : (isMine
+                                            ? isFailed
+                                                ? 'bg-red-100 text-red-800 rounded-br-sm border border-red-200 px-4 py-2.5'
+                                                : 'bg-clinical-600 text-white rounded-br-sm px-4 py-2.5'
+                                            : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100 px-4 py-2.5')
                                 }`}>
                                     <MessageContent msg={msg} isMine={isMine} />
                                 </div>
