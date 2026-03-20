@@ -375,19 +375,19 @@ export async function uploadFile(apiKey: string, file: File): Promise<string> {
 
   const json = await response.json()
   // API returns: { status: "ok", data: { uid, filename, temporary_download_url, ... } }
-  const downloadUrl = json?.data?.temporary_download_url
-  if (!downloadUrl) throw new Error('No download URL returned from upload')
-  return downloadUrl
+  const fileUid = json?.data?.uid
+  if (!fileUid) throw new Error('No file UID returned from upload')
+  return fileUid
 }
 
-/** Send a file (already uploaded) to a chat */
+/** Send a file (already uploaded) to a chat using file_uid */
 export async function sendFileMessage(
   apiKey: string,
   chatId: string,
-  fileDownloadUrl: string,
+  fileUid: string,
   caption?: string
 ): Promise<void> {
-  const body: Record<string, string> = { attachment_url: fileDownloadUrl }
+  const body: Record<string, string> = { file_uid: fileUid }
   if (caption) body.text = caption
 
   const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {

@@ -774,15 +774,20 @@ const ConversationPanel = ({
                 {/* File/Image preview */}
                 {pendingFile && (
                     <div className="mb-2 flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+                        {/* Preview: image thumbnail, audio player, or file icon */}
                         {pendingPreview ? (
                             <img src={pendingPreview} alt="Preview" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                        ) : pendingFile.type.startsWith('audio/') ? (
+                            <audio controls className="h-8 w-40 shrink-0" src={URL.createObjectURL(pendingFile)} preload="auto" />
                         ) : (
                             <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center shrink-0">
                                 <LucideFileText className="w-5 h-5 text-gray-500" />
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-gray-700 truncate">{pendingFile.name}</p>
+                            <p className="text-xs font-medium text-gray-700 truncate">
+                                {pendingFile.type.startsWith('audio/') ? '🎤 Audio grabado' : pendingFile.name}
+                            </p>
                             <p className="text-[10px] text-gray-400">{(pendingFile.size / 1024).toFixed(0)} KB</p>
                         </div>
                         {uploadMutation.isPending ? (
