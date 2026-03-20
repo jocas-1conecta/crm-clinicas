@@ -402,6 +402,25 @@ export async function sendFileMessage(
   }
 }
 
+/** Send a voice note as a native WhatsApp PTT audio message */
+export async function sendVoiceMessage(
+  apiKey: string,
+  chatId: string,
+  audioFile: File
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', audioFile, audioFile.name)
+
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/voice_message`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error sending voice message ${response.status}: ${response.statusText}`)
+  }
+}
 
 // ─── Webhook registration ─────────────────────────────────────────────────────
 

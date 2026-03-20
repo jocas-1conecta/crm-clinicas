@@ -284,8 +284,16 @@ export function useUploadAndSendFile() {
             caption?: string
         }) => {
             if (!apiKey) throw new Error('No API Key configurada')
-            const downloadUrl = await api.uploadFile(apiKey, file)
-            await api.sendFileMessage(apiKey, chatId, downloadUrl, caption)
+
+            // Audio files → use dedicated voice_message endpoint (sends as WhatsApp PTT)
+            if (file.type.startsWith('audio/')) {
+                await api.sendVoiceMessage(apiKey, chatId, file)
+                return
+            }
+
+            // All other files → upload first, then send with file_uid
+            const fileUid = await api.uploadFile(apiKey, file)
+            await api.sendFileMessage(apiKey, chatId, fileUid, caption)
         },
         onSuccess: (_data, { chatId }) => {
             setTimeout(() => queryClient.invalidateQueries({
