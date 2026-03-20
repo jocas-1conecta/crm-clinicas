@@ -47,6 +47,10 @@ export interface TimelinesMessage {
   media_url?: string
   caption?: string
   author_name?: string
+  // Attachment fields (from Timelines AI API)
+  has_attachment?: boolean
+  attachment_url?: string
+  attachment_filename?: string
 }
 
 export interface TimelinesTemplate {
@@ -114,8 +118,10 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
 /** Normalise a raw message object to our TimelinesMessage shape */
 function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
   const text = String(raw.text ?? raw.body ?? raw.caption ?? '')
-  // from_me is directly provided by the API (bool)
   const fromMe = raw.from_me === true || raw.direction === 'sent'
+  const attachmentUrl = String(raw.attachment_url ?? raw.media_url ?? '')
+  const attachmentFilename = String(raw.attachment_filename ?? raw.filename ?? '')
+  const hasAttachment = raw.has_attachment === true || !!attachmentUrl
 
   return {
     ...(raw as unknown as TimelinesMessage),
@@ -127,6 +133,9 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
     from_me: fromMe,
     message_type: String(raw.message_type ?? raw.type ?? 'text'),
     author_name: String(raw.sender_name ?? raw.author_name ?? ''),
+    has_attachment: hasAttachment,
+    attachment_url: attachmentUrl || undefined,
+    attachment_filename: attachmentFilename || undefined,
   }
 }
 

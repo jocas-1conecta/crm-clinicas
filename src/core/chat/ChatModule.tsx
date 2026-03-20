@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation } from './useTimelinesAI'
-import { TimelinesChat } from '../../services/timelinesAIService'
+import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
     LucideSearch,
     LucideSend,
@@ -23,6 +23,8 @@ import {
     LucideZap,
     LucideFileText,
     LucidePlus,
+    LucideDownload,
+    LucidePlay,
 } from 'lucide-react'
 
 // ─── Util ────────────────────────────────────────────────────────────────────
@@ -39,7 +41,133 @@ function formatTime(isoOrTimestamp: string | number | undefined): string {
     return d.toLocaleDateString('es', { day: '2-digit', month: 'short' })
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+/** Detect file type from URL or filename */
+function getAttachmentType(url: string, filename?: string): 'image' | 'audio' | 'video' | 'document' {
+    const ext = (filename || url).split('.').pop()?.toLowerCase()?.split('?')[0] || ''
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'image'
+    if (['mp3', 'ogg', 'opus', 'wav', 'm4a', 'aac', 'oga'].includes(ext)) return 'audio'
+    if (['mp4', 'webm', 'mov', 'avi', '3gp'].includes(ext)) return 'video'
+    return 'document'
+}
+
+/** Format WhatsApp-style text: *bold*, _italic_, ~strikethrough~, and auto-link URLs */
+function formatWhatsAppText(text: string, isMine: boolean): React.ReactNode[] {
+    if (!text) return []
+    // Split by URL pattern first
+    const urlRegex = /(https?:\/\/[^\s<>"]+)/g
+    const parts = text.split(urlRegex)
+    
+    return parts.map((part, i) => {
+        // If this part is a URL
+        if (urlRegex.test(part)) {
+            urlRegex.lastIndex = 0 // Reset regex
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`underline break-all ${isMine ? 'text-blue-100 hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}
+                >
+                    {part.length > 50 ? part.slice(0, 50) + '…' : part}
+                </a>
+            )
+        }
+        // Apply WhatsApp formatting: *bold*, _italic_, ~strikethrough~
+        const formatted = part
+            .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+            .replace(/_((?!\s)[^_]+(?!\s))_/g, '<em>$1</em>')
+            .replace(/~([^~]+)~/g, '<del>$1</del>')
+        
+        return <span key={i} dangerouslySetInnerHTML={{ __html: formatted }} />
+    })
+}
+
+/** Rich message content renderer — handles images, audio, video, documents, URLs, formatting */
+const MessageContent = ({ msg, isMine }: { msg: TimelinesMessage; isMine: boolean }) => {
+    const [imgExpanded, setImgExpanded] = useState(false)
+    const attachUrl = msg.attachment_url
+    const attachName = msg.attachment_filename
+    const hasAttach = msg.has_attachment && !!attachUrl
+
+    if (hasAttach && attachUrl) {
+        const type = getAttachmentType(attachUrl, attachName)
+
+        if (type === 'image') {
+            return (
+                <div>
+                    <img
+                        src={attachUrl}
+                        alt={attachName || 'Imagen'}
+                        className="rounded-lg max-w-full max-h-64 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setImgExpanded(true)}
+                        loading="lazy"
+                    />
+                    {msg.text && <p className="mt-1.5 text-sm">{formatWhatsAppText(msg.text, isMine)}</p>}
+                    {imgExpanded && (
+                        <div
+                            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
+                            onClick={() => setImgExpanded(false)}
+                        >
+                            <img src={attachUrl} alt={attachName || 'Imagen'} className="max-w-full max-h-full rounded-lg" />
+                        </div>
+                    )}
+                </div>
+            )
+        }
+
+        if (type === 'audio') {
+            return (
+                <div className="min-w-[240px]">
+                    <audio controls className="w-full h-10" preload="none">
+                        <source src={attachUrl} />
+                    </audio>
+                    {msg.text && <p className="mt-1 text-sm">{formatWhatsAppText(msg.text, isMine)}</p>}
+                </div>
+            )
+        }
+
+        if (type === 'video') {
+            return (
+                <div>
+                    <video
+                        controls
+                        className="rounded-lg max-w-full max-h-64"
+                        preload="none"
+                    >
+                        <source src={attachUrl} />
+                    </video>
+                    {msg.text && <p className="mt-1.5 text-sm">{formatWhatsAppText(msg.text, isMine)}</p>}
+                </div>
+            )
+        }
+
+        // Document/file
+        return (
+            <div>
+                <a
+                    href={attachUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                        isMine
+                            ? 'border-white/20 bg-white/10 hover:bg-white/20 text-white'
+                            : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700'
+                    }`}
+                >
+                    <LucideFileText className="w-5 h-5 shrink-0" />
+                    <span className="text-sm truncate flex-1">{attachName || 'Archivo'}</span>
+                    <LucideDownload className="w-4 h-4 shrink-0" />
+                </a>
+                {msg.text && <p className="mt-1.5 text-sm">{formatWhatsAppText(msg.text, isMine)}</p>}
+            </div>
+        )
+    }
+
+    // Text-only message with formatting + auto-links
+    return <>{formatWhatsAppText(msg.text, isMine)}</>
+}
+
 
 const EmptyState = ({ icon: Icon, title, subtitle, action }: {
     icon: React.ElementType
@@ -514,7 +642,7 @@ const ConversationPanel = ({
                                             : 'bg-clinical-600 text-white rounded-br-sm'
                                         : 'bg-white text-gray-800 rounded-bl-sm border border-gray-100'
                                 }`}>
-                                    {msg.text}
+                                    <MessageContent msg={msg} isMine={isMine} />
                                 </div>
                                 {/* Per-message status indicator */}
                                 <div className={`text-[10px] mt-1 px-1 flex items-center gap-1 ${
