@@ -358,5 +358,74 @@ export function useCreateNewConversation() {
     })
 }
 
+// ─── Labels ───────────────────────────────────────────────────────────────────
+
+/** Fetch and manage labels for a chat */
+export function useChatLabels(chatId: string | null) {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+    const queryKey = ['timelines_labels', apiKey, chatId]
+
+    const query = useQuery({
+        queryKey,
+        queryFn: () => api.getChatLabels(apiKey!, chatId!),
+        enabled: !!apiKey && !!chatId,
+        staleTime: 60_000,
+    })
+
+    const addLabel = useMutation({
+        mutationFn: async (label: string) => {
+            if (!apiKey || !chatId) throw new Error('Missing params')
+            return api.addChatLabel(apiKey, chatId, label)
+        },
+        onSuccess: (newLabels) => {
+            queryClient.setQueryData(queryKey, newLabels)
+        },
+    })
+
+    const removeLabel = useMutation({
+        mutationFn: async (label: string) => {
+            if (!apiKey || !chatId) throw new Error('Missing params')
+            const current = query.data ?? []
+            const updated = current.filter(l => l !== label)
+            await api.setChatLabels(apiKey, chatId, updated)
+            return updated
+        },
+        onSuccess: (updated) => {
+            queryClient.setQueryData(queryKey, updated)
+        },
+    })
+
+    return { labels: query.data ?? [], isLoading: query.isLoading, addLabel, removeLabel }
+}
+
+// ─── Internal Notes ───────────────────────────────────────────────────────────
+
+/** Add an internal note to a chat */
+export function useAddChatNote() {
+    const { data: apiKey } = useApiKey()
+
+    return useMutation({
+        mutationFn: async ({ chatId, text }: { chatId: string; text: string }) => {
+            if (!apiKey) throw new Error('No API Key configurada')
+            return api.addChatNote(apiKey, chatId, text)
+        },
+    })
+}
+
+// ─── Message Delivery Status ──────────────────────────────────────────────────
+
+/** Get delivery status for a message */
+export function useMessageStatus(messageUid: string | null) {
+    const { data: apiKey } = useApiKey()
+
+    return useQuery({
+        queryKey: ['timelines_msg_status', apiKey, messageUid],
+        queryFn: () => api.getMessageStatusHistory(apiKey!, messageUid!),
+        enabled: !!apiKey && !!messageUid,
+        staleTime: 30_000,
+    })
+}
+
 export { useApiKey }
 

@@ -434,6 +434,83 @@ export async function markChatAsRead(apiKey: string, chatId: string): Promise<vo
   }
 }
 
+// ─── Labels ───────────────────────────────────────────────────────────────────
+
+/** Get labels for a chat */
+export async function getChatLabels(apiKey: string, chatId: string): Promise<string[]> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/labels`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+  if (!response.ok) return []
+  const json = await response.json()
+  return json?.data?.labels ?? []
+}
+
+/** Set labels for a chat (replaces all existing labels) */
+export async function setChatLabels(apiKey: string, chatId: string, labels: string[]): Promise<void> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/labels`, {
+    method: 'PUT',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ labels }),
+  })
+  if (!response.ok) {
+    throw new Error(`Error setting labels: ${response.status}`)
+  }
+}
+
+/** Add a single label to a chat (preserves existing labels) */
+export async function addChatLabel(apiKey: string, chatId: string, label: string): Promise<string[]> {
+  // POST /chats/{id}/labels adds a label without removing existing ones
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/labels`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ labels: [label] }),
+  })
+  if (!response.ok) {
+    throw new Error(`Error adding label: ${response.status}`)
+  }
+  const json = await response.json()
+  return json?.data?.labels ?? []
+}
+
+// ─── Internal Notes ───────────────────────────────────────────────────────────
+
+/** Add an internal note to a chat (visible only to workspace members) */
+export async function addChatNote(apiKey: string, chatId: string, text: string): Promise<string> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/notes`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ text }),
+  })
+  if (!response.ok) {
+    throw new Error(`Error adding note: ${response.status}`)
+  }
+  const json = await response.json()
+  return json?.data?.message_uid ?? ''
+}
+
+// ─── Message Delivery Status ──────────────────────────────────────────────────
+
+export interface MessageStatusEntry {
+  status: 'Sent' | 'Delivered' | 'Read' | string
+  timestamp: string
+}
+
+/** Get delivery status history for a specific message */
+export async function getMessageStatusHistory(
+  apiKey: string,
+  messageUid: string
+): Promise<MessageStatusEntry[]> {
+  const response = await fetch(`${BASE_URL}/messages/${messageUid}/status_history`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+  if (!response.ok) return []
+  const json = await response.json()
+  return json?.data ?? []
+}
+
 // ─── Webhook registration ─────────────────────────────────────────────────────
 
 /** Register a webhook URL to receive real-time events from Timelines AI */

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote } from './useTimelinesAI'
 import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -753,7 +753,7 @@ const ConversationPanel = ({
                                     {!isTemp && isMine && (
                                         <>
                                             <span>{formatTime(msg.timestamp)}</span>
-                                            <span className="text-clinical-400">✓</span>
+                                            <span className="text-clinical-400">✓✓</span>
                                         </>
                                     )}
                                     {!isMine && (
@@ -946,7 +946,33 @@ const ConversationPanel = ({
 
 // ─── Contact Info Panel ───────────────────────────────────────────────────────
 
-const ContactInfoPanel = ({ chat, onClose }: { chat: TimelinesChat; onClose: () => void }) => (
+const ContactInfoPanel = ({ chat, onClose }: { chat: TimelinesChat; onClose: () => void }) => {
+    const { labels, addLabel, removeLabel } = useChatLabels(chat.id)
+    const addNoteMutation = useAddChatNote()
+    const [newLabel, setNewLabel] = useState('')
+    const [noteText, setNoteText] = useState('')
+    const [noteSuccess, setNoteSuccess] = useState(false)
+
+    const handleAddLabel = () => {
+        const label = newLabel.trim()
+        if (!label) return
+        addLabel.mutate(label)
+        setNewLabel('')
+    }
+
+    const handleAddNote = () => {
+        const text = noteText.trim()
+        if (!text) return
+        addNoteMutation.mutate({ chatId: chat.id, text }, {
+            onSuccess: () => {
+                setNoteText('')
+                setNoteSuccess(true)
+                setTimeout(() => setNoteSuccess(false), 3000)
+            },
+        })
+    }
+
+    return (
     <div className="w-72 bg-white border-l border-gray-200 flex flex-col shrink-0">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-900 text-sm">Info del Contacto</h3>
@@ -979,21 +1005,71 @@ const ContactInfoPanel = ({ chat, onClose }: { chat: TimelinesChat; onClose: () 
             </div>
 
             {/* Labels */}
-            {chat.labels && chat.labels.length > 0 && (
-                <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Etiquetas</p>
-                    <div className="flex flex-wrap gap-2">
-                        {chat.labels.map(label => (
-                            <span key={label} className="px-2.5 py-1 bg-clinical-50 text-clinical-700 rounded-full text-xs font-medium">
-                                {label}
-                            </span>
-                        ))}
-                    </div>
+            <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Etiquetas</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                    {labels.map(label => (
+                        <span key={label} className="inline-flex items-center gap-1 px-2.5 py-1 bg-clinical-50 text-clinical-700 rounded-full text-xs font-medium group">
+                            {label}
+                            <button
+                                onClick={() => removeLabel.mutate(label)}
+                                className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
+                                title="Quitar etiqueta"
+                            >
+                                <LucideX className="w-3 h-3" />
+                            </button>
+                        </span>
+                    ))}
+                    {labels.length === 0 && <span className="text-xs text-gray-400 italic">Sin etiquetas</span>}
                 </div>
-            )}
+                <div className="flex gap-1.5">
+                    <input
+                        value={newLabel}
+                        onChange={e => setNewLabel(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddLabel()}
+                        placeholder="Agregar etiqueta..."
+                        className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-clinical-400"
+                    />
+                    <button
+                        onClick={handleAddLabel}
+                        disabled={!newLabel.trim() || addLabel.isPending}
+                        className="px-2.5 py-1.5 bg-clinical-500 text-white rounded-lg text-xs font-medium hover:bg-clinical-600 transition-colors disabled:opacity-40"
+                    >
+                        <LucidePlus className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Internal Notes */}
+            <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notas Internas</p>
+                <p className="text-[10px] text-gray-400 mb-1.5">Solo visible para el equipo</p>
+                <textarea
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                    placeholder="Escribir una nota..."
+                    rows={3}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs resize-none focus:outline-none focus:ring-1 focus:ring-clinical-400"
+                />
+                <div className="flex items-center gap-2 mt-1.5">
+                    <button
+                        onClick={handleAddNote}
+                        disabled={!noteText.trim() || addNoteMutation.isPending}
+                        className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors disabled:opacity-40 flex items-center gap-1"
+                    >
+                        {addNoteMutation.isPending
+                            ? <LucideLoader2 className="w-3 h-3 animate-spin" />
+                            : <LucideFileText className="w-3 h-3" />
+                        }
+                        Agregar Nota
+                    </button>
+                    {noteSuccess && <span className="text-xs text-green-600 font-medium">✓ Nota guardada</span>}
+                </div>
+            </div>
         </div>
     </div>
-)
+    )
+}
 
 const InfoRow = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) => (
     <div className="flex items-start gap-3">
