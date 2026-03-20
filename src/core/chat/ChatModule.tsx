@@ -499,7 +499,7 @@ const ConversationPanel = ({
                     </div>
                 )}
 
-                {messages?.map((msg) => {
+                {[...(messages ?? [])].reverse().map((msg) => {
                     const isMine = msg.from_me
                     const isTemp = msg.uid?.startsWith('temp-')
                     const isFailed = isTemp && sendMutation.isError
