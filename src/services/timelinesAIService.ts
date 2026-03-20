@@ -183,6 +183,32 @@ export async function getChats(
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
   const chats = raw.map(normaliseChat)
 
+  // Enrich each chat with its latest message text (in parallel, max 15 at once)
+  const enrichPromises = chats.slice(0, 50).map(async (chat) => {
+    try {
+      const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
+        method: 'GET',
+        headers: authHeaders(apiKey),
+      })
+      if (msgResponse.ok) {
+        const msgJson = await msgResponse.json()
+        const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
+        if (msgs.length > 0) {
+          const latestMsg = msgs[0]
+          chat.last_message = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
+          chat.last_message_time = String(latestMsg.timestamp ?? chat.last_message_time ?? '')
+          // If latest message is not from us and not read → unread
+          if (latestMsg.from_me === false && chat.read === false) {
+            chat.unread_count = 1
+          }
+        }
+      }
+    } catch {
+      // Silently skip enrichment failures
+    }
+  })
+  await Promise.all(enrichPromises)
+
   // Sort by most recent message descending
   chats.sort((a, b) => {
     const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
