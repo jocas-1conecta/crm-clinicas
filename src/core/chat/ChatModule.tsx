@@ -600,7 +600,7 @@ const ConversationPanel = ({
         <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
             {/* Conversation Header */}
             <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={onShowInfo}>
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold">
                         {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
                     </div>
