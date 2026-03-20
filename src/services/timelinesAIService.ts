@@ -177,9 +177,16 @@ export async function getChats(
 
   const json = await response.json()
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-  const chats = raw.map(normaliseChat)
+  const allChats = raw.map(normaliseChat)
 
-  // Enrich each chat with its latest message text (in parallel, max 15 at once)
+  // Filter: only show WhatsApp chats (jid ends with @s.whatsapp.net or @g.us)
+  // This excludes Facebook Messenger, Instagram, etc.
+  const chats = allChats.filter(chat => {
+    const jid = String(chat.jid ?? '')
+    return jid.endsWith('@s.whatsapp.net') || jid.endsWith('@g.us')
+  })
+
+  // Enrich each chat with its latest message text (in parallel)
   const enrichPromises = chats.slice(0, 50).map(async (chat) => {
     try {
       const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
@@ -193,7 +200,6 @@ export async function getChats(
           const latestMsg = msgs[0]
           chat.last_message = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
           chat.last_message_time = String(latestMsg.timestamp ?? chat.last_message_time ?? '')
-          // If latest message is not from us and not read → unread
           if (latestMsg.from_me === false && chat.read === false) {
             chat.unread_count = 1
           }
