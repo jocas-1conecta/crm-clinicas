@@ -24,37 +24,36 @@ ALTER TABLE public.chat_templates ENABLE ROW LEVEL SECURITY;
 -- All authenticated users in the same clinic can read templates
 CREATE POLICY "Users can read own clinic templates"
     ON public.chat_templates FOR SELECT
-    USING (
-        clinica_id IN (
-            SELECT clinica_id FROM public.users WHERE id = auth.uid()
-        )
-    );
+    USING (clinica_id = get_user_clinica_id());
 
 -- Only admins can manage templates
 CREATE POLICY "Admins can insert templates"
     ON public.chat_templates FOR INSERT
     WITH CHECK (
-        clinica_id IN (
-            SELECT u.clinica_id FROM public.users u
-            WHERE u.id = auth.uid() AND u.role IN ('Super_Admin', 'Admin_Clinica')
+        clinica_id = get_user_clinica_id()
+        AND EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid() AND p.role IN ('Super_Admin', 'Admin_Clinica')
         )
     );
 
 CREATE POLICY "Admins can update templates"
     ON public.chat_templates FOR UPDATE
     USING (
-        clinica_id IN (
-            SELECT u.clinica_id FROM public.users u
-            WHERE u.id = auth.uid() AND u.role IN ('Super_Admin', 'Admin_Clinica')
+        clinica_id = get_user_clinica_id()
+        AND EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid() AND p.role IN ('Super_Admin', 'Admin_Clinica')
         )
     );
 
 CREATE POLICY "Admins can delete templates"
     ON public.chat_templates FOR DELETE
     USING (
-        clinica_id IN (
-            SELECT u.clinica_id FROM public.users u
-            WHERE u.id = auth.uid() AND u.role IN ('Super_Admin', 'Admin_Clinica')
+        clinica_id = get_user_clinica_id()
+        AND EXISTS (
+            SELECT 1 FROM public.profiles p
+            WHERE p.id = auth.uid() AND p.role IN ('Super_Admin', 'Admin_Clinica')
         )
     );
 

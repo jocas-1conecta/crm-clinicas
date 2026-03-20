@@ -430,7 +430,7 @@ export async function getTemplates(_apiKey: string): Promise<TimelinesTemplate[]
     const { supabase: sb } = await import('./supabase')
     const { data: { user } } = await sb.auth.getUser()
     if (user) {
-      const { data: profile } = await sb.from('users').select('clinica_id').eq('id', user.id).single()
+      const { data: profile } = await sb.from('profiles').select('clinica_id').eq('id', user.id).single()
       if (profile?.clinica_id) {
         const { data: dbTemplates } = await sb
           .from('chat_templates')
