@@ -464,7 +464,13 @@ const ConversationPanel = ({
     const [showAssign, setShowAssign] = useState(false)
     const [showTemplates, setShowTemplates] = useState(false)
     const [pendingFile, setPendingFile] = useState<File | null>(null)
+    const [pendingPreview, setPendingPreview] = useState<string | null>(null)
+    const [isRecording, setIsRecording] = useState(false)
+    const [uploadError, setUploadError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const imageInputRef = useRef<HTMLInputElement>(null)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const audioChunksRef = useRef<Blob[]>([])
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const { data: messages, isLoading } = useChatMessages(chat?.id ?? null)
     const sendMutation = useSendMessage()
@@ -478,6 +484,9 @@ const ConversationPanel = ({
 
     useEffect(() => {
         setDraft('')
+        setPendingFile(null)
+        setPendingPreview(null)
+        setUploadError(null)
     }, [chat?.id])
 
     useEffect(() => {
@@ -486,11 +495,53 @@ const ConversationPanel = ({
 
     const lastFailedText = useRef<string>('')
 
+    const handleFileSelected = (file: File) => {
+        setPendingFile(file)
+        setUploadError(null)
+        // Generate image preview if it's an image
+        if (file.type.startsWith('image/')) {
+            const url = URL.createObjectURL(file)
+            setPendingPreview(url)
+        } else {
+            setPendingPreview(null)
+        }
+    }
+
+    const clearPendingFile = () => {
+        setPendingFile(null)
+        if (pendingPreview) {
+            URL.revokeObjectURL(pendingPreview)
+            setPendingPreview(null)
+        }
+        setUploadError(null)
+    }
+
+    const handleSendFile = () => {
+        if (!pendingFile || !chat) return
+        setUploadError(null)
+        uploadMutation.mutate(
+            { chatId: chat.id, file: pendingFile, caption: draft || undefined },
+            {
+                onSuccess: () => {
+                    clearPendingFile()
+                    setDraft('')
+                },
+                onError: (err) => {
+                    setUploadError(err instanceof Error ? err.message : 'Error al enviar archivo')
+                }
+            }
+        )
+    }
+
     const handleSend = () => {
+        if (pendingFile) {
+            handleSendFile()
+            return
+        }
         if (!draft.trim() || !chat) return
         const textToSend = draft.trim()
         lastFailedText.current = textToSend
-        setDraft('') // Clear input immediately for better UX
+        setDraft('')
         sendMutation.mutate({ chatId: chat.id, text: textToSend })
     }
 
@@ -504,6 +555,35 @@ const ConversationPanel = ({
             e.preventDefault()
             handleSend()
         }
+    }
+
+    // Audio recording
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+            audioChunksRef.current = []
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data)
+            }
+            recorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop())
+                const blob = new Blob(audioChunksRef.current, { type: 'audio/ogg' })
+                const audioFile = new File([blob], `audio_${Date.now()}.ogg`, { type: 'audio/ogg' })
+                handleFileSelected(audioFile)
+            }
+            recorder.start()
+            mediaRecorderRef.current = recorder
+            setIsRecording(true)
+        } catch {
+            setUploadError('No se pudo acceder al micrófono')
+        }
+    }
+
+    const stopRecording = () => {
+        mediaRecorderRef.current?.stop()
+        mediaRecorderRef.current = null
+        setIsRecording(false)
     }
 
     if (!chat) {
@@ -690,14 +770,52 @@ const ConversationPanel = ({
             </div>
 
             {/* Input */}
-            <div className="bg-white border-t border-gray-200 p-4 shrink-0">
-                {/* File preview */}
+            <div className="bg-white border-t border-gray-200 p-3 shrink-0">
+                {/* File/Image preview */}
                 {pendingFile && (
-                    <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
-                        <LucideFileText className="w-4 h-4 text-gray-400 shrink-0" />
-                        <span className="flex-1 truncate">{pendingFile.name}</span>
-                        <button onClick={() => setPendingFile(null)} className="text-gray-400 hover:text-gray-600">
-                            <LucideX className="w-3.5 h-3.5" />
+                    <div className="mb-2 flex items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+                        {pendingPreview ? (
+                            <img src={pendingPreview} alt="Preview" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                        ) : (
+                            <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center shrink-0">
+                                <LucideFileText className="w-5 h-5 text-gray-500" />
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-700 truncate">{pendingFile.name}</p>
+                            <p className="text-[10px] text-gray-400">{(pendingFile.size / 1024).toFixed(0)} KB</p>
+                        </div>
+                        {uploadMutation.isPending ? (
+                            <LucideLoader2 className="w-4 h-4 text-clinical-600 animate-spin shrink-0" />
+                        ) : (
+                            <button onClick={clearPendingFile} className="text-gray-400 hover:text-gray-600 shrink-0">
+                                <LucideX className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Upload error */}
+                {uploadError && (
+                    <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+                        <LucideAlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span className="flex-1">{uploadError}</span>
+                        <button onClick={() => setUploadError(null)} className="text-red-400 hover:text-red-600">
+                            <LucideX className="w-3 h-3" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Recording indicator */}
+                {isRecording && (
+                    <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                        <span className="flex-1 font-medium">Grabando audio...</span>
+                        <button
+                            onClick={stopRecording}
+                            className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600 transition-colors"
+                        >
+                            Detener
                         </button>
                     </div>
                 )}
@@ -721,28 +839,66 @@ const ConversationPanel = ({
                     </div>
                 )}
                 {showTemplates && templates.length === 0 && (
-                    <p className="mb-2 text-xs text-gray-400 text-center py-2">No hay plantillas configuradas en Timelines AI</p>
+                    <p className="mb-2 text-xs text-gray-400 text-center py-2">No hay plantillas configuradas</p>
                 )}
 
-                <div className="flex items-end gap-2">
-                    {/* Attach file button */}
+                <div className="flex items-end gap-1.5">
+                    {/* Hidden file inputs */}
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*,video/*"
+                        onChange={e => {
+                            const f = e.target.files?.[0]
+                            if (f) handleFileSelected(f)
+                            e.target.value = ''
+                        }}
+                    />
                     <input
                         ref={fileInputRef}
                         type="file"
                         className="hidden"
-                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                        accept="*/*"
                         onChange={e => {
                             const f = e.target.files?.[0]
-                            if (f) { setPendingFile(f); setDraft('') }
+                            if (f) handleFileSelected(f)
                             e.target.value = ''
                         }}
                     />
+
+                    {/* Image button (camera) */}
+                    <button
+                        onClick={() => imageInputRef.current?.click()}
+                        disabled={isRecording || uploadMutation.isPending}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-clinical-600 transition-colors shrink-0 disabled:opacity-40"
+                        title="Enviar imagen o video"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    </button>
+
+                    {/* File button (paperclip) */}
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+                        disabled={isRecording || uploadMutation.isPending}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-clinical-600 transition-colors shrink-0 disabled:opacity-40"
                         title="Adjuntar archivo"
                     >
                         <LucidePaperclip className="w-4 h-4" />
+                    </button>
+
+                    {/* Mic button (audio recording) */}
+                    <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={uploadMutation.isPending}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors shrink-0 ${
+                            isRecording
+                                ? 'bg-red-500 text-white animate-pulse'
+                                : 'text-gray-400 hover:bg-gray-100 hover:text-clinical-600'
+                        }`}
+                        title={isRecording ? 'Detener grabación' : 'Grabar audio'}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
                     </button>
 
                     {/* Templates button */}
@@ -751,31 +907,27 @@ const ConversationPanel = ({
                         className={`w-9 h-9 flex items-center justify-center rounded-xl transition-colors shrink-0 ${
                             showTemplates ? 'bg-clinical-50 text-clinical-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                         }`}
-                        title="Plantillas de mensaje"
+                        title="Plantillas"
                     >
                         <LucideZap className="w-4 h-4" />
                     </button>
 
+                    {/* Text input */}
                     <textarea
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={pendingFile ? 'Escribe un pie de foto (opcional)...' : 'Escribe un mensaje... (Enter para enviar)'}
+                        placeholder={pendingFile ? 'Pie de foto (opcional)...' : 'Escribe un mensaje...'}
                         rows={1}
-                        disabled={!!pendingFile && uploadMutation.isPending}
+                        disabled={isRecording || uploadMutation.isPending}
                         className="flex-1 resize-none px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-clinical-400 focus:border-transparent transition-all placeholder-gray-400"
                         style={{ minHeight: '42px', maxHeight: '120px' }}
                     />
+
+                    {/* Send button */}
                     <button
-                        onClick={() => {
-                            if (pendingFile && chat) {
-                                uploadMutation.mutate({ chatId: chat.id, file: pendingFile, caption: draft || undefined },
-                                    { onSuccess: () => { setPendingFile(null); setDraft('') } })
-                            } else {
-                                handleSend()
-                            }
-                        }}
-                        disabled={(!draft.trim() && !pendingFile) || sendMutation.isPending || uploadMutation.isPending}
+                        onClick={handleSend}
+                        disabled={(!draft.trim() && !pendingFile) || sendMutation.isPending || uploadMutation.isPending || isRecording}
                         className="w-10 h-10 bg-clinical-600 hover:bg-clinical-700 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                         {(sendMutation.isPending || uploadMutation.isPending)
