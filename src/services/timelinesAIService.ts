@@ -192,8 +192,9 @@ export async function getChats(
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
   const chats = raw.map(normaliseChat)
 
-  // Enrich first 15 chats with last message text preview (in parallel)
-  const enrichPromises = chats.slice(0, 15).map(async (chat) => {
+  // Enrich first 5 chats with last message text preview (in parallel)
+  // Kept minimal to avoid rate-limit issues at scale (200+ concurrent users)
+  const enrichPromises = chats.slice(0, 5).map(async (chat) => {
     try {
       const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
         method: 'GET',

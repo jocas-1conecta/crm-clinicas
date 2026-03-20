@@ -133,7 +133,8 @@ export function useChats(options: {
             return result
         },
         enabled: !!apiKey,
-        refetchInterval: 60_000,
+        staleTime: 30_000,       // Don't refetch for 30s — prevents redundant calls on tab switches
+        refetchInterval: 60_000, // Background refresh every 60s
         retry: 1,
     })
 
@@ -165,7 +166,8 @@ export function useChatMessages(chatId: string | null) {
         queryKey: ['timelines_messages', apiKey, chatId],
         queryFn: () => api.getChatMessages(apiKey!, chatId!),
         enabled: !!apiKey && !!chatId,
-        refetchInterval: 15_000, // Poll every 15s
+        staleTime: 10_000,       // Don't refetch for 10s — realtime handles most updates
+        refetchInterval: 15_000, // Fallback poll every 15s
         retry: 1,
     })
 }
