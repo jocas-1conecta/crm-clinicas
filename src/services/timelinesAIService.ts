@@ -110,7 +110,12 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
     last_message_time: String(raw.last_message_timestamp ?? raw.last_message_time ?? ''),
     chat_status: raw.closed ? 'closed' : 'open',
     chat_assignee: String(raw.responsible_name ?? raw.chat_assignee ?? '') || null,
-    whatsapp_account_phone: String(raw.whatsapp_account_id ?? raw.whatsapp_account_phone ?? ''),
+    whatsapp_account_phone: (() => {
+      const raw_wa = String(raw.whatsapp_account_id ?? raw.whatsapp_account_phone ?? '')
+      // Strip JID suffix like @s.whatsapp.net → just the phone number
+      const phone = raw_wa.replace(/@.*$/, '')
+      return phone ? `+${phone}` : ''
+    })(),
     unread_count: raw.read === false ? 1 : 0,
   }
 }
