@@ -422,6 +422,18 @@ export async function sendVoiceMessage(
   }
 }
 
+/** Mark a chat as read via PATCH /chats/{id} */
+export async function markChatAsRead(apiKey: string, chatId: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}`, {
+    method: 'PATCH',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ read: true }),
+  })
+  if (!response.ok) {
+    console.warn(`Failed to mark chat ${chatId} as read: ${response.status}`)
+  }
+}
+
 // ─── Webhook registration ─────────────────────────────────────────────────────
 
 /** Register a webhook URL to receive real-time events from Timelines AI */

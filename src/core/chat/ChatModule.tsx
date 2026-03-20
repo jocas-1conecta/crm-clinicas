@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead } from './useTimelinesAI'
 import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -412,9 +412,7 @@ const ChatListPanel = ({
                                 {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
                             </div>
                             {(chat.unread_count ?? 0) > 0 && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                    {chat.unread_count}
-                                </div>
+                                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900" />
                             )}
                         </div>
 
@@ -1039,6 +1037,10 @@ const NoApiKeyBanner = ({ slugPrefix }: { slugPrefix: string }) => (
 export const ChatModule: React.FC = () => {
     const { currentUser } = useStore()
     const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : ''
+    const markAsRead = useMarkChatAsRead()
+
+    // Admin roles should NOT mark chats as read when viewing
+    const isAdmin = ['Platform_Owner', 'Super_Admin'].includes(currentUser?.role ?? '')
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
@@ -1095,7 +1097,14 @@ export const ChatModule: React.FC = () => {
             <ChatListPanel
                 chats={chats}
                 selectedId={selectedChat?.id ?? null}
-                onSelect={(chat) => { setSelectedChat(chat); setShowInfo(false) }}
+                onSelect={(chat) => {
+                    setSelectedChat(chat)
+                    setShowInfo(false)
+                    // Mark as read only for non-admin roles
+                    if (!isAdmin && (chat.unread_count ?? 0) > 0) {
+                        markAsRead(chat.id)
+                    }
+                }}
                 isLoading={chatsLoading}
                 isError={isError}
                 onRefresh={refetch}

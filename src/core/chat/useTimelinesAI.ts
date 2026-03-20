@@ -303,6 +303,31 @@ export function useUploadAndSendFile() {
     })
 }
 
+/** Mark a chat as read (updates API + optimistic cache update) */
+export function useMarkChatAsRead() {
+    const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
+
+    return useCallback(async (chatId: string) => {
+        if (!apiKey) return
+        // Optimistic: update local cache immediately
+        queryClient.setQueriesData<{ chats: api.TimelinesChat[]; hasMore: boolean; page: number }>(
+            { queryKey: ['timelines_chats'] },
+            (old) => {
+                if (!old) return old
+                return {
+                    ...old,
+                    chats: old.chats.map(c =>
+                        c.id === chatId ? { ...c, unread_count: 0 } : c
+                    ),
+                }
+            }
+        )
+        // Fire-and-forget API call
+        api.markChatAsRead(apiKey, chatId).catch(() => {})
+    }, [apiKey, queryClient])
+}
+
 /** Fetch message templates from Timelines AI */
 export function useTemplates() {
     const { data: apiKey } = useApiKey()
