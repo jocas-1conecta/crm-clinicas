@@ -298,44 +298,6 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
     return false
   }
 }
-
-/** Upload a file to Timelines AI and return its file_id */
-export async function uploadFile(apiKey: string, file: File): Promise<string> {
-  const formData = new FormData()
-  formData.append('file', file)
-
-  const response = await fetch(`${BASE_URL}/files`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}` }, // No Content-Type: browser sets multipart boundary
-    body: formData,
-  })
-  if (!response.ok) {
-    throw new Error(`Error subiendo archivo ${response.status}: ${response.statusText}`)
-  }
-  const json = await response.json()
-  // Response: { status: "ok", data: { file_id: "..." } } or { file_id: "..." }
-  const fileId = json?.data?.file_id ?? json?.file_id ?? json?.id
-  if (!fileId) throw new Error('No se recibió file_id de Timelines AI')
-  return String(fileId)
-}
-
-/** Send a file message using a pre-uploaded file_id */
-export async function sendFileMessage(
-  apiKey: string,
-  chatId: string,
-  fileId: string,
-  caption?: string
-): Promise<void> {
-  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
-    method: 'POST',
-    headers: authHeaders(apiKey),
-    body: JSON.stringify({ file_id: fileId, text: caption ?? '' }),
-  })
-  if (!response.ok) {
-    throw new Error(`Error enviando archivo ${response.status}: ${response.statusText}`)
-  }
-}
-
 /** Fetch message templates from Timelines AI workspace */
 export async function getTemplates(apiKey: string): Promise<TimelinesTemplate[]> {
   const response = await fetch(`${BASE_URL}/templates`, {
@@ -391,6 +353,52 @@ export async function getWorkspaceMembers(apiKey: string): Promise<WorkspaceMemb
     name: String(u.name ?? u.full_name ?? u.email ?? ''),
     email: String(u.email ?? ''),
   }))
+}
+
+
+// ─── File Upload ──────────────────────────────────────────────────────────────
+
+/** Upload a file to Timelines AI and return the file UID */
+export async function uploadFile(apiKey: string, file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file, file.name)
+
+  const response = await fetch(`${BASE_URL}/files_upload`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error uploading file ${response.status}: ${response.statusText}`)
+  }
+
+  const json = await response.json()
+  // API returns: { status: "ok", data: { uid, filename, temporary_download_url, ... } }
+  const downloadUrl = json?.data?.temporary_download_url
+  if (!downloadUrl) throw new Error('No download URL returned from upload')
+  return downloadUrl
+}
+
+/** Send a file (already uploaded) to a chat */
+export async function sendFileMessage(
+  apiKey: string,
+  chatId: string,
+  fileDownloadUrl: string,
+  caption?: string
+): Promise<void> {
+  const body: Record<string, string> = { attachment_url: fileDownloadUrl }
+  if (caption) body.text = caption
+
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Error sending file ${response.status}: ${response.statusText}`)
+  }
 }
 
 

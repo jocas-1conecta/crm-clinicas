@@ -282,8 +282,8 @@ export function useUploadAndSendFile() {
             caption?: string
         }) => {
             if (!apiKey) throw new Error('No API Key configurada')
-            const fileId = await api.uploadFile(apiKey, file)
-            await api.sendFileMessage(apiKey, chatId, fileId, caption)
+            const downloadUrl = await api.uploadFile(apiKey, file)
+            await api.sendFileMessage(apiKey, chatId, downloadUrl, caption)
         },
         onSuccess: (_data, { chatId }) => {
             setTimeout(() => queryClient.invalidateQueries({
