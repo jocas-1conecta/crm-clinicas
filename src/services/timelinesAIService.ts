@@ -161,13 +161,9 @@ export async function getChats(
   if (status === 'open')   params.set('closed', 'false')
   if (status === 'closed') params.set('closed', 'true')
 
-  // Type filter: all = unread only (to get active chats), direct/group = explicit
+  // Type filter: direct/group = explicit
   if (chatType === 'direct') params.set('group', 'false')
   if (chatType === 'group')  params.set('group', 'true')
-
-  // Default behaviour when "all" status: fetch unread chats to get recent activity
-  if (status === 'all' && chatType === 'all') params.set('read', 'false')
-  if (status === 'open')   params.set('read', 'false')
 
   const url = `${BASE_URL}/chats?${params.toString()}`
   const response = await fetch(url, {
