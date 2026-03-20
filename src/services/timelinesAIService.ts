@@ -157,13 +157,17 @@ export async function getChats(
 
   const params = new URLSearchParams({ page: String(page) })
 
-  // Status filter: all = no filter, open = closed=false, closed = closed=true
+  // Status filter
   if (status === 'open')   params.set('closed', 'false')
   if (status === 'closed') params.set('closed', 'true')
 
-  // Type filter: direct/group = explicit
+  // Type filter
   if (chatType === 'direct') params.set('group', 'false')
   if (chatType === 'group')  params.set('group', 'true')
+
+  // Show unread chats by default → API returns them sorted by recent activity
+  // with last_message_timestamp populated. For 'closed' tab, skip this filter.
+  if (status !== 'closed') params.set('read', 'false')
 
   const url = `${BASE_URL}/chats?${params.toString()}`
   const response = await fetch(url, {
@@ -177,17 +181,10 @@ export async function getChats(
 
   const json = await response.json()
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-  const allChats = raw.map(normaliseChat)
+  const chats = raw.map(normaliseChat)
 
-  // Filter: only show WhatsApp chats (jid ends with @s.whatsapp.net or @g.us)
-  // This excludes Facebook Messenger, Instagram, etc.
-  const chats = allChats.filter(chat => {
-    const jid = String(chat.jid ?? '')
-    return jid.endsWith('@s.whatsapp.net') || jid.endsWith('@g.us')
-  })
-
-  // Enrich each chat with its latest message text (in parallel)
-  const enrichPromises = chats.slice(0, 50).map(async (chat) => {
+  // Enrich first 15 chats with last message text preview (in parallel)
+  const enrichPromises = chats.slice(0, 15).map(async (chat) => {
     try {
       const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
         method: 'GET',
@@ -198,30 +195,15 @@ export async function getChats(
         const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
         if (msgs.length > 0) {
           const latestMsg = msgs[0]
-          chat.last_message = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
-          chat.last_message_time = String(latestMsg.timestamp ?? chat.last_message_time ?? '')
-          if (latestMsg.from_me === false && chat.read === false) {
-            chat.unread_count = 1
-          }
+          const text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
+          chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
         }
       }
     } catch {
-      // Silently skip enrichment failures
+      // Silently skip
     }
   })
   await Promise.all(enrichPromises)
-
-  // Sort by most recent message descending — chats without timestamps go to the bottom
-  chats.sort((a, b) => {
-    const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
-    const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
-    // If both have timestamps, sort by most recent first
-    if (ta && tb) return tb - ta
-    // Chats with timestamps go before those without
-    if (ta && !tb) return -1
-    if (!ta && tb) return 1
-    return 0
-  })
 
   return {
     chats,
