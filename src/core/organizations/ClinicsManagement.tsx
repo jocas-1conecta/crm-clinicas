@@ -356,7 +356,7 @@ export const ClinicsManagement = () => {
     const queryClient = useQueryClient()
     const [searchTerm, setSearchTerm] = useState('')
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [selectedClinic, setSelectedClinic] = useState<any>(null)
+    const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null)
 
     const { data: clinics = [], isLoading } = useQuery({
         queryKey: ['clinicas'],
@@ -463,7 +463,7 @@ export const ClinicsManagement = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {filteredClinics.map((clinic: any) => (
                                     <tr key={clinic.id} className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
-                                        onClick={() => setSelectedClinic(clinic)}>
+                                        onClick={() => setSelectedClinicId(clinic.id)}>
                                         <td className="p-5">
                                             <div className="flex items-center space-x-3">
                                                 <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
@@ -515,7 +515,7 @@ export const ClinicsManagement = () => {
                                                         <LucideCheckCircle className="w-4 h-4" />
                                                     </button>
                                                 )}
-                                                <button onClick={() => setSelectedClinic(clinic)}
+                                                <button onClick={() => setSelectedClinicId(clinic.id)}
                                                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
                                                     <LucideChevronRight className="w-4 h-4" />
                                                 </button>
@@ -540,7 +540,7 @@ export const ClinicsManagement = () => {
 
             {/* Modals */}
             <CreateClinicModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
-            <EditClinicDrawer clinic={selectedClinic} open={!!selectedClinic} onClose={() => setSelectedClinic(null)} />
+            <EditClinicDrawer clinic={clinics.find((c: any) => c.id === selectedClinicId)} open={!!selectedClinicId} onClose={() => setSelectedClinicId(null)} />
         </div>
     )
 }
