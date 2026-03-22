@@ -30,8 +30,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     // Role Helper
     const roleLabel = {
         'Platform_Owner': 'SaaS Founder',
-        'Super_Admin': 'Super Admin',
-        'Admin_Clinica': 'Director Clínica',
+        'Super_Admin': 'Director General',
+        'Admin_Clinica': 'Gerente de Sucursal',
         'Asesor_Sucursal': 'Asesor Comercial'
     }[currentUser?.role || 'Asesor_Sucursal'];
 
@@ -52,11 +52,11 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Platform Owner
         { name: 'Clinicas', path: `/clinicas`, icon: LucideBuilding, roles: ['Platform_Owner'] },
 
-        // Clinic Admin & Super Admin Specific
-        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica', 'Super_Admin'] },
-        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica', 'Super_Admin'] },
-        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica', 'Super_Admin'] },
-        { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Admin_Clinica', 'Super_Admin'] },
+        // Director General (Super_Admin) Only
+        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Super_Admin'] },
+        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Super_Admin'] },
+        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Super_Admin'] },
+        { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Super_Admin'] },
 
         // Advisor Specific
         { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },
@@ -74,7 +74,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
         { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Admin_Clinica', 'Super_Admin'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Super_Admin'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)
@@ -157,9 +157,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                                 {
                                     currentUser?.role === 'Platform_Owner' ? 'Plataforma Global' :
-                                    currentUser?.role === 'Super_Admin' ? 'Vista Consolidada Tenant' :
-                                        currentUser?.role === 'Admin_Clinica' ? 'Vista Administrativa' :
-                                            'Vista de Sucursal'
+                                    currentUser?.role === 'Super_Admin' ? 'Vista Director General' :
+                                        currentUser?.role === 'Admin_Clinica' ? 'Vista de Sucursal' :
+                                            'Vista de Asesor'
                                 }
                             </span>
                             {(currentUser?.role === 'Admin_Clinica' || currentUser?.role === 'Super_Admin') && (

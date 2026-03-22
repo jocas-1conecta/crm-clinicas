@@ -176,12 +176,12 @@ function App() {
                     {/* Platform Owner Routes (Global SaaS) */}
                     {currentUser.role === 'Platform_Owner' && ['/clinicas', '/:slug/clinicas'].map(p => <Route key={p} path={p} element={<ClinicsManagement />} />)}
 
-                    {/* Clinic Admin & Super Admin Routes */}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
+                    {/* Director General (Super_Admin) Only Routes */}
+                    {currentUser.role === 'Super_Admin' && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
+                    {currentUser.role === 'Super_Admin' && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
+                    {currentUser.role === 'Super_Admin' && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
+                    {currentUser.role === 'Super_Admin' && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
+                    {currentUser.role === 'Super_Admin' && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
 
                     {/* Operation Roles (Super Admin, Admin & Asesor) */}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}

@@ -10,8 +10,8 @@ export const Profile = () => {
 
     const roleLabel = {
         'Platform_Owner': 'SaaS Founder',
-        'Super_Admin': 'Super Administrador',
-        'Admin_Clinica': 'Director de Clínica',
+        'Super_Admin': 'Director General',
+        'Admin_Clinica': 'Gerente de Sucursal',
         'Asesor_Sucursal': 'Asesor Comercial'
     }[currentUser.role];
 

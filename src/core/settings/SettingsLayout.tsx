@@ -34,7 +34,7 @@ export const SettingsLayout: React.FC = () => {
     ]
 
     // Opciones exclusivas para roles administrativos
-    const isAdmin = currentUser.role === 'Super_Admin' || currentUser.role === 'Admin_Clinica'
+    const isAdmin = currentUser.role === 'Super_Admin'
     if (isAdmin) {
         menuItems.push({
             title: 'Espacio de Trabajo',

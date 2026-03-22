@@ -12,9 +12,8 @@ export const ReportsDashboard = () => {
     const renderContent = () => {
         switch (role) {
             case 'Super_Admin':
-                return <SuperAdminReports currentUser={currentUser} />
-            case 'Admin_Clinica':
                 return <ClinicAdminReports currentUser={currentUser} />
+            case 'Admin_Clinica':
             case 'Asesor_Sucursal':
                 return <AdvisorReports currentUser={currentUser} />
             default:

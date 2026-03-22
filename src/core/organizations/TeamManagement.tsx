@@ -24,6 +24,10 @@ export const TeamManagement: React.FC = () => {
                 .eq('clinica_id', currentUser.clinica_id)
                 .neq('role', 'Super_Admin');
             if (error) throw error;
+            // Admin_Clinica only sees members from their own sucursal
+            if (currentUser.role === 'Admin_Clinica' && currentUser.sucursal_id) {
+                return data.filter((m: any) => m.sucursal_id === currentUser.sucursal_id);
+            }
             return data;
         },
         enabled: !!currentUser?.clinica_id,
@@ -261,7 +265,9 @@ export const TeamManagement: React.FC = () => {
                                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                     >
                                         <option value="Asesor_Sucursal">Asesor de Sucursal</option>
-                                        <option value="Admin_Clinica">Administrador Local</option>
+                                        {currentUser?.role === 'Super_Admin' && (
+                                            <option value="Admin_Clinica">Gerente de Sucursal</option>
+                                        )}
                                     </select>
                                 </div>
                                 <div>

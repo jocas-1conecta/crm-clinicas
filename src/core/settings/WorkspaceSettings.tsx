@@ -21,7 +21,7 @@ export const WorkspaceSettings: React.FC = () => {
              if (error) throw error
              return data
         },
-        enabled: !!currentUser?.clinica_id && (currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica')
+        enabled: !!currentUser?.clinica_id && currentUser?.role === 'Super_Admin'
     })
 
     const [name, setName] = useState('')
@@ -110,7 +110,7 @@ export const WorkspaceSettings: React.FC = () => {
         }
     }
 
-    if (currentUser?.role !== 'Super_Admin' && currentUser?.role !== 'Admin_Clinica') {
+    if (currentUser?.role !== 'Super_Admin') {
          return <div className="text-red-500">No tienes permisos para ver esta sección.</div>
     }
 

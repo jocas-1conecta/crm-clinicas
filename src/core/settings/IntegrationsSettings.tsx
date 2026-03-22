@@ -65,7 +65,7 @@ export const IntegrationsSettings: React.FC = () => {
         }
     })
 
-    if (currentUser?.role !== 'Super_Admin' && currentUser?.role !== 'Admin_Clinica') {
+    if (currentUser?.role !== 'Super_Admin') {
         return <div className="text-red-500">No tienes permisos para ver esta sección.</div>
     }
 
