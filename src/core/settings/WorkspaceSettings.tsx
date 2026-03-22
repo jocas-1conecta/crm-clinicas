@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
-import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera } from 'lucide-react'
+import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink } from 'lucide-react'
+import { buildTenantUrl } from '../../utils/getTenantSlug'
 
 export const WorkspaceSettings: React.FC = () => {
     const { currentUser } = useStore()
@@ -28,14 +29,63 @@ export const WorkspaceSettings: React.FC = () => {
     const [email, setEmail] = useState('')
     const [currency, setCurrency] = useState('USD')
     const [uploadingLogo, setUploadingLogo] = useState(false)
+
+    // Slug editing state
+    const [slug, setSlug] = useState('')
+    const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
+    const [isCheckingSlug, setIsCheckingSlug] = useState(false)
+    const [slugError, setSlugError] = useState('')
     
     useEffect(() => {
         if (tenant) {
             setName(tenant.name || '')
             setEmail(tenant.email_contacto || '')
             setCurrency(tenant.currency || 'USD')
+            setSlug(tenant.slug || '')
         }
     }, [tenant])
+
+    // Debounced slug availability check
+    useEffect(() => {
+        if (!slug || slug === tenant?.slug) {
+            setSlugAvailable(null)
+            setSlugError('')
+            return
+        }
+
+        // Validate format
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+            setSlugError('Solo letras minúsculas, números y guiones. Debe comenzar con letra o número.')
+            setSlugAvailable(false)
+            return
+        }
+        if (slug.length < 3) {
+            setSlugError('Mínimo 3 caracteres.')
+            setSlugAvailable(null)
+            return
+        }
+
+        setSlugError('')
+        setIsCheckingSlug(true)
+
+        const timeout = setTimeout(async () => {
+            try {
+                const { data, error } = await supabase.rpc('is_slug_available', {
+                    checked_slug: slug
+                })
+                if (error) throw error
+                setSlugAvailable(data === true)
+                if (data !== true) setSlugError('Este slug ya está en uso.')
+            } catch (err) {
+                console.error('Error checking slug:', err)
+                setSlugAvailable(null)
+            } finally {
+                setIsCheckingSlug(false)
+            }
+        }, 500)
+
+        return () => clearTimeout(timeout)
+    }, [slug, tenant?.slug])
 
     const updateMutation = useMutation({
         mutationFn: async (updates: { name: string, email_contacto: string, currency: string }) => {
@@ -56,14 +106,41 @@ export const WorkspaceSettings: React.FC = () => {
         }
     })
 
+    const slugMutation = useMutation({
+        mutationFn: async (newSlug: string) => {
+            if (!currentUser?.clinica_id) throw new Error("No tenant id")
+            const { data, error } = await supabase
+                .from('clinicas')
+                .update({ slug: newSlug })
+                .eq('id', currentUser.clinica_id)
+                .select()
+                .single()
+            if (error) throw error
+            return data
+        },
+        onSuccess: (updatedData) => {
+            queryClient.setQueryData(['tenant_settings', currentUser?.clinica_id], updatedData)
+            // Redirect to new subdomain
+            window.location.href = buildTenantUrl(updatedData.slug, '/configuracion/empresa')
+        }
+    })
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         updateMutation.mutate({ name, email_contacto: email, currency })
     }
 
+    const handleSlugSave = () => {
+        if (!slug || slug === tenant?.slug || slugAvailable !== true) return
+        if (!confirm(`¿Estás seguro de cambiar tu URL a ${slug}.1clc.app? Se redirigirá automáticamente a tu nuevo subdominio.`)) return
+        slugMutation.mutate(slug)
+    }
+
     const isPristine = name === (tenant?.name || '') &&
                        email === (tenant?.email_contacto || '') &&
                        currency === (tenant?.currency || 'USD')
+
+    const slugChanged = slug !== (tenant?.slug || '')
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -90,7 +167,6 @@ export const WorkspaceSettings: React.FC = () => {
                 .from('logos')
                 .getPublicUrl(filePath)
 
-            // Update clinicas with new logo URL
             const { error: updateError } = await supabase
                 .from('clinicas')
                 .update({ logo_url: publicUrl })
@@ -172,6 +248,83 @@ export const WorkspaceSettings: React.FC = () => {
                         <h3 className="text-sm font-bold text-gray-900 block mb-1">Logo de la Empresa</h3>
                         <p className="text-xs text-gray-500">Haz clic en la imagen para cambiarla. Se recomiendan PNGs transparentes.</p>
                     </div>
+                </div>
+
+                {/* Slug / Subdomain Section */}
+                <div className="mb-8 pb-8 border-b border-gray-100">
+                    <div className="flex items-center space-x-2 mb-4">
+                        <LucideGlobe className="w-4 h-4 text-indigo-500" />
+                        <h3 className="text-sm font-bold text-gray-900">URL de tu Plataforma</h3>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex-1">
+                            <input
+                                id="workspace-slug"
+                                type="text"
+                                value={slug}
+                                onChange={(e) => {
+                                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                                    setSlug(val)
+                                }}
+                                className="flex-1 px-4 py-2.5 bg-transparent text-gray-900 font-medium outline-none text-sm"
+                                placeholder="mi-clinica"
+                            />
+                            <span className="pr-4 text-gray-400 text-sm font-medium select-none whitespace-nowrap">.1clc.app</span>
+                        </div>
+
+                        <button
+                            onClick={handleSlugSave}
+                            disabled={!slugChanged || slugAvailable !== true || slugMutation.isPending}
+                            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                                slugChanged && slugAvailable === true
+                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                            {slugMutation.isPending ? (
+                                <><LucideLoader2 className="w-3.5 h-3.5 animate-spin" /> Guardando...</>
+                            ) : (
+                                <><LucideGlobe className="w-3.5 h-3.5" /> Cambiar URL</>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Status indicators */}
+                    <div className="mt-2 min-h-[20px]">
+                        {isCheckingSlug && (
+                            <p className="text-xs text-gray-400 flex items-center gap-1">
+                                <LucideLoader2 className="w-3 h-3 animate-spin" /> Verificando disponibilidad...
+                            </p>
+                        )}
+                        {!isCheckingSlug && slugChanged && slugAvailable === true && (
+                            <p className="text-xs text-emerald-600 flex items-center gap-1">
+                                <LucideCheckCircle2 className="w-3 h-3" /> ¡Disponible! Tu URL será: <strong>{slug}.1clc.app</strong>
+                            </p>
+                        )}
+                        {!isCheckingSlug && slugError && (
+                            <p className="text-xs text-red-500 flex items-center gap-1">
+                                <LucideAlertCircle className="w-3 h-3" /> {slugError}
+                            </p>
+                        )}
+                        {!slugChanged && tenant?.slug && (
+                            <a 
+                                href={buildTenantUrl(tenant.slug, '/')} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors"
+                            >
+                                <LucideExternalLink className="w-3 h-3" />
+                                {tenant.slug}.1clc.app
+                            </a>
+                        )}
+                    </div>
+
+                    {slugMutation.isError && (
+                        <div className="mt-3 bg-red-50 text-red-700 p-3 rounded-xl text-xs border border-red-100">
+                            Error al cambiar el slug: {slugMutation.error?.message}
+                        </div>
+                    )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
