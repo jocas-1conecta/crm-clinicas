@@ -66,24 +66,56 @@ export const ProfileSettings: React.FC = () => {
                        phone === (profile?.phone || '') &&
                        timezone === (profile?.timezone || 'America/Bogota')
 
+    // Compress image using Canvas API — no external libraries needed
+    const compressImage = (file: File, maxSize = 512, quality = 0.8): Promise<Blob> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                let { width, height } = img
+
+                // Scale down proportionally if larger than maxSize
+                if (width > maxSize || height > maxSize) {
+                    if (width > height) {
+                        height = Math.round((height * maxSize) / width)
+                        width = maxSize
+                    } else {
+                        width = Math.round((width * maxSize) / height)
+                        height = maxSize
+                    }
+                }
+
+                canvas.width = width
+                canvas.height = height
+                const ctx = canvas.getContext('2d')
+                if (!ctx) { reject(new Error('Canvas not supported')); return }
+
+                ctx.drawImage(img, 0, 0, width, height)
+                canvas.toBlob(
+                    (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+                    'image/jpeg',
+                    quality
+                )
+            }
+            img.onerror = () => reject(new Error('Error loading image'))
+            img.src = URL.createObjectURL(file)
+        })
+    }
+
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file || !currentUser) return
 
-        if (file.size > 2 * 1024 * 1024) {
-            alert('La imagen seleccionada es demasiado grande. Por favor, asegúrate de que pese menos de 2MB.')
-            return
-        }
-
         setUploadingAvatar(true)
         try {
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`
+            // Compress the image (max 512x512, JPEG 80% quality)
+            const compressed = await compressImage(file, 512, 0.8)
+            const fileName = `${currentUser.id}-${Date.now()}.jpg`
             const filePath = `avatars/${fileName}`
 
             let { error: uploadError } = await supabase.storage
                 .from('avatars')
-                .upload(filePath, file)
+                .upload(filePath, compressed, { contentType: 'image/jpeg' })
 
             if (uploadError) throw uploadError
 
