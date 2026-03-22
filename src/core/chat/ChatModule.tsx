@@ -208,7 +208,6 @@ const ChatListPanel = ({
     isLoading,
     isError,
     onRefresh,
-    slugPrefix,
     hasMore,
     onLoadMore,
     statusFilter,
@@ -222,7 +221,6 @@ const ChatListPanel = ({
     isLoading: boolean
     isError: boolean
     onRefresh: () => void
-    slugPrefix: string
     hasMore: boolean
     onLoadMore: () => void
     statusFilter: 'all' | 'open' | 'closed'
@@ -389,7 +387,7 @@ const ChatListPanel = ({
                 {isError && (
                     <div className="m-4 bg-red-900/30 text-red-300 p-3 rounded-xl text-xs border border-red-800/40 flex items-start gap-2">
                         <LucideAlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Error al cargar chats. Verifica tu API Key en <Link to={`${slugPrefix}/configuracion/integraciones`} className="underline">Configuración → Integraciones</Link>.</span>
+                        <span>Error al cargar chats. Verifica tu API Key en <Link to="/configuracion/integraciones" className="underline">Configuración → Integraciones</Link>.</span>
                     </div>
                 )}
 
@@ -1083,7 +1081,7 @@ const InfoRow = ({ icon: Icon, label, value }: { icon: React.ElementType; label:
 
 // ─── No API Key Banner ────────────────────────────────────────────────────────
 
-const NoApiKeyBanner = ({ slugPrefix }: { slugPrefix: string }) => (
+const NoApiKeyBanner = () => (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8">
         <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-100 to-emerald-200 flex items-center justify-center shadow-sm">
             <LucidePlugZap className="w-10 h-10 text-emerald-600" />
@@ -1096,7 +1094,7 @@ const NoApiKeyBanner = ({ slugPrefix }: { slugPrefix: string }) => (
             </p>
         </div>
         <Link
-            to={`${slugPrefix}/configuracion/integraciones`}
+            to="/configuracion/integraciones"
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-700 transition-all shadow-md shadow-green-100"
         >
             <LucidePlugZap className="w-4 h-4" />
@@ -1110,7 +1108,6 @@ const NoApiKeyBanner = ({ slugPrefix }: { slugPrefix: string }) => (
 
 export const ChatModule: React.FC = () => {
     const { currentUser } = useStore()
-    const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : ''
     const markAsRead = useMarkChatAsRead()
 
     // Admin/Director roles should NOT mark chats as read when viewing
@@ -1158,7 +1155,7 @@ export const ChatModule: React.FC = () => {
     if (!apiKey) {
         return (
             <div className="flex-1 flex flex-col bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
-                <NoApiKeyBanner slugPrefix={slugPrefix} />
+                <NoApiKeyBanner />
             </div>
         )
     }
@@ -1182,7 +1179,7 @@ export const ChatModule: React.FC = () => {
                 isLoading={chatsLoading}
                 isError={isError}
                 onRefresh={refetch}
-                slugPrefix={slugPrefix}
+
                 hasMore={hasMore}
                 onLoadMore={loadMore}
                 statusFilter={statusFilter}

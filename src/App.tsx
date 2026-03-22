@@ -34,10 +34,31 @@ import { ChatModule } from './core/chat/ChatModule'
 import { IntegrationsSettings } from './core/settings/IntegrationsSettings'
 import { ChatTemplatesSettings } from './core/settings/ChatTemplatesSettings'
 import { useGlobalChatNotifications } from './core/chat/useGlobalChatNotifications'
+import { getTenantSlug, buildTenantUrl } from './utils/getTenantSlug'
 
 /** Mounts the global real-time chat notification listener for all authenticated routes */
 function GlobalNotificationsMount() {
     useGlobalChatNotifications()
+    return null
+}
+
+/**
+ * Backward-compatibility redirect:
+ * If someone visits 1clc.app/clinicademo/dashboard (old path-based URL),
+ * redirect them to clinicademo.1clc.app/dashboard (new subdomain URL).
+ */
+function LegacySlugRedirect() {
+    const path = window.location.pathname
+    const match = path.match(/^\/([a-z0-9][a-z0-9-]+)(\/.*)?$/)
+    if (match && !getTenantSlug()) {
+        const possibleSlug = match[1]
+        const rest = match[2] || '/dashboard'
+        const reserved = ['login', 'registro', 'join', 'olvide-mi-contrasena', 'actualizar-contrasena', 'dashboard', 'clinicas', 'configuracion', 'leads', 'tareas', 'chat', 'citas', 'pacientes', 'reportes', 'perfil', 'mis-sucursales', 'catalogos', 'embudos', 'automatizaciones', 'gestion', 'mi-dashboard']
+        if (!reserved.includes(possibleSlug)) {
+            window.location.href = buildTenantUrl(possibleSlug, rest)
+            return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Redirigiendo...</p></div>
+        }
+    }
     return null
 }
 
@@ -48,7 +69,6 @@ function App() {
     const [isAuthLoading, setIsAuthLoading] = useState(true)
 
     useEffect(() => {
-        // Initial session check
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 fetchProfileAndSetUser(session.user)
@@ -58,7 +78,6 @@ function App() {
             }
         })
 
-        // Listen for auth changes (login, logout)
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 fetchProfileAndSetUser(session.user)
@@ -73,8 +92,6 @@ function App() {
 
     const fetchProfileAndSetUser = async (user: any) => {
         try {
-            // Use the SECURITY DEFINER RPC to bypass all RLS policies.
-            // This prevents infinite recursion during login for all roles.
             const { data, error } = await supabase.rpc('get_my_profile')
 
             if (error) {
@@ -88,7 +105,6 @@ function App() {
                 return
             }
 
-            // Only fetch clinic data if user belongs to a clinic (Platform Owner has none)
             let clinica_slug: string | undefined = undefined
             let active_modules: string[] = []
 
@@ -137,25 +153,17 @@ function App() {
     if (!currentUser) {
         return (
             <Routes>
-                {/* Guest Routes (No Auth Needed) */}
-                {['/olvide-mi-contrasena', '/:slug/olvide-mi-contrasena'].map(p => <Route key={p} path={p} element={<ForgotPassword />} />)}
-                {['/actualizar-contrasena', '/:slug/actualizar-contrasena'].map(p => <Route key={p} path={p} element={<UpdatePassword />} />)}
-                
-                {/* Identifier-First Auth Router */}
-                <Route path="/:slug/login" element={<Login />} />
+                <Route path="/olvide-mi-contrasena" element={<ForgotPassword />} />
+                <Route path="/actualizar-contrasena" element={<UpdatePassword />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/registro" element={<OnboardingWizard />} />
                 <Route path="/join" element={<AcceptInvitation />} />
                 <Route path="/" element={<Login />} />
-                
-                {/* Fallback to Global Gateway if typing random string */}
-                <Route path="/:slug" element={<Login />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<Login />} />
             </Routes>
         )
     }
 
-    // Default redirects based on role
     const getRoleFallback = () => {
         switch(currentUser.role) {
             case 'Platform_Owner': return '/clinicas';
@@ -169,62 +177,56 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
         <GlobalNotificationsMount />
+        <LegacySlugRedirect />
         <Layout>
             <Suspense fallback={<div className="p-10 flex justify-center text-gray-400">Cargando módulo...</div>}>
                 <Routes>
-                    {/* Dashboards (Universal Proxy) */}
-                    {(currentUser.role === 'Platform_Owner' || currentUser.role === 'Super_Admin' || currentUser.role === 'Admin_Clinica' || currentUser.role === 'Asesor_Sucursal') && 
-                        ['/dashboard', '/:slug/dashboard'].map(p => <Route key={p} path={p} element={<RootDashboard />} />)
-                    }
+                    {/* Dashboards */}
+                    <Route path="/dashboard" element={<RootDashboard />} />
 
-                    {/* Platform Owner Routes (Global SaaS) */}
-                    {currentUser.role === 'Platform_Owner' && ['/clinicas', '/:slug/clinicas'].map(p => <Route key={p} path={p} element={<ClinicsManagement />} />)}
+                    {/* Platform Owner */}
+                    {currentUser.role === 'Platform_Owner' && <Route path="/clinicas" element={<ClinicsManagement />} />}
 
-                    {/* Director General (Super_Admin) Only Routes */}
-                    {currentUser.role === 'Super_Admin' && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
-                    {currentUser.role === 'Super_Admin' && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
-                    {currentUser.role === 'Super_Admin' && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
-                    {currentUser.role === 'Super_Admin' && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
+                    {/* Super_Admin Only */}
+                    {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales" element={<BranchesManagement />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/catalogos" element={<CatalogsManagement />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/embudos" element={<PipelineConfig />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/gestion" element={<Management />} />}
 
-                    {/* Protected by automations module */}
                     <Route element={<ModuleGuard requiredModule="automations" />}>
-                        {currentUser.role === 'Super_Admin' && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
+                        {currentUser.role === 'Super_Admin' && <Route path="/automatizaciones" element={<TaskSequenceConfig />} />}
                     </Route>
 
-                    {/* Operation Roles (Super Admin, Admin & Asesor) */}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/tareas', '/:slug/tareas'].map(p => <Route key={p} path={p} element={<CalendarTasks />} />)}
+                    {/* Operation Roles */}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/leads" element={<LeadsPipeline />} />}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/tareas" element={<CalendarTasks />} />}
 
-                    {/* Protected by chat_whatsapp module */}
                     <Route element={<ModuleGuard requiredModule="chat_whatsapp" />}>
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/chat', '/:slug/chat'].map(p => <Route key={p} path={p} element={<ChatModule />} />)}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/chat" element={<ChatModule />} />}
                     </Route>
 
-                    {/* Protected Clinic Modules */}
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/citas', '/:slug/citas'].map(p => <Route key={p} path={p} element={<AppointmentsPipeline />} />)}
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/pacientes', '/:slug/pacientes'].map(p => <Route key={p} path={p} element={currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />} />)}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/citas" element={<AppointmentsPipeline />} />}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/pacientes" element={currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />} />}
                     </Route>
 
-                    {/* Protected by analytics module */}
                     <Route element={<ModuleGuard requiredModule="analytics" />}>
-                        {['/reportes', '/:slug/reportes'].map(p => <Route key={p} path={p} element={<ReportsDashboard />} />)}
+                        <Route path="/reportes" element={<ReportsDashboard />} />
                     </Route>
-                    {['/perfil', '/:slug/perfil'].map(p => <Route key={p} path={p} element={<Profile />} />)}
-                    {['/actualizar-contrasena', '/:slug/actualizar-contrasena'].map(p => <Route key={p} path={p} element={<UpdatePassword />} />)}
 
-                    {/* Settings Hub (Nested Routes) */}
-                    {['/configuracion', '/:slug/configuracion'].map(basePath => (
-                        <Route key={basePath} path={basePath} element={<SettingsLayout />}>
-                            <Route index element={<Navigate to="perfil" replace />} />
-                            <Route path="perfil" element={<ProfileSettings />} />
-                            <Route path="seguridad" element={<SecuritySettings />} />
-                            <Route path="empresa" element={<WorkspaceSettings />} />
-                            <Route path="equipo" element={<TeamManagement />} />
-                            <Route path="integraciones" element={<IntegrationsSettings />} />
-                            <Route path="plantillas-chat" element={<ChatTemplatesSettings />} />
-                        </Route>
-                    ))}
+                    <Route path="/perfil" element={<Profile />} />
+                    <Route path="/actualizar-contrasena" element={<UpdatePassword />} />
+
+                    {/* Settings Hub */}
+                    <Route path="/configuracion" element={<SettingsLayout />}>
+                        <Route index element={<Navigate to="perfil" replace />} />
+                        <Route path="perfil" element={<ProfileSettings />} />
+                        <Route path="seguridad" element={<SecuritySettings />} />
+                        <Route path="empresa" element={<WorkspaceSettings />} />
+                        <Route path="equipo" element={<TeamManagement />} />
+                        <Route path="integraciones" element={<IntegrationsSettings />} />
+                        <Route path="plantillas-chat" element={<ChatTemplatesSettings />} />
+                    </Route>
                     
                     {/* Fallback */}
                     <Route path="*" element={<Navigate to={getRoleFallback()} replace />} />

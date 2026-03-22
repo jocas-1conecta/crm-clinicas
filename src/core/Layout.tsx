@@ -42,45 +42,44 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         'Asesor_Sucursal': 'bg-green-100 text-green-700'
     }[currentUser?.role || 'Asesor_Sucursal'];
 
-    const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : '';
     const hasModule = (mod: string) => currentUser?.active_modules?.includes(mod);
 
     const navItems = [
         // Shared
-        { name: 'Dashboard', path: `${slugPrefix}/dashboard`, icon: LucideLayoutDashboard, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'] },
+        { name: 'Dashboard', path: '/dashboard', icon: LucideLayoutDashboard, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'] },
 
         // Platform Owner
-        { name: 'Clinicas', path: `/clinicas`, icon: LucideBuilding, roles: ['Platform_Owner'] },
+        { name: 'Clinicas', path: '/clinicas', icon: LucideBuilding, roles: ['Platform_Owner'] },
 
         // Director General (Super_Admin) Only
-        { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Super_Admin'] },
-        { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Super_Admin'] },
-        { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Super_Admin'] },
+        { name: 'Mis Sucursales', path: '/mis-sucursales', icon: LucideMapPin, roles: ['Super_Admin'] },
+        { name: 'Catálogos', path: '/catalogos', icon: LucideBriefcase, roles: ['Super_Admin'] },
+        { name: 'Embudos', path: '/embudos', icon: LucideWaypoints, roles: ['Super_Admin'] },
         ...(hasModule('automations') ? [
-            { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Super_Admin'] },
+            { name: 'Automatizaciones', path: '/automatizaciones', icon: LucideZap, roles: ['Super_Admin'] },
         ] : []),
 
         // Advisor Specific
-        { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },
+        { name: 'Mi Dashboard', path: '/mi-dashboard', icon: LucideActivity, roles: ['Asesor_Sucursal'] },
 
         // Operating Roles (Super Admin, Admin & Asesor)
-        { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+        { name: 'Leads', path: '/leads', icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+        { name: 'Tareas', path: '/tareas', icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ...(hasModule('chat_whatsapp') ? [
-            { name: 'Chat', path: `${slugPrefix}/chat`, icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+            { name: 'Chat', path: '/chat', icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ] : []),
         ...(hasModule('clinic_core') ? [
-            { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-            { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+            { name: 'Citas', path: '/citas', icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+            { name: 'Pacientes', path: '/pacientes', icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ] : []),
 
         // Analytics
         ...(hasModule('analytics') ? [
-            { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+            { name: 'Reportes', path: '/reportes', icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
         ] : []),
-        { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        { name: 'Configuración', path: '/configuracion/perfil', icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Super_Admin'] },
+        { name: 'Gestión', path: '/gestion', icon: LucideWaypoints, roles: ['Super_Admin'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)
@@ -125,15 +124,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
                 <div className="p-4 border-t border-gray-100">
                     <button
-                        onClick={async () => {
-                            const slug = currentUser?.clinica_slug;
+                         onClick={async () => {
                             queryClient.clear();
                             await logout();
-                            if (slug) {
-                                window.location.href = `/${slug}`;
-                            } else {
-                                window.location.href = '/';
-                            }
+                            window.location.href = '/login';
                         }}
                         className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium"
                     >
@@ -177,7 +171,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         </div>
 
 
-                        <Link to={`${slugPrefix}/configuracion/perfil`} className="flex items-center space-x-4 pl-6 border-l border-gray-100 group cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
+                        <Link to="/configuracion/perfil" className="flex items-center space-x-4 pl-6 border-l border-gray-100 group cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
                             <div className="text-right">
                                 <p className="text-sm font-bold text-gray-900 leading-none group-hover:text-clinical-600 transition-colors">{currentUser?.name}</p>
                                 <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${roleColor}`}>

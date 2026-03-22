@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { buildTenantUrl } from '../../utils/getTenantSlug'
 import { supabase } from '../../services/supabase'
 import { 
     LucideBuilding, 
@@ -187,8 +188,8 @@ export const OnboardingWizard = () => {
             // Refrescamos sesión automáticamente porque el role/tenant fueron asginados backdoor por el RPC
             await supabase.auth.refreshSession()
             
-            // Navegamos al Gateway del Tenant pre-llenando el email para paso 2.
-            navigate(`/${formData.tenantSlug}/login?email=${encodeURIComponent(formData.adminEmail)}`)
+            // Redirect to the tenant's subdomain
+            window.location.href = buildTenantUrl(formData.tenantSlug, `/login?email=${encodeURIComponent(formData.adminEmail)}`)
 
         } catch (err: any) {
             console.error("Onboarding Error:", err)

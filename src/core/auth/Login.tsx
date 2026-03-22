@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
 import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock, LucideBuilding } from 'lucide-react'
+import { getTenantSlug, buildTenantUrl, buildPlatformUrl } from '../../utils/getTenantSlug'
 
 export const Login = () => {
-    // URL Slug for the specific SaaS Tenant (ex: /inmobiliaria-xyz/login)
-    const { slug } = useParams<{ slug?: string }>()
+    // Detect tenant from subdomain instead of URL params
+    const slug = getTenantSlug()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
 
@@ -28,22 +29,6 @@ export const Login = () => {
     const [tenantTheme, setTenantTheme] = useState<{ primary_color: string, logo_url: string } | null>(null)
     const [tenantName, setTenantName] = useState<string | null>(null)
 
-    // Sincroniza el step y datos cuando cambian las URLs sin desmontar React
-    useEffect(() => {
-        if (isGlobalGateway) {
-            setStep(1)
-            setPassword('')
-        } else {
-            const urlEmail = searchParams.get('email')
-            if (urlEmail) {
-                setEmail(urlEmail)
-                setStep(2)
-            } else {
-                setStep(1)
-            }
-        }
-    }, [slug, isGlobalGateway, searchParams])
-
     useEffect(() => {
         const fetchTenantBrand = async () => {
             if (isGlobalGateway) {
@@ -59,8 +44,8 @@ export const Login = () => {
                     .single()
                 
                 if (error || !data) {
-                    // Slug not found. Fallback to gateway.
-                    navigate('/')
+                    // Slug not found. Redirect to main platform.
+                    window.location.href = buildPlatformUrl('/login')
                     return;
                 }
                 
@@ -70,7 +55,7 @@ export const Login = () => {
                 }
             } catch (err: any) {
                 console.error("Error cargando el branding del entorno:", err)
-                navigate('/')
+                window.location.href = buildPlatformUrl('/login')
             } finally {
                 setTenantReady(true)
             }
@@ -105,8 +90,8 @@ export const Login = () => {
                          // Es el Platform Owner, lo enrutamos al login global inyectando el email
                          setStep(2);
                     } else {
-                         // Navegar forzosamente inyectando el email al tenant. 
-                         navigate(`/${foundSlug}/login?email=${encodeURIComponent(plainEmail)}`)
+                         // Redirect to tenant subdomain
+                         window.location.href = buildTenantUrl(foundSlug, `/login?email=${encodeURIComponent(plainEmail)}`)
                     }
                 } else {
                     setError('No encontramos ninguna cuenta corporativa asociada a este correo.')
@@ -155,8 +140,8 @@ export const Login = () => {
         if (isGlobalGateway) {
             setStep(1)
         } else {
-            // "Cambiar cuenta" limpia todo y nos devuelve al gateway global
-            navigate('/')
+            // "Cambiar cuenta" — redirect to main platform gateway
+            window.location.href = buildPlatformUrl('/login')
         }
     }
 
@@ -312,7 +297,7 @@ export const Login = () => {
                                     <div>
                                         <div className="flex items-center justify-between mb-2 ml-1">
                                             <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-                                            <Link to={slug ? `/${slug}/olvide-mi-contrasena` : '/olvide-mi-contrasena'} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                                            <Link to="/olvide-mi-contrasena" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
                                                 ¿Olvidaste tu contraseña?
                                             </Link>
                                         </div>
