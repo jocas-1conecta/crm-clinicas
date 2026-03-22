@@ -13,8 +13,23 @@ import {
     LucideBriefcase,
     LucidePlus,
     LucideTag,
-    LucideCalendar
+    LucideCalendar,
+    LucideHistory,
+    LucideStethoscope,
+    LucideClock,
+    LucideCheckCircle2,
+    LucideCircle,
+    LucideArrowRight
 } from 'lucide-react'
+
+const APPT_STATUS_CONFIG: Record<string, { bg: string; text: string }> = {
+    'Por Confirmar': { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700' },
+    'Confirmada': { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' },
+    'En Sala': { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' },
+    'Completada': { bg: 'bg-gray-100 border-gray-200', text: 'text-gray-600' },
+    'Cancelada': { bg: 'bg-red-50 border-red-200', text: 'text-red-600' },
+    'No Asistió': { bg: 'bg-red-50 border-red-200', text: 'text-red-600' },
+}
 
 export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClose: () => void }) => {
     const queryClient = useQueryClient()
@@ -43,7 +58,33 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
         }
     })
 
+    // ─── Appointments query ───────────────────────────────────
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['patient_appointments', patientId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('appointments')
+                .select('*')
+                .eq('patient_id', patientId)
+                .order('appointment_date', { ascending: false });
+            if (error) throw error;
+            return data;
+        }
+    })
 
+    // ─── Completed tasks (for timeline) ──────────────────────
+    const { data: completedTasks = [] } = useQuery({
+        queryKey: ['patient_completed_tasks', patientId],
+        queryFn: async () => {
+            const { data, error } = await supabase.from('crm_tasks')
+                .select('*')
+                .eq('patient_id', patientId)
+                .eq('is_completed', true)
+                .order('completed_at', { ascending: false })
+                .limit(50);
+            if (error) throw error;
+            return data;
+        }
+    })
 
     const addDealMut = useMutation({
         mutationFn: async (deal: any) => {
@@ -75,11 +116,44 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
         setDealValue(0)
     }
 
+    // ─── Build timeline events ─────────────────────────────
+    const timelineEvents = [
+        ...appointments.map((a: any) => ({
+            type: 'appointment' as const,
+            date: new Date(`${a.appointment_date}T${a.appointment_time || '00:00'}`),
+            title: a.service_name || a.specialty || 'Cita médica',
+            subtitle: `Dr. ${a.doctor_name} · ${a.status}`,
+            status: a.status,
+            icon: LucideStethoscope,
+            color: 'text-blue-600 bg-blue-100',
+        })),
+        ...completedTasks.map((t: any) => ({
+            type: 'task' as const,
+            date: new Date(t.completed_at || t.created_at),
+            title: t.title,
+            subtitle: `Tarea completada · ${t.task_type || 'otro'}`,
+            status: 'completada',
+            icon: LucideCheckCircle2,
+            color: 'text-emerald-600 bg-emerald-100',
+        })),
+        ...deals.map((d: any) => ({
+            type: 'deal' as const,
+            date: new Date(d.created_at),
+            title: d.title,
+            subtitle: `Oportunidad · $${Number(d.estimated_value).toLocaleString()} · ${d.status}`,
+            status: d.status,
+            icon: LucideBriefcase,
+            color: 'text-violet-600 bg-violet-100',
+        })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime())
+
     const tabs = [
         { id: 'info', name: 'Datos Personales', icon: LucideUser },
+        { id: 'appointments', name: 'Citas', icon: LucideStethoscope },
         { id: 'deals', name: 'Oportunidades', icon: LucideBriefcase },
-        { id: 'tasks', name: 'Contactos / Tareas', icon: LucideCalendar },
-        { id: 'files', name: 'Materiales Enviados', icon: LucideFiles },
+        { id: 'tasks', name: 'Tareas', icon: LucideCalendar },
+        { id: 'timeline', name: 'Timeline', icon: LucideHistory },
+        { id: 'files', name: 'Archivos', icon: LucideFiles },
     ]
 
     const dealStatuses = ['Nuevo negocio/oportunidad', 'Contactado', 'En validación/seguimiento', 'Ganado', 'Perdido']
@@ -236,8 +310,108 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
                             </div>
                         )}
 
+                        {activeTab === 'appointments' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-lg text-gray-900">Historial de Citas</h3>
+                                    <span className="text-xs font-bold text-gray-400">{appointments.length} cita{appointments.length !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                {appointments.length === 0 ? (
+                                    <div className="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
+                                        <LucideStethoscope className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500 font-medium">Este paciente no tiene citas registradas.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {appointments.map((appt: any) => {
+                                            const statusCfg = APPT_STATUS_CONFIG[appt.status] || APPT_STATUS_CONFIG['Por Confirmar']
+                                            const dateStr = new Date(appt.appointment_date).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+                                            return (
+                                                <div key={appt.id} className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex items-start space-x-3">
+                                                            <div className="p-2 bg-blue-50 rounded-xl shrink-0 mt-0.5">
+                                                                <LucideStethoscope className="w-5 h-5 text-blue-600" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-bold text-gray-900">{appt.service_name || appt.specialty || 'Consulta'}</p>
+                                                                <p className="text-sm text-gray-500 mt-0.5">Dr. {appt.doctor_name}</p>
+                                                                <div className="flex items-center space-x-3 mt-2 text-xs text-gray-400">
+                                                                    <span className="flex items-center space-x-1">
+                                                                        <LucideCalendar className="w-3.5 h-3.5" />
+                                                                        <span>{dateStr}</span>
+                                                                    </span>
+                                                                    <span className="flex items-center space-x-1">
+                                                                        <LucideClock className="w-3.5 h-3.5" />
+                                                                        <span>{appt.appointment_time?.substring(0, 5) || '--:--'}</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${statusCfg.bg} ${statusCfg.text}`}>
+                                                            {appt.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {activeTab === 'tasks' && (
                             <EntityTasks entityType="patient" entityId={patientId} entityPhone={patient.phone} />
+                        )}
+
+                        {activeTab === 'timeline' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-bold text-lg text-gray-900">Línea de Tiempo</h3>
+                                    <span className="text-xs font-bold text-gray-400">{timelineEvents.length} eventos</span>
+                                </div>
+
+                                {timelineEvents.length === 0 ? (
+                                    <div className="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
+                                        <LucideHistory className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                        <p className="text-gray-500 font-medium">No hay actividad registrada para este paciente.</p>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        {/* Vertical line */}
+                                        <div className="absolute left-5 top-2 bottom-2 w-0.5 bg-gray-200 rounded-full"></div>
+
+                                        <div className="space-y-4">
+                                            {timelineEvents.map((event, idx) => {
+                                                const EventIcon = event.icon
+                                                const dateStr = event.date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                const timeStr = event.date.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+                                                return (
+                                                    <div key={`${event.type}-${idx}`} className="relative flex items-start space-x-4 pl-1">
+                                                        {/* Icon on line */}
+                                                        <div className={`relative z-10 p-2 rounded-xl ${event.color} shrink-0 ring-4 ring-white`}>
+                                                            <EventIcon className="w-4 h-4" />
+                                                        </div>
+                                                        {/* Card */}
+                                                        <div className="flex-1 bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                                                            <div className="flex items-start justify-between">
+                                                                <div>
+                                                                    <p className="font-bold text-sm text-gray-900">{event.title}</p>
+                                                                    <p className="text-xs text-gray-500 mt-0.5">{event.subtitle}</p>
+                                                                </div>
+                                                                <span className="text-[10px] font-medium text-gray-400 shrink-0 ml-3">
+                                                                    {dateStr} · {timeStr}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {activeTab === 'files' && (
