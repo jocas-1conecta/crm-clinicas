@@ -15,6 +15,7 @@ export interface User {
     email: string;
     role: 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal';
     avatarUrl: string;
+    avatarThumbUrl: string;
     clinica_id?: string;
     tenant_id?: string; // Generic abstraction
     sucursal_id?: string;

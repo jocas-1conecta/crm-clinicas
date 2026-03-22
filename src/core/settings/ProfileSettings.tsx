@@ -67,7 +67,7 @@ export const ProfileSettings: React.FC = () => {
                        timezone === (profile?.timezone || 'America/Bogota')
 
     // Compress image using Canvas API — no external libraries needed
-    const compressImage = (file: File, maxSize = 512, quality = 0.8): Promise<Blob> => {
+    const compressImage = (file: File, maxSize: number, quality = 0.8): Promise<Blob> => {
         return new Promise((resolve, reject) => {
             const img = new Image()
             img.onload = () => {
@@ -108,31 +108,38 @@ export const ProfileSettings: React.FC = () => {
 
         setUploadingAvatar(true)
         try {
-            // Compress the image (max 512x512, JPEG 80% quality)
-            const compressed = await compressImage(file, 512, 0.8)
-            const fileName = `${currentUser.id}-${Date.now()}.jpg`
-            const filePath = `avatars/${fileName}`
+            // Generate both sizes in parallel
+            const [thumbBlob, fullBlob] = await Promise.all([
+                compressImage(file, 128, 0.8),  // Thumbnail: 128px for chat, lists, topbar
+                compressImage(file, 512, 0.85),  // Full: 512px for profile page
+            ])
 
-            let { error: uploadError } = await supabase.storage
-                .from('avatars')
-                .upload(filePath, compressed, { contentType: 'image/jpeg' })
+            const baseName = `${currentUser.id}-${Date.now()}`
+            const thumbPath = `avatars/${baseName}_thumb.jpg`
+            const fullPath = `avatars/${baseName}_full.jpg`
 
-            if (uploadError) throw uploadError
+            // Upload both in parallel
+            const [thumbUpload, fullUpload] = await Promise.all([
+                supabase.storage.from('avatars').upload(thumbPath, thumbBlob, { contentType: 'image/jpeg' }),
+                supabase.storage.from('avatars').upload(fullPath, fullBlob, { contentType: 'image/jpeg' }),
+            ])
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath)
+            if (thumbUpload.error) throw thumbUpload.error
+            if (fullUpload.error) throw fullUpload.error
 
-            // Update profile with new avatar URL
+            const { data: { publicUrl: thumbUrl } } = supabase.storage.from('avatars').getPublicUrl(thumbPath)
+            const { data: { publicUrl: fullUrl } } = supabase.storage.from('avatars').getPublicUrl(fullPath)
+
+            // Update profile with both URLs
             const { error: updateError } = await supabase
                 .from('profiles')
-                .update({ avatar_url: publicUrl })
+                .update({ avatar_url: fullUrl, avatar_thumb_url: thumbUrl })
                 .eq('id', currentUser.id)
                 
             if (updateError) throw updateError
 
             queryClient.invalidateQueries({ queryKey: ['profile', currentUser.id] })
-            setCurrentUser({ ...currentUser, avatarUrl: publicUrl })
+            setCurrentUser({ ...currentUser, avatarUrl: fullUrl, avatarThumbUrl: thumbUrl })
             
             setSuccessMsg('Avatar actualizado correctamente')
             setTimeout(() => setSuccessMsg(''), 4000)

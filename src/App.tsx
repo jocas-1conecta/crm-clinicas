@@ -103,12 +103,16 @@ function App() {
                 active_modules = clinicData?.active_modules || []
             }
 
+            const avatarFull = data.avatar_url || `https://ui-avatars.com/api/?name=${data.name}`
+            const avatarThumb = data.avatar_thumb_url || avatarFull.replace('_full.jpg', '_thumb.jpg')
+
             setCurrentUser({
                 id: data.id,
                 name: data.name,
                 email: data.email,
                 role: data.role as 'Platform_Owner' | 'Super_Admin' | 'Admin_Clinica' | 'Asesor_Sucursal',
-                avatarUrl: data.avatar_url || `https://ui-avatars.com/api/?name=${data.name}`,
+                avatarUrl: avatarFull,
+                avatarThumbUrl: avatarThumb,
                 clinica_id: data.clinica_id,
                 sucursal_id: data.sucursal_id,
                 clinica_slug,

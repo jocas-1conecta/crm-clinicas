@@ -185,7 +185,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                                 </span>
                             </div>
                             <img
-                                src={currentUser?.avatarUrl}
+                                src={currentUser?.avatarThumbUrl || currentUser?.avatarUrl}
                                 alt="Profile"
                                 className="w-10 h-10 rounded-full ring-2 ring-clinical-100 object-cover group-hover:ring-clinical-200 transition-all"
                             />
