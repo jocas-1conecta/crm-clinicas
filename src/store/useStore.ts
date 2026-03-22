@@ -79,15 +79,23 @@ export interface Service {
 export interface Lead {
     id: string;
     name: string;
-    status: 'Nuevo' | 'En validación' | 'Calificado' | 'Agendado' | 'Asistido/Cerrado';
+    status?: string; // Legacy fallback, source of truth is stage_id
     service: string;
     phone: string;
     email: string;
     assignedTo: string;
+    assigned_to?: string;
     createdAt: string;
     sucursal_id: string;
     documents?: Document[];
     source?: 'Bot WhatsApp' | 'Manual' | 'Web';
+    // Pipeline fields
+    stage_id?: string;
+    substage_id?: string;
+    stage_entered_at?: string;
+    closed_at?: string;
+    sale_value?: number;
+    lost_reason?: string;
 }
 
 interface Message {
@@ -113,17 +121,30 @@ export interface Appointment {
     serviceId?: string;
     date: string;
     time: string;
-    status: 'Por Confirmar' | 'Confirmada' | 'Atendida' | 'Cancelada';
+    status?: string; // Legacy fallback
     avatar: string;
     sucursal_id: string;
+    // Pipeline fields
+    stage_id?: string;
+    substage_id?: string;
+    stage_entered_at?: string;
+    closed_at?: string;
+    closed_by?: string;
 }
 
 export interface Deal {
     id: string;
     title: string;
     estimatedValue: number;
-    status: 'Nuevo negocio/oportunidad' | 'Contactado' | 'En validación/seguimiento' | 'Ganado' | 'Perdido';
+    status?: string; // Legacy fallback
     createdAt: string;
+    patient_id?: string;
+    // Pipeline fields
+    stage_id?: string;
+    substage_id?: string;
+    stage_entered_at?: string;
+    closed_at?: string;
+    closed_by?: string;
 }
 
 export interface ActivityTask {

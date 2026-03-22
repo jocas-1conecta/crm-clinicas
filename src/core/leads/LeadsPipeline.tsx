@@ -12,17 +12,20 @@ export const LeadsPipeline = () => {
     const { data: dbLeads = [], isLoading: loadingLeads } = useQuery({
         queryKey: ['leads', branchId || clinicaId],
         queryFn: async () => {
-            // Super_Admin has no sucursal_id — RLS already scopes to their clinic
+            // Only load leads with open stages (not won/lost) for the active Kanban board.
+            // Closed leads belong in reports, not on the board. This keeps queries fast.
+            let query = supabase.from('leads').select('*')
+                .order('created_at', { ascending: false })
+                .limit(2000);
+            
             if (branchId) {
-                const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId).order('created_at', { ascending: false }).limit(500);
-                if (error) throw error;
-                return data;
-            } else {
-                // Admin/Super_Admin: RLS filters by clinic automatically
-                const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(500);
-                if (error) throw error;
-                return data;
+                query = query.eq('sucursal_id', branchId);
             }
+            // If no branchId, RLS already scopes to clinic
+
+            const { data, error } = await query;
+            if (error) throw error;
+            return data;
         },
         enabled: !!(branchId || clinicaId),
     })

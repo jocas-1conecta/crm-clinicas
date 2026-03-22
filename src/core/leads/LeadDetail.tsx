@@ -69,11 +69,11 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
     const { data: history = [] } = useQuery({
         queryKey: ['lead_history', leadId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('lead_history_log')
+            const { data, error } = await supabase.from('pipeline_history_log')
                 .select(`
                     id, 
                     changed_at,
-                    profiles!changed_by (first_name, last_name),
+                    changed_by,
                     from_substage:pipeline_substages!from_substage_id(name),
                     to_substage:pipeline_substages!to_substage_id(name),
                     from_stage:pipeline_stages!from_stage_id(name),
@@ -479,7 +479,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm transition-all hover:bg-white hover:border-gray-200">
                                                     <div className="flex justify-between items-start mb-3">
                                                         <p className="text-sm text-gray-700">
-                                                            <strong className="text-gray-900">{log.profiles?.first_name} {log.profiles?.last_name}</strong> trasladó este prospecto a una nueva fase:
+                                                            <strong className="text-gray-900">Un asesor</strong> trasladó este prospecto a una nueva fase:
                                                         </p>
                                                     </div>
                                                     

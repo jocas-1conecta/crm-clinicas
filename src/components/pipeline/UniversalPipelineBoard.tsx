@@ -52,7 +52,8 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
     const { data: rules = [] } = useQuery({
         queryKey: ['stage_transition_rules', clinicaId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('stage_transition_rules').select('*');
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('stage_transition_rules').select('*').eq('clinica_id', clinicaId);
             if (error) throw error;
             return data;
         },

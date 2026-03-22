@@ -57,7 +57,8 @@ export const PipelineConfig = () => {
     const { data: rules = [], isLoading: isLoadingRules } = useQuery({
         queryKey: ['stage_transition_rules', clinicaId],
         queryFn: async () => {
-             const { data, error } = await supabase.from('stage_transition_rules').select('*');
+             if (!clinicaId) return [];
+             const { data, error } = await supabase.from('stage_transition_rules').select('*').eq('clinica_id', clinicaId);
              if (error) throw error;
              return data;
         },
@@ -92,7 +93,7 @@ export const PipelineConfig = () => {
                 await supabase.from('stage_transition_rules').delete().eq('target_stage_id', targetId);
                 // Insert new ones if any
                 if (variables.rules && variables.rules.length > 0) {
-                    await supabase.from('stage_transition_rules').insert([{ target_stage_id: targetId, required_fields: variables.rules }]);
+                    await supabase.from('stage_transition_rules').insert([{ target_stage_id: targetId, required_fields: variables.rules, clinica_id: clinicaId }]);
                 }
                 queryClient.invalidateQueries({ queryKey: ['stage_transition_rules'] })
             }
@@ -129,7 +130,7 @@ export const PipelineConfig = () => {
             if (targetId) {
                 await supabase.from('stage_transition_rules').delete().eq('target_substage_id', targetId);
                 if (variables.rules && variables.rules.length > 0) {
-                    await supabase.from('stage_transition_rules').insert([{ target_substage_id: targetId, required_fields: variables.rules }]);
+                    await supabase.from('stage_transition_rules').insert([{ target_substage_id: targetId, required_fields: variables.rules, clinica_id: clinicaId }]);
                 }
                 queryClient.invalidateQueries({ queryKey: ['stage_transition_rules'] })
             }
