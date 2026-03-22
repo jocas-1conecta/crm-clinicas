@@ -21,6 +21,7 @@ import { AppointmentsPipeline } from './modules/clinic/appointments/Appointments
 import { SuperAdminDashboard } from './core/dashboards/SuperAdminDashboard'
 import { ClinicsManagement } from './core/organizations/ClinicsManagement'
 import { BranchesManagement } from './core/organizations/BranchesManagement'
+import { BranchDetail } from './core/organizations/BranchDetail'
 import { TeamManagement } from './core/organizations/TeamManagement'
 import { PipelineConfig } from './core/organizations/PipelineConfig'
 import { TaskSequenceConfig } from './core/organizations/TaskSequenceConfig'
@@ -189,6 +190,7 @@ function App() {
 
                     {/* Super_Admin Only */}
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales" element={<BranchesManagement />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales/:branchId" element={<BranchDetail />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/catalogos" element={<CatalogsManagement />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/embudos" element={<PipelineConfig />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/gestion" element={<Management />} />}

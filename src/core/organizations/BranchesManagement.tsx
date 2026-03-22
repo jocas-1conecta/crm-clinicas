@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { LucideBuilding, LucideMapPin, LucidePlus, LucideUsers, LucideX } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { LucideBuilding, LucideMapPin, LucidePlus, LucideUsers, LucideX, LucideGlobe } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
@@ -7,8 +8,9 @@ import { supabase } from '../../services/supabase'
 export const BranchesManagement = () => {
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const [showModal, setShowModal] = useState(false)
-    const [formData, setFormData] = useState({ name: '', address: '' })
+    const [formData, setFormData] = useState({ name: '', address: '', slug: '' })
 
     // Fetch branches from Supabase
     const { data: myBranches = [], isLoading, isError } = useQuery({
@@ -44,7 +46,7 @@ export const BranchesManagement = () => {
 
     // Mutation to add a new branch
     const addBranchMutation = useMutation({
-        mutationFn: async (newBranch: { name: string, address: string, clinica_id: string }) => {
+        mutationFn: async (newBranch: { name: string, address: string, slug: string, clinica_id: string }) => {
             const { data, error } = await supabase
                 .from('sucursales')
                 .insert([newBranch])
@@ -56,7 +58,7 @@ export const BranchesManagement = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['branches', currentUser?.clinica_id] });
             setShowModal(false);
-            setFormData({ name: '', address: '' });
+            setFormData({ name: '', address: '', slug: '' });
         },
         onError: (error) => {
             console.error('Error adding branch:', error);
@@ -69,6 +71,7 @@ export const BranchesManagement = () => {
         addBranchMutation.mutate({
             name: formData.name,
             address: formData.address,
+            slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
             clinica_id: currentUser.clinica_id
         });
     }
@@ -106,17 +109,27 @@ export const BranchesManagement = () => {
                                 </span>
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 mb-1">{branch.name}</h3>
-                            <div className="flex items-center text-gray-500 text-sm mb-4">
+                            <div className="flex items-center text-gray-500 text-sm mb-1">
                                 <LucideMapPin className="w-4 h-4 mr-1" />
                                 {branch.address}
                             </div>
+                            {branch.slug && (
+                                <div className="flex items-center text-gray-400 text-xs mb-4">
+                                    <LucideGlobe className="w-3 h-3 mr-1" />
+                                    {branch.slug}
+                                </div>
+                            )}
+                            {!branch.slug && <div className="mb-4" />}
 
                             <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
                                 <div className="flex items-center text-sm text-gray-600">
                                     <LucideUsers className="w-4 h-4 mr-2" />
                                     <span>{staffCount} Asesores</span>
                                 </div>
-                                <button className="text-clinical-600 text-sm font-medium hover:underline">
+                                <button
+                                    onClick={() => navigate(`/mis-sucursales/${branch.id}`)}
+                                    className="text-clinical-600 text-sm font-medium hover:underline"
+                                >
                                     Ver Detalles
                                 </button>
                             </div>
@@ -156,6 +169,23 @@ export const BranchesManagement = () => {
                                     value={formData.address}
                                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <LucideGlobe className="w-3.5 h-3.5 inline mr-1" />
+                                    Slug (identificador)
+                                </label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none font-medium"
+                                    placeholder="sede-norte (se auto-genera del nombre si lo dejas vacío)"
+                                    value={formData.slug}
+                                    onChange={(e) => {
+                                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                                        setFormData({ ...formData, slug: val })
+                                    }}
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Solo letras minúsculas, números y guiones.</p>
                             </div>
 
                             <button
