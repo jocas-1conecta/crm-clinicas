@@ -3,7 +3,7 @@ import {
     LucideSearch, LucideCheckCircle, LucidePauseCircle, LucidePlus, LucideX,
     LucideBuilding, LucideLoader2, LucideCheck, LucideAlertCircle,
     LucideSave, LucideToggleLeft, LucideToggleRight, LucideChevronRight,
-    LucideMapPin, LucideMail, LucideGlobe, LucideCreditCard, LucidePackage
+    LucideMapPin, LucideMail, LucideGlobe, LucidePackage
 } from 'lucide-react'
 import { useStore, Clinic } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -11,7 +11,11 @@ import { supabase } from '../../services/supabase'
 
 // ─── Available Modules ────────────────────────────────────────
 const AVAILABLE_MODULES = [
-    { id: 'clinic_core', name: 'Sala de Espera Viva', description: 'Citas, pacientes e historial clínico', icon: '🏥' },
+    { id: 'crm_core', name: 'CRM Core', description: 'Leads, Pipeline, Tareas, Dashboard', icon: '🎯', locked: true },
+    { id: 'clinic_core', name: 'Sala de Espera Viva', description: 'Citas, pacientes e historial clínico', icon: '🏥', locked: false },
+    { id: 'chat_whatsapp', name: 'Chat & WhatsApp', description: 'Mensajería, plantillas y notificaciones', icon: '💬', locked: false },
+    { id: 'automations', name: 'Automatizaciones', description: 'Secuencias automáticas de tareas', icon: '⚡', locked: false },
+    { id: 'analytics', name: 'Analíticas Avanzadas', description: 'Reportes y métricas de rendimiento', icon: '📊', locked: false },
 ]
 
 // ─── Create Clinic Modal ──────────────────────────────────────
@@ -186,7 +190,6 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
     const queryClient = useQueryClient()
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
-    const [plan, setPlan] = useState<string>('Free')
     const [modules, setModules] = useState<string[]>([])
     const [successMsg, setSuccessMsg] = useState('')
 
@@ -194,7 +197,6 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
         if (clinic) {
             setName(clinic.name || '')
             setEmail(clinic.email_contacto || '')
-            setPlan(clinic.plan || 'Free')
             setModules(clinic.active_modules || [])
             setSuccessMsg('')
         }
@@ -209,7 +211,7 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
             if (!clinic?.id) throw new Error('No clinic')
             const { error } = await supabase
                 .from('clinicas')
-                .update({ name, email_contacto: email || null, plan, active_modules: modules })
+                .update({ name, email_contacto: email || null, active_modules: modules })
                 .eq('id', clinic.id)
             if (error) throw error
         },
@@ -222,8 +224,7 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
 
     const isPristine = name === (clinic?.name || '') &&
         email === (clinic?.email_contacto || '') &&
-        plan === (clinic?.plan || 'Free') &&
-        JSON.stringify(modules.sort()) === JSON.stringify((clinic?.active_modules || []).sort())
+        JSON.stringify([...modules].sort()) === JSON.stringify([...(clinic?.active_modules || [])].sort())
 
     if (!open || !clinic) return null
 
@@ -268,52 +269,38 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
                         </div>
                     </div>
 
-                    {/* Plan */}
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center space-x-2">
-                            <LucideCreditCard className="w-3.5 h-3.5" /><span>Suscripción</span>
-                        </h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(['Free', 'Pro', 'Enterprise'] as const).map(p => (
-                                <button key={p} onClick={() => setPlan(p)}
-                                    className={`p-3 rounded-xl border-2 text-center transition-all ${
-                                        plan === p 
-                                            ? 'border-yellow-400 bg-yellow-50 shadow-sm' 
-                                            : 'border-gray-100 hover:border-gray-200'
-                                    }`}>
-                                    <span className={`text-sm font-bold ${plan === p ? 'text-yellow-700' : 'text-gray-700'}`}>{p}</span>
-                                    <span className="block text-[10px] text-gray-400 mt-0.5">
-                                        {p === 'Free' ? '$0' : p === 'Pro' ? '$99/mo' : '$299/mo'}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Modules */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center space-x-2">
-                            <LucidePackage className="w-3.5 h-3.5" /><span>Módulos Activos</span>
+                            <LucidePackage className="w-3.5 h-3.5" /><span>Módulos</span>
                         </h4>
                         {AVAILABLE_MODULES.map(mod => {
-                            const isActive = modules.includes(mod.id)
+                            const isActive = mod.locked || modules.includes(mod.id)
                             return (
-                                <button key={mod.id} onClick={() => toggleModule(mod.id)}
+                                <button key={mod.id} 
+                                    onClick={() => !mod.locked && toggleModule(mod.id)}
+                                    disabled={mod.locked}
                                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
-                                        isActive 
-                                            ? 'border-emerald-300 bg-emerald-50' 
-                                            : 'border-gray-100 bg-gray-50/50 hover:border-gray-200'
+                                        mod.locked 
+                                            ? 'border-gray-200 bg-gray-50 cursor-default'
+                                            : isActive 
+                                                ? 'border-emerald-300 bg-emerald-50 cursor-pointer' 
+                                                : 'border-gray-100 bg-gray-50/50 hover:border-gray-200 cursor-pointer'
                                     }`}>
                                     <div className="flex items-center space-x-3">
                                         <span className="text-xl">{mod.icon}</span>
                                         <div className="text-left">
-                                            <span className={`text-sm font-bold ${isActive ? 'text-emerald-700' : 'text-gray-700'}`}>{mod.name}</span>
+                                            <span className={`text-sm font-bold ${
+                                                mod.locked ? 'text-gray-600' : isActive ? 'text-emerald-700' : 'text-gray-700'
+                                            }`}>{mod.name}</span>
                                             <p className="text-xs text-gray-500">{mod.description}</p>
                                         </div>
                                     </div>
-                                    {isActive 
-                                        ? <LucideToggleRight className="w-6 h-6 text-emerald-500" />
-                                        : <LucideToggleLeft className="w-6 h-6 text-gray-300" />
+                                    {mod.locked 
+                                        ? <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-2 py-1 rounded-md">SIEMPRE ACTIVO</span>
+                                        : isActive 
+                                            ? <LucideToggleRight className="w-6 h-6 text-emerald-500" />
+                                            : <LucideToggleLeft className="w-6 h-6 text-gray-300" />
                                     }
                                 </button>
                             )

@@ -180,13 +180,21 @@ function App() {
                     {currentUser.role === 'Super_Admin' && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
                     {currentUser.role === 'Super_Admin' && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
                     {currentUser.role === 'Super_Admin' && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
-                    {currentUser.role === 'Super_Admin' && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
                     {currentUser.role === 'Super_Admin' && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
+
+                    {/* Protected by automations module */}
+                    <Route element={<ModuleGuard requiredModule="automations" />}>
+                        {currentUser.role === 'Super_Admin' && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
+                    </Route>
 
                     {/* Operation Roles (Super Admin, Admin & Asesor) */}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/leads', '/:slug/leads'].map(p => <Route key={p} path={p} element={<LeadsPipeline />} />)}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/tareas', '/:slug/tareas'].map(p => <Route key={p} path={p} element={<CalendarTasks />} />)}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/chat', '/:slug/chat'].map(p => <Route key={p} path={p} element={<ChatModule />} />)}
+
+                    {/* Protected by chat_whatsapp module */}
+                    <Route element={<ModuleGuard requiredModule="chat_whatsapp" />}>
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/chat', '/:slug/chat'].map(p => <Route key={p} path={p} element={<ChatModule />} />)}
+                    </Route>
 
                     {/* Protected Clinic Modules */}
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
@@ -194,8 +202,10 @@ function App() {
                         {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && ['/pacientes', '/:slug/pacientes'].map(p => <Route key={p} path={p} element={currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />} />)}
                     </Route>
 
-                    {/* Universal (Needs Login o Token Temporal) */}
-                    {['/reportes', '/:slug/reportes'].map(p => <Route key={p} path={p} element={<ReportsDashboard />} />)}
+                    {/* Protected by analytics module */}
+                    <Route element={<ModuleGuard requiredModule="analytics" />}>
+                        {['/reportes', '/:slug/reportes'].map(p => <Route key={p} path={p} element={<ReportsDashboard />} />)}
+                    </Route>
                     {['/perfil', '/:slug/perfil'].map(p => <Route key={p} path={p} element={<Profile />} />)}
                     {['/actualizar-contrasena', '/:slug/actualizar-contrasena'].map(p => <Route key={p} path={p} element={<UpdatePassword />} />)}
 

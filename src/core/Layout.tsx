@@ -43,7 +43,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     }[currentUser?.role || 'Asesor_Sucursal'];
 
     const slugPrefix = currentUser?.clinica_slug ? `/${currentUser.clinica_slug}` : '';
-    const hasClinicModule = currentUser?.active_modules?.includes('clinic_core');
+    const hasModule = (mod: string) => currentUser?.active_modules?.includes(mod);
 
     const navItems = [
         // Shared
@@ -56,7 +56,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Super_Admin'] },
         { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Super_Admin'] },
         { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Super_Admin'] },
-        { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Super_Admin'] },
+        ...(hasModule('automations') ? [
+            { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Super_Admin'] },
+        ] : []),
 
         // Advisor Specific
         { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },
@@ -64,17 +66,21 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Operating Roles (Super Admin, Admin & Asesor)
         { name: 'Leads', path: `${slugPrefix}/leads`, icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         { name: 'Tareas', path: `${slugPrefix}/tareas`, icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        { name: 'Chat', path: `${slugPrefix}/chat`, icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        ...(hasClinicModule ? [
+        ...(hasModule('chat_whatsapp') ? [
+            { name: 'Chat', path: `${slugPrefix}/chat`, icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+        ] : []),
+        ...(hasModule('clinic_core') ? [
             { name: 'Citas', path: `${slugPrefix}/citas`, icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
             { name: 'Pacientes', path: `${slugPrefix}/pacientes`, icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
         ] : []),
 
-        // Analytics (ALL ROLES)
-        { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        // Analytics
+        ...(hasModule('analytics') ? [
+            { name: 'Reportes', path: `${slugPrefix}/reportes`, icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+        ] : []),
         { name: 'Configuración', path: `${slugPrefix}/configuracion/perfil`, icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
 
-        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Platform_Owner', 'Super_Admin'] },
+        { name: 'Gestión', path: `${slugPrefix}/gestion`, icon: LucideWaypoints, roles: ['Super_Admin'] },
     ]
 
     const activeItem = navItems.find(item => item.path === location.pathname)
