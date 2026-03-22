@@ -23,6 +23,7 @@ import { ClinicsManagement } from './core/organizations/ClinicsManagement'
 import { BranchesManagement } from './core/organizations/BranchesManagement'
 import { TeamManagement } from './core/organizations/TeamManagement'
 import { PipelineConfig } from './core/organizations/PipelineConfig'
+import { TaskSequenceConfig } from './core/organizations/TaskSequenceConfig'
 import { CatalogsManagement } from './core/catalogs/CatalogsManagement'
 import { RootDashboard } from './core/dashboards/RootDashboard'
 import { LeadsPipeline } from './core/leads/LeadsPipeline'
@@ -179,6 +180,7 @@ function App() {
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/mis-sucursales', '/:slug/mis-sucursales'].map(p => <Route key={p} path={p} element={<BranchesManagement />} />)}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/catalogos', '/:slug/catalogos'].map(p => <Route key={p} path={p} element={<CatalogsManagement />} />)}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/embudos', '/:slug/embudos'].map(p => <Route key={p} path={p} element={<PipelineConfig />} />)}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/automatizaciones', '/:slug/automatizaciones'].map(p => <Route key={p} path={p} element={<TaskSequenceConfig />} />)}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin') && ['/gestion', '/:slug/gestion'].map(p => <Route key={p} path={p} element={<Management />} />)}
 
                     {/* Operation Roles (Super Admin, Admin & Asesor) */}

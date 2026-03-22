@@ -18,7 +18,8 @@ import {
     LucideBarChart3,
     LucideCheckSquare,
     LucideWaypoints,
-    LucideMessageSquare
+    LucideMessageSquare,
+    LucideZap
 } from 'lucide-react'
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -55,6 +56,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         { name: 'Mis Sucursales', path: `${slugPrefix}/mis-sucursales`, icon: LucideMapPin, roles: ['Admin_Clinica', 'Super_Admin'] },
         { name: 'Catálogos', path: `${slugPrefix}/catalogos`, icon: LucideBriefcase, roles: ['Admin_Clinica', 'Super_Admin'] },
         { name: 'Embudos', path: `${slugPrefix}/embudos`, icon: LucideWaypoints, roles: ['Admin_Clinica', 'Super_Admin'] },
+        { name: 'Automatizaciones', path: `${slugPrefix}/automatizaciones`, icon: LucideZap, roles: ['Admin_Clinica', 'Super_Admin'] },
 
         // Advisor Specific
         { name: 'Mi Dashboard', path: `${slugPrefix}/mi-dashboard`, icon: LucideActivity, roles: ['Asesor_Sucursal'] },

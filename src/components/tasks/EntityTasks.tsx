@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore, CrmTask, TaskCategory, TaskPriority } from '../../store/useStore'
@@ -68,6 +68,16 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
 
     const pendingTasks = tasks.filter(t => !t.is_completed)
     const completedTasks = tasks.filter(t => t.is_completed)
+
+    // ─── Realtime ─────────────────────────────────────────────
+    useEffect(() => {
+        const channel = supabase.channel(`tasks:${entityType}:${entityId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'crm_tasks' }, () => {
+                queryClient.invalidateQueries({ queryKey: ['entity_tasks', entityType, entityId] })
+            })
+            .subscribe()
+        return () => { supabase.removeChannel(channel) }
+    }, [entityType, entityId, queryClient])
 
     // ─── Mutations ────────────────────────────────────────────
     const toggleMut = useMutation({
