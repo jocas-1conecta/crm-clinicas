@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
+import { EntityTasks } from '../../components/tasks/EntityTasks'
 import {
     LucideX,
     LucideUser,
@@ -86,17 +87,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
         }
     })
 
-    const { data: leadTasks = [] } = useQuery({
-        queryKey: ['lead_tasks', leadId],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('crm_tasks')
-                .select('*')
-                .eq('lead_id', leadId)
-                .order('due_date', { ascending: true });
-            if (error) throw error;
-            return data;
-        }
-    })
+
 
     const [activeTab, setActiveTab] = useState('info')
     const [message, setMessage] = useState('')
@@ -383,33 +374,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                         )}
 
                         {activeTab === 'tasks' && (
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-bold text-lg text-gray-900">Tareas Pendientes</h3>
-                                    <button className="text-clinical-600 text-sm font-bold flex items-center space-x-1 hover:underline">
-                                        <LucidePlus className="w-4 h-4" /> <span>Nueva Tarea</span>
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                                    {leadTasks.length === 0 ? (
-                                        <p className="text-sm text-gray-500">No hay tareas pendientes para este lead.</p>
-                                    ) : (
-                                        leadTasks.map((task: any) => (
-                                            <div key={task.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl border border-gray-100 group cursor-pointer hover:bg-white transition-all">
-                                                <div className={`w-6 h-6 border-2 rounded-md ${task.is_completed ? 'border-clinical-500 bg-clinical-500 text-white' : 'border-gray-300 group-hover:border-clinical-500'}`}>
-                                                    {task.is_completed && <LucideCheckCircle2 className="w-5 h-5 mx-auto" />}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <span className={`text-gray-700 font-medium ${task.is_completed ? 'line-through text-gray-400' : ''}`}>{task.title}</span>
-                                                    {task.due_date && (
-                                                        <p className="text-xs text-gray-400 font-medium">{new Date(task.due_date).toLocaleDateString()}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
+                            <EntityTasks entityType="lead" entityId={leadId} entityPhone={lead.phone} />
                         )}
 
                         {activeTab === 'files' && (

@@ -147,17 +147,30 @@ export interface Deal {
     closed_by?: string;
 }
 
-export interface ActivityTask {
+export type TaskCategory = 'llamada' | 'mensaje' | 'reunion' | 'cotizacion' | 'otro';
+export type TaskPriority = 'alta' | 'normal' | 'baja';
+
+export interface CrmTask {
     id: string;
     title: string;
-    date: string;
-    time?: string;
-    status: 'Pendiente' | 'Realizada' | 'Reprogramada';
-    relType: 'lead' | 'patient';
-    relId: string;
-    assignedTo: string;
-    sucursal_id: string;
+    description?: string;
+    task_type: TaskCategory;
+    priority: TaskPriority;
+    due_date: string;
+    is_completed: boolean;
+    completed_at?: string;
+    lead_id?: string;
+    patient_id?: string;
+    assigned_to?: string;
+    sucursal_id?: string;
+    start_time?: string;
+    end_time?: string;
+    extra_fields?: Record<string, any>;
+    created_at?: string;
 }
+
+// Legacy alias for backwards compatibility
+export type ActivityTask = CrmTask;
 
 export interface Patient {
     id: string;

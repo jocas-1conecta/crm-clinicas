@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useStore, Deal } from '../../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
+import { EntityTasks } from '../../../components/tasks/EntityTasks'
 import {
     LucideX,
     LucideUser,
@@ -42,14 +43,7 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
         }
     })
 
-    const { data: patientTasks = [] } = useQuery({
-        queryKey: ['tasks', patientId],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('tasks').select('*').eq('rel_id', patientId);
-            if (error) throw error;
-            return data;
-        }
-    })
+
 
     const addDealMut = useMutation({
         mutationFn: async (deal: any) => {
@@ -243,32 +237,7 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
                         )}
 
                         {activeTab === 'tasks' && (
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-bold text-lg text-gray-900">Próximos Contactos y Tareas</h3>
-                                    <button className="text-clinical-600 text-sm font-bold flex items-center space-x-1 hover:underline">
-                                        <LucidePlus className="w-4 h-4" /> <span>Programar</span>
-                                    </button>
-                                </div>
-                                
-                                {patientTasks.length === 0 ? (
-                                     <div className="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
-                                        <p className="text-gray-500">No hay contactos programados (Una actividad siempre lleva a una nueva).</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {patientTasks.map(task => (
-                                            <div key={task.id} className="flex flex-col p-4 bg-gray-50 rounded-xl border border-gray-100 group cursor-pointer hover:bg-white transition-all">
-                                                <div className="flex justify-between">
-                                                    <span className="flex-1 text-gray-700 font-bold">{task.title}</span>
-                                                    <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{task.status}</span>
-                                                </div>
-                                                <div className="text-xs text-gray-500 mt-2">{task.task_date} {task.task_time}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <EntityTasks entityType="patient" entityId={patientId} entityPhone={patient.phone} />
                         )}
 
                         {activeTab === 'files' && (
