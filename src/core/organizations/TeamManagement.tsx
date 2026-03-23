@@ -107,6 +107,21 @@ export const TeamManagement: React.FC = () => {
         }
     })
 
+    const changeRoleMutation = useMutation({
+        mutationFn: async ({ id, newRole }: { id: string, newRole: string }) => {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ role: newRole })
+                .eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['team', currentUser?.clinica_id] });
+            setSuccessMsg('Rol actualizado correctamente');
+            setTimeout(() => setSuccessMsg(''), 3000);
+        }
+    })
+
     if (currentUser?.role !== 'Super_Admin' && currentUser?.role !== 'Admin_Clinica') {
         return (
             <div className="p-8 text-center text-red-500">
@@ -193,9 +208,25 @@ export const TeamManagement: React.FC = () => {
                                 </td>
                                 <td className="p-6 text-sm text-gray-500">{member.email}</td>
                                 <td className="p-6">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                                        {member.role}
-                                    </span>
+                                    {currentUser?.role === 'Super_Admin' ? (
+                                        <select
+                                            value={member.role}
+                                            onChange={(e) => {
+                                                if (confirm(`¿Cambiar el rol de ${member.name} a ${e.target.value === 'Admin_Clinica' ? 'Gerente de Sucursal' : 'Asesor de Sucursal'}?`)) {
+                                                    changeRoleMutation.mutate({ id: member.id, newRole: e.target.value });
+                                                }
+                                            }}
+                                            className="text-xs font-medium rounded-lg px-2 py-1 border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                            disabled={changeRoleMutation.isPending}
+                                        >
+                                            <option value="Asesor_Sucursal">Asesor de Sucursal</option>
+                                            <option value="Admin_Clinica">Gerente de Sucursal</option>
+                                        </select>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
+                                            {member.role === 'Admin_Clinica' ? 'Gerente de Sucursal' : 'Asesor de Sucursal'}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="p-6">
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${member.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
