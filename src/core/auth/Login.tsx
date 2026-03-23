@@ -44,7 +44,7 @@ export const Login = () => {
             try {
                 const { data, error } = await supabase
                     .from('clinicas')
-                    .select('name, theme, logo_url')
+                    .select('name, theme, logo_url, login_logo_url')
                     .eq('slug', slug)
                     .single()
                 
@@ -70,7 +70,7 @@ export const Login = () => {
                 }
                 
                 setTenantName(data.name)
-                setTenantLogoUrl(data.logo_url || null)
+                setTenantLogoUrl(data.login_logo_url || data.logo_url || null)
                 if (data.theme) {
                     setTenantTheme(data.theme)
                 }

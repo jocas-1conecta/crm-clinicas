@@ -249,6 +249,44 @@ export const WorkspaceSettings: React.FC = () => {
         }
     }
 
+    const [uploadingLoginLogo, setUploadingLoginLogo] = useState(false)
+
+    const handleLoginLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !currentUser?.clinica_id) return
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('El logo seleccionado es demasiado grande. Máximo 5MB.')
+            return
+        }
+
+        setUploadingLoginLogo(true)
+        try {
+            const fullBlob = await compressImage(file, 512, 0.9)
+            const path = `tenant-${currentUser.clinica_id}-login-${Date.now()}.png`
+            const { error: uploadError } = await supabase.storage.from('logos').upload(path, fullBlob, { contentType: 'image/png', upsert: true })
+            if (uploadError) throw new Error(uploadError.message || JSON.stringify(uploadError))
+
+            const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+
+            const { error: updateError } = await supabase
+                .from('clinicas')
+                .update({ login_logo_url: publicUrl })
+                .eq('id', currentUser.clinica_id)
+            if (updateError) throw new Error(updateError.message || JSON.stringify(updateError))
+
+            queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+            setSuccessMsg('Logo de login actualizado')
+            setTimeout(() => setSuccessMsg(''), 4000)
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
+            console.error('Login logo upload error:', error)
+            alert('Error subiendo imagen: ' + errorMessage)
+        } finally {
+            setUploadingLoginLogo(false)
+        }
+    }
+
     const handleDisplayModeChange = async (mode: string) => {
         if (!currentUser?.clinica_id) return
         setLogoDisplayMode(mode)
@@ -302,62 +340,103 @@ export const WorkspaceSettings: React.FC = () => {
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden p-6">
                 
-                {/* Logo Upload Section */}
+                {/* Logo Upload Section — Dual */}
                 <div className="mb-8 pb-8 border-b border-gray-100">
-                    <div className="flex items-center space-x-6 mb-5">
-                        <label className={`relative cursor-pointer group ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <div className="w-24 h-24 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
-                                {tenant?.logo_url ? (
-                                    <img src={tenant.logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
-                                ) : (
-                                    <LucideBuilding className="w-8 h-8 text-gray-300" />
-                                )}
-                            </div>
-                            <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                {uploadingLogo ? (
-                                    <LucideLoader2 className="w-6 h-6 text-white animate-spin" />
-                                ) : (
-                                    <LucideCamera className="w-6 h-6 text-white" />
-                                )}
-                            </div>
-                            <input 
-                                type="file" 
-                                className="hidden" 
-                                accept="image/png,image/jpeg,image/webp,image/svg+xml" 
-                                onChange={handleLogoUpload}
-                                disabled={uploadingLogo}
-                            />
-                        </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Sidebar Logo */}
                         <div>
-                            <h3 className="text-sm font-bold text-gray-900 block mb-1">Logo de la Empresa</h3>
-                            <p className="text-xs text-gray-500">Haz clic en la imagen para cambiarla. Se recomiendan PNGs transparentes.</p>
-                            {uploadingLogo && <p className="text-xs text-blue-500 mt-1 flex items-center gap-1"><LucideLoader2 className="w-3 h-3 animate-spin" /> Optimizando y subiendo...</p>}
-                        </div>
-                    </div>
+                            <h3 className="text-sm font-bold text-gray-900 mb-1">Logo del Sidebar</h3>
+                            <p className="text-xs text-gray-500 mb-3">Se muestra en la navegación interna de la app.</p>
+                            <div className="flex items-center space-x-4">
+                                <label className={`relative cursor-pointer group ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-20 h-20 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
+                                        {tenant?.logo_url ? (
+                                            <img src={tenant.logo_url} alt="Logo sidebar" className="w-full h-full object-contain p-2" />
+                                        ) : (
+                                            <LucideBuilding className="w-8 h-8 text-gray-300" />
+                                        )}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingLogo ? (
+                                            <LucideLoader2 className="w-5 h-5 text-white animate-spin" />
+                                        ) : (
+                                            <LucideCamera className="w-5 h-5 text-white" />
+                                        )}
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/png,image/jpeg,image/webp,image/svg+xml" 
+                                        onChange={handleLogoUpload}
+                                        disabled={uploadingLogo}
+                                    />
+                                </label>
+                                <div className="text-xs text-gray-400">
+                                    <p>PNG transparente recomendado</p>
+                                    {uploadingLogo && <p className="text-blue-500 mt-1 flex items-center gap-1"><LucideLoader2 className="w-3 h-3 animate-spin" /> Subiendo...</p>}
+                                </div>
+                            </div>
 
-                    {/* Display Mode Selector */}
-                    <div className="mt-4">
-                        <label className="block text-xs font-medium text-gray-500 mb-2">¿Cómo se muestra en el sidebar?</label>
-                        <div className="flex gap-2">
-                            {[
-                                { value: 'logo_text', label: 'Logo + Texto', icon: LucideLayoutList },
-                                { value: 'logo_only', label: 'Solo Logo', icon: LucideImage },
-                                { value: 'text_only', label: 'Solo Texto', icon: LucideType },
-                            ].map(opt => (
-                                <button
-                                    key={opt.value}
-                                    type="button"
-                                    onClick={() => handleDisplayModeChange(opt.value)}
-                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${
-                                        logoDisplayMode === opt.value
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
-                                            : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    <opt.icon className="w-3.5 h-3.5" />
-                                    {opt.label}
-                                </button>
-                            ))}
+                            {/* Display Mode Selector */}
+                            <div className="mt-4">
+                                <label className="block text-xs font-medium text-gray-500 mb-2">¿Cómo se muestra en el sidebar?</label>
+                                <div className="flex gap-2">
+                                    {[
+                                        { value: 'logo_text', label: 'Logo + Texto', icon: LucideLayoutList },
+                                        { value: 'logo_only', label: 'Solo Logo', icon: LucideImage },
+                                        { value: 'text_only', label: 'Solo Texto', icon: LucideType },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => handleDisplayModeChange(opt.value)}
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${
+                                                logoDisplayMode === opt.value
+                                                    ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                                                    : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            <opt.icon className="w-3.5 h-3.5" />
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Login Logo */}
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900 mb-1">Logo del Login</h3>
+                            <p className="text-xs text-gray-500 mb-3">Se muestra en la página de inicio de sesión.</p>
+                            <div className="flex items-center space-x-4">
+                                <label className={`relative cursor-pointer group ${uploadingLoginLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-20 h-20 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
+                                        {(tenant?.login_logo_url || tenant?.logo_url) ? (
+                                            <img src={tenant?.login_logo_url || tenant?.logo_url} alt="Logo login" className="w-full h-full object-contain p-2" />
+                                        ) : (
+                                            <LucideBuilding className="w-8 h-8 text-gray-300" />
+                                        )}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingLoginLogo ? (
+                                            <LucideLoader2 className="w-5 h-5 text-white animate-spin" />
+                                        ) : (
+                                            <LucideCamera className="w-5 h-5 text-white" />
+                                        )}
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/png,image/jpeg,image/webp,image/svg+xml" 
+                                        onChange={handleLoginLogoUpload}
+                                        disabled={uploadingLoginLogo}
+                                    />
+                                </label>
+                                <div className="text-xs text-gray-400">
+                                    <p>PNG transparente recomendado</p>
+                                    {uploadingLoginLogo && <p className="text-blue-500 mt-1 flex items-center gap-1"><LucideLoader2 className="w-3 h-3 animate-spin" /> Subiendo...</p>}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -431,11 +510,11 @@ export const WorkspaceSettings: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Live preview */}
+                    {/* Live preview (login page) */}
                     <div className="mt-4 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                         <div className="h-16 flex items-center px-5 gap-3" style={{ backgroundColor: brandColor }}>
-                            {tenant?.logo_url && (
-                                <img src={tenant.logo_thumb_url || tenant.logo_url} alt="" className="w-8 h-8 rounded object-contain" />
+                            {(tenant?.login_logo_url || tenant?.logo_url) && (
+                                <img src={tenant?.login_logo_url || tenant?.logo_thumb_url || tenant?.logo_url} alt="" className="w-8 h-8 rounded object-contain" />
                             )}
                             <span className="text-white font-bold text-sm">{tenant?.name || 'Tu Empresa'}</span>
                             <span className="ml-auto text-white/60 text-xs">Vista previa</span>
