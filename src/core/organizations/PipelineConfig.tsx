@@ -431,6 +431,9 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                     <option value="won">Ganado</option>
                                     <option value="lost">Perdido</option>
                                 </select>
+                                {stageForm.resolution_type !== 'open' && stages.some((s:any) => s.resolution_type === stageForm.resolution_type && s.id !== stageForm.id) && (
+                                    <p className="text-[10px] text-orange-600 mt-1 flex items-center gap-1"><LucideAlertTriangle className="w-3 h-3" /> Ya existe un estado "{stageForm.resolution_type === 'won' ? 'Ganado' : 'Perdido'}" en este embudo.</p>
+                                )}
                             </div>
                             <label className="flex items-center gap-2 text-xs text-gray-600 bg-amber-50/60 px-3 py-2 rounded-lg cursor-pointer">
                                 <input type="checkbox" id="is_default" checked={stageForm.is_default} onChange={e => setStageForm({...stageForm, is_default: e.target.checked})} className="w-3.5 h-3.5 text-clinical-600 rounded" />
@@ -442,7 +445,12 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                             <div className="flex-1 flex flex-col gap-0.5">
                                 <button 
                                     onClick={() => saveStageMutation.mutate(stageForm)} 
-                                    disabled={!stageForm.name.trim() || stages.some((s:any) => s.name.toLowerCase() === stageForm.name.trim().toLowerCase() && s.id !== stageForm.id) || saveStageMutation.isPending}
+                                    disabled={
+                                        !stageForm.name.trim() || 
+                                        stages.some((s:any) => s.name.toLowerCase() === stageForm.name.trim().toLowerCase() && s.id !== stageForm.id) || 
+                                        (stageForm.resolution_type !== 'open' && stages.some((s:any) => s.resolution_type === stageForm.resolution_type && s.id !== stageForm.id)) ||
+                                        saveStageMutation.isPending
+                                    }
                                     className="w-full px-3 py-1.5 bg-clinical-600 text-white rounded-lg text-xs hover:bg-clinical-700 disabled:opacity-50"
                                 >
                                     {saveStageMutation.isPending ? 'Guardando...' : 'Guardar'}

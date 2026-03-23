@@ -160,6 +160,23 @@ const ClinicAdminReports = ({ currentUser }: any) => {
         }
     })
 
+    const { data: dealStages = [] } = useQuery({
+        queryKey: ['pipeline_stages', clinicId, 'deals'],
+        queryFn: async () => {
+            if (!clinicId) return [];
+            const { data, error } = await supabase.from('pipeline_stages')
+                .select('*').eq('clinica_id', clinicId).eq('board_type', 'deals').is('is_archived', false);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicId
+    })
+
+    const getDealResolution = (deal: any) => {
+        const stage = dealStages.find((s:any) => s.id === deal.stage_id);
+        return stage ? stage.resolution_type : (deal.status === 'Ganado' ? 'won' : deal.status === 'Perdido' ? 'lost' : 'open');
+    }
+
     return (
         <div className="space-y-8">
             {/* Branch Performance */}
@@ -223,7 +240,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
                                 const memberPatients = patients.filter((p: any) => p.assigned_to === member.id)
                                 const memberPatientIds = memberPatients.map((p: any) => p.id)
                                 const memberDeals = deals.filter((d: any) => memberPatientIds.includes(d.patient_id))
-                                const memberWonValue = memberDeals.filter((d: any) => d.status === 'Ganado').reduce((sum: number, d: any) => sum + Number(d.estimated_value), 0)
+                                const memberWonValue = memberDeals.filter((d: any) => getDealResolution(d) === 'won').reduce((sum: number, d: any) => sum + Number(d.estimated_value), 0)
 
                                 return (
                                     <tr key={member.id}>
@@ -306,6 +323,23 @@ const AdvisorReports = ({ currentUser }: any) => {
         enabled: !!branchId,
     })
 
+    const { data: dealStages = [] } = useQuery({
+        queryKey: ['pipeline_stages', currentUser?.clinica_id, 'deals'],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return [];
+            const { data, error } = await supabase.from('pipeline_stages')
+                .select('*').eq('clinica_id', currentUser.clinica_id).eq('board_type', 'deals').is('is_archived', false);
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!currentUser?.clinica_id
+    })
+
+    const getDealResolution = (deal: any) => {
+        const stage = dealStages.find((s:any) => s.id === deal.stage_id);
+        return stage ? stage.resolution_type : (deal.status === 'Ganado' ? 'won' : deal.status === 'Perdido' ? 'lost' : 'open');
+    }
+
     const totalLeads = leads.length
     const scheduled = leads.filter((l: any) => l.status === 'Agendado').length
     // In our store, converted leads become patients and are removed from leads list. 
@@ -317,7 +351,7 @@ const AdvisorReports = ({ currentUser }: any) => {
     const canceled = appointments.filter((a: any) => a.status === 'Cancelada').length
     const totalAppts = attended + canceled || 1 // avoid div 0
 
-    const wonDeals = deals.filter((d: any) => d.status === 'Ganado')
+    const wonDeals = deals.filter((d: any) => getDealResolution(d) === 'won')
     const wonValue = wonDeals.reduce((sum: number, d: any) => sum + Number(d.estimated_value), 0)
 
     return (

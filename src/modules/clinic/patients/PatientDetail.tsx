@@ -33,6 +33,8 @@ const APPT_STATUS_CONFIG: Record<string, { bg: string; text: string }> = {
 
 export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClose: () => void }) => {
     const queryClient = useQueryClient()
+    const { currentUser } = useStore()
+    const clinicaId = currentUser?.clinica_id
     const [activeTab, setActiveTab] = useState('info')
     
     // Formulario Nuevo Negocio
@@ -56,6 +58,19 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
             if (error) throw error;
             return data;
         }
+    })
+
+    // ─── Pipeline stages for deals ────────────────────────────
+    const { data: dealStages = [] } = useQuery({
+        queryKey: ['pipeline_stages', clinicaId, 'deals'],
+        queryFn: async () => {
+            if (!clinicaId) return [];
+            const { data, error } = await supabase.from('pipeline_stages')
+                .select('*').eq('clinica_id', clinicaId).eq('board_type', 'deals').is('is_archived', false).order('sort_order', { ascending: true });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!clinicaId
     })
 
     // ─── Appointments query ───────────────────────────────────
@@ -95,8 +110,20 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
     })
 
     const updateDealMut = useMutation({
-        mutationFn: async ({ id, status }: { id: string, status: string }) => {
-            const { error } = await supabase.from('deals').update({ status }).eq('id', id);
+        mutationFn: async ({ id, stage_id }: { id: string, stage_id: string }) => {
+            const targetStage = dealStages.find((s:any) => s.id === stage_id);
+            const updatePayload: any = { stage_id };
+            if (targetStage?.resolution_type === 'won') {
+                updatePayload.status = 'Ganado';
+                updatePayload.closed_at = new Date().toISOString();
+            } else if (targetStage?.resolution_type === 'lost') {
+                updatePayload.status = 'Perdido';
+                updatePayload.closed_at = new Date().toISOString();
+            } else {
+                updatePayload.status = targetStage?.name || 'En Progreso';
+                updatePayload.closed_at = null;
+            }
+            const { error } = await supabase.from('deals').update(updatePayload).eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deals', patientId] })
@@ -106,10 +133,12 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
 
     const handleAddDeal = () => {
         if (!dealTitle) return
+        const defaultStage = dealStages.find((s:any) => s.is_default) || dealStages[0];
         addDealMut.mutate({
             title: dealTitle,
             estimated_value: Number(dealValue),
-            status: 'Nuevo negocio/oportunidad'
+            status: defaultStage?.name || 'Nuevo negocio/oportunidad',
+            stage_id: defaultStage?.id || null
         })
         setShowNewDeal(false)
         setDealTitle('')
@@ -156,7 +185,11 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
         { id: 'files', name: 'Archivos', icon: LucideFiles },
     ]
 
-    const dealStatuses = ['Nuevo negocio/oportunidad', 'Contactado', 'En validación/seguimiento', 'Ganado', 'Perdido']
+    // Helper to get resolution type for a deal
+    const getDealResolutionType = (deal: any) => {
+        const stage = dealStages.find((s:any) => s.id === deal.stage_id);
+        return stage ? stage.resolution_type : 'open';
+    }
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -296,11 +329,15 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
                                                 <div className="text-right space-y-2">
                                                     <label className="text-xs font-bold text-gray-400 uppercase">Fase Actual</label>
                                                     <select
-                                                        value={deal.status}
-                                                        onChange={(e) => updateDealMut.mutate({ id: deal.id, status: e.target.value })}
+                                                        value={deal.stage_id || ''}
+                                                        onChange={(e) => updateDealMut.mutate({ id: deal.id, stage_id: e.target.value })}
                                                         className="block w-full border-gray-200 rounded-lg text-sm bg-gray-50 font-medium p-2 outline-none cursor-pointer focus:ring-2 focus:ring-clinical-500"
                                                     >
-                                                        {dealStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                                        {dealStages.map((s:any) => (
+                                                            <option key={s.id} value={s.id}>
+                                                                {s.name}{s.resolution_type === 'won' ? ' ✓' : s.resolution_type === 'lost' ? ' ✗' : ''}
+                                                            </option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>
@@ -429,12 +466,12 @@ export const PatientDetail = ({ patientId, onClose }: { patientId: string, onClo
                             <div className="space-y-2">
                                 <p className="text-sm font-bold text-gray-900">
                                     Oportunidades Abiertas: <span className="text-clinical-600">
-                                        {deals.filter(d => d.status !== 'Ganado' && d.status !== 'Perdido').length}
+                                        {deals.filter(d => getDealResolutionType(d) === 'open').length}
                                     </span>
                                 </p>
                                 <p className="text-sm font-bold text-gray-900">
                                     Oportunidades Ganadas: <span className="text-emerald-600">
-                                        {deals.filter(d => d.status === 'Ganado').length}
+                                        {deals.filter(d => getDealResolutionType(d) === 'won').length}
                                     </span>
                                 </p>
                             </div>
