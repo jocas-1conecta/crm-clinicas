@@ -16,8 +16,10 @@ import { SecuritySettings } from './core/settings/SecuritySettings'
 import { WorkspaceSettings } from './core/settings/WorkspaceSettings'
 import { Layout } from './core/Layout'
 import { Patients } from './modules/clinic/patients/Patients'
+import { PatientsTable } from './modules/clinic/patients/PatientsTable'
 import { Management } from './core/organizations/Management'
 import { AppointmentsPipeline } from './modules/clinic/appointments/AppointmentsPipeline'
+import { AppointmentsTable } from './modules/clinic/appointments/AppointmentsTable'
 import { SuperAdminDashboard } from './core/dashboards/SuperAdminDashboard'
 import { ClinicsManagement } from './core/organizations/ClinicsManagement'
 import { BranchesManagement } from './core/organizations/BranchesManagement'
@@ -28,6 +30,7 @@ import { TaskSequenceConfig } from './core/organizations/TaskSequenceConfig'
 import { CatalogsManagement } from './core/catalogs/CatalogsManagement'
 import { RootDashboard } from './core/dashboards/RootDashboard'
 import { LeadsPipeline } from './core/leads/LeadsPipeline'
+import { LeadsTable } from './core/leads/LeadsTable'
 import { PatientsDirectory } from './modules/clinic/patients/PatientsDirectory'
 import { ReportsDashboard } from './core/analytics/ReportsDashboard'
 import { CalendarTasks } from './core/calendar/CalendarTasks'
@@ -200,7 +203,7 @@ function App() {
                     </Route>
 
                     {/* Operation Roles */}
-                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/leads" element={<LeadsPipeline />} />}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/leads" element={currentUser.role === 'Super_Admin' ? <LeadsTable /> : <LeadsPipeline />} />}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/tareas" element={<CalendarTasks />} />}
 
                     <Route element={<ModuleGuard requiredModule="chat_whatsapp" />}>
@@ -208,8 +211,8 @@ function App() {
                     </Route>
 
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/citas" element={<AppointmentsPipeline />} />}
-                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/pacientes" element={currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />} />}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/citas" element={currentUser.role === 'Super_Admin' ? <AppointmentsTable /> : <AppointmentsPipeline />} />}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/pacientes" element={currentUser.role === 'Super_Admin' ? <PatientsTable /> : (currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />)} />}
                     </Route>
 
                     <Route element={<ModuleGuard requiredModule="analytics" />}>
