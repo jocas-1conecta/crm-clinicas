@@ -73,16 +73,17 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
     // Mutations for Stages
     const saveStageMutation = useMutation({
         mutationFn: async (payload: any) => {
+            const { id, rules, ...rest } = payload;
+            const dbPayload = { name: rest.name, color: rest.color, is_default: rest.is_default, resolution_type: rest.resolution_type };
             if (payload.is_default) {
-                // Remove default from others
                 await supabase.from('pipeline_stages').update({ is_default: false }).eq('clinica_id', clinicaId).eq('board_type', activeBoard)
             }
-            if (payload.id) {
-                const { data, error } = await supabase.from('pipeline_stages').update(payload).eq('id', payload.id)
+            if (id) {
+                const { data, error } = await supabase.from('pipeline_stages').update(dbPayload).eq('id', id).select()
                 if (error) throw error;
                 return data;
             } else {
-                const { data, error } = await supabase.from('pipeline_stages').insert([{ ...payload, clinica_id: clinicaId, board_type: activeBoard, sort_order: stages.length }])
+                const { data, error } = await supabase.from('pipeline_stages').insert([{ ...dbPayload, clinica_id: clinicaId, board_type: activeBoard, sort_order: stages.length }]).select()
                 if (error) throw error;
                 return data;
             }
