@@ -113,9 +113,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                         {tenant?.logo_display_mode !== 'text_only' && (
                             tenant?.logo_thumb_url || tenant?.logo_url ? (
                                 <img 
-                                    src={tenant.logo_thumb_url || tenant.logo_url} 
+                                    src={tenant?.logo_display_mode === 'logo_only' ? (tenant.logo_url || tenant.logo_thumb_url) : (tenant.logo_thumb_url || tenant.logo_url)} 
                                     alt="Logo" 
-                                    className={`rounded-lg object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'w-12 h-12' : 'w-10 h-10'}`} 
+                                    className={`object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'max-h-14 w-auto' : 'w-10 h-10 rounded-lg'}`} 
                                 />
                             ) : (
                                 <div className="bg-clinical-100 p-2 rounded-lg">
