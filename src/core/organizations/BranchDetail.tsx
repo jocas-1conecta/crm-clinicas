@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
@@ -379,12 +379,6 @@ export const BranchDetail: React.FC = () => {
                         <LucideUsers className="w-4 h-4 text-clinical-500" />
                         Equipo ({advisors.length} asesores)
                     </h2>
-                    <Link
-                        to="/gestion"
-                        className="text-xs text-clinical-600 hover:underline font-medium"
-                    >
-                        Ir a Gestión de Equipo →
-                    </Link>
                 </div>
 
                 {advisors.length === 0 ? (
