@@ -395,25 +395,41 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                 <label className="block text-[11px] font-medium text-gray-500 mb-1">Nombre</label>
                                 <input type="text" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-clinical-500 outline-none" value={stageForm.name} onChange={e => setStageForm({...stageForm, name: e.target.value})} placeholder="Ej. Nuevo, Calificado..." />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Color</label>
-                                    <select className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs" value={stageForm.color} onChange={e => setStageForm({...stageForm, color: e.target.value})}>
-                                        <option value="blue">Azul</option>
-                                        <option value="amber">Ámbar</option>
-                                        <option value="purple">Morado</option>
-                                        <option value="emerald">Verde</option>
-                                        <option value="gray">Gris</option>
-                                    </select>
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">Color</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        { value: 'blue', bg: 'bg-blue-500' },
+                                        { value: 'sky', bg: 'bg-sky-500' },
+                                        { value: 'cyan', bg: 'bg-cyan-500' },
+                                        { value: 'teal', bg: 'bg-teal-500' },
+                                        { value: 'emerald', bg: 'bg-emerald-500' },
+                                        { value: 'lime', bg: 'bg-lime-500' },
+                                        { value: 'amber', bg: 'bg-amber-500' },
+                                        { value: 'orange', bg: 'bg-orange-500' },
+                                        { value: 'red', bg: 'bg-red-500' },
+                                        { value: 'pink', bg: 'bg-pink-500' },
+                                        { value: 'purple', bg: 'bg-purple-500' },
+                                        { value: 'gray', bg: 'bg-gray-500' },
+                                    ].map(c => (
+                                        <button
+                                            key={c.value}
+                                            type="button"
+                                            onClick={() => setStageForm({...stageForm, color: c.value})}
+                                            className={`w-6 h-6 rounded-full ${c.bg} transition-all flex items-center justify-center ${stageForm.color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'}`}
+                                        >
+                                            {stageForm.color === c.value && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div>
-                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Tipo</label>
-                                    <select className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs" value={stageForm.resolution_type} onChange={e => setStageForm({...stageForm, resolution_type: e.target.value})}>
-                                        <option value="open">En Progreso</option>
-                                        <option value="won">Ganado</option>
-                                        <option value="lost">Perdido</option>
-                                    </select>
-                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">Tipo</label>
+                                <select className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs" value={stageForm.resolution_type} onChange={e => setStageForm({...stageForm, resolution_type: e.target.value})}>
+                                    <option value="open">En Progreso</option>
+                                    <option value="won">Ganado</option>
+                                    <option value="lost">Perdido</option>
+                                </select>
                             </div>
                             <label className="flex items-center gap-2 text-xs text-gray-600 bg-amber-50/60 px-3 py-2 rounded-lg cursor-pointer">
                                 <input type="checkbox" id="is_default" checked={stageForm.is_default} onChange={e => setStageForm({...stageForm, is_default: e.target.checked})} className="w-3.5 h-3.5 text-clinical-600 rounded" />
