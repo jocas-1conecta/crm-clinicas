@@ -146,6 +146,15 @@ export const WorkspaceSettings: React.FC = () => {
     const slugMutation = useMutation({
         mutationFn: async (newSlug: string) => {
             if (!currentUser?.clinica_id) throw new Error("No tenant id")
+
+            // Save the old slug for redirect before changing
+            const oldSlug = tenant?.slug
+            if (oldSlug && oldSlug !== newSlug) {
+                await supabase
+                    .from('slug_redirects')
+                    .insert({ clinica_id: currentUser.clinica_id, old_slug: oldSlug, new_slug: newSlug })
+            }
+
             const { data, error } = await supabase
                 .from('clinicas')
                 .update({ slug: newSlug })

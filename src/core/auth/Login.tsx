@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
 import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock, LucideBuilding } from 'lucide-react'
 import { getTenantSlug, buildTenantUrl, buildPlatformUrl } from '../../utils/getTenantSlug'
+import { SlugRedirectPage } from './SlugRedirectPage'
 
 export const Login = () => {
     // Detect tenant from subdomain instead of URL params
@@ -29,6 +30,9 @@ export const Login = () => {
     const [tenantTheme, setTenantTheme] = useState<{ primary_color: string, logo_url: string } | null>(null)
     const [tenantName, setTenantName] = useState<string | null>(null)
 
+    // Slug redirect state
+    const [redirectNewSlug, setRedirectNewSlug] = useState<string | null>(null)
+
     useEffect(() => {
         const fetchTenantBrand = async () => {
             if (isGlobalGateway) {
@@ -44,7 +48,22 @@ export const Login = () => {
                     .single()
                 
                 if (error || !data) {
-                    // Slug not found. Redirect to main platform.
+                    // Slug not found — check if it was renamed
+                    const { data: redirect } = await supabase
+                        .from('slug_redirects')
+                        .select('new_slug')
+                        .eq('old_slug', slug)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single()
+
+                    if (redirect?.new_slug) {
+                        // Show animated redirect page
+                        setRedirectNewSlug(redirect.new_slug)
+                        return
+                    }
+
+                    // No redirect found — go to platform login
                     window.location.href = buildPlatformUrl('/login')
                     return;
                 }
@@ -63,6 +82,11 @@ export const Login = () => {
         
         fetchTenantBrand()
     }, [slug, isGlobalGateway, navigate])
+
+    // If we have a redirect, show the animated redirect page
+    if (redirectNewSlug) {
+        return <SlugRedirectPage newSlug={redirectNewSlug} />
+    }
 
     const handleEmailSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
