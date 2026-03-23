@@ -87,7 +87,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 ...(hasModule('chat_whatsapp') ? [
                     { name: 'Chat', path: '/chat', icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
                 ] : []),
-                { name: 'Embudos', path: '/embudos', icon: LucideWaypoints, roles: ['Super_Admin'] },
                 ...(hasModule('automations') ? [
                     { name: 'Automatizaciones', path: '/automatizaciones', icon: LucideZap, roles: ['Super_Admin'] },
                 ] : []),

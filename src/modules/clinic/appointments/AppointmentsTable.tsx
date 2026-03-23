@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideCalendar } from 'lucide-react'
+import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideCalendar, LucideSettings2 } from 'lucide-react'
+import { PipelineConfig } from '../../../core/organizations/PipelineConfig'
 
 type SortDir = 'asc' | 'desc' | null
 type SortKey = 'patient_name' | 'stage' | 'date' | 'created_at'
@@ -16,6 +17,7 @@ export const AppointmentsTable = () => {
     const [filterAdvisor, setFilterAdvisor] = useState<string>('all')
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
+    const [showConfig, setShowConfig] = useState(false)
 
     const { data: appointments = [], isLoading } = useQuery({
         queryKey: ['appointments-admin-table', clinicaId],
@@ -157,6 +159,9 @@ export const AppointmentsTable = () => {
                 )}
 
                 <span className="text-xs text-gray-400 ml-auto">{sorted.length} citas</span>
+                <button onClick={() => setShowConfig(true)} className="p-2 text-gray-400 hover:text-clinical-600 hover:bg-clinical-50 rounded-xl transition-colors" title="Configurar embudo de citas">
+                    <LucideSettings2 className="w-5 h-5" />
+                </button>
             </div>
 
             {/* Table */}
@@ -227,6 +232,26 @@ export const AppointmentsTable = () => {
                     </table>
                 </div>
             </div>
+
+            {showConfig && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div className="absolute inset-0 bg-black/30" onClick={() => setShowConfig(false)} />
+                    <div className="relative w-full max-w-2xl bg-gray-50 shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300">
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <LucideSettings2 className="w-5 h-5 text-clinical-600" />
+                                Configuración del Embudo de Citas
+                            </h2>
+                            <button onClick={() => setShowConfig(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                                <LucideX className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <PipelineConfig boardType="appointments" embedded />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -25,7 +25,6 @@ import { ClinicsManagement } from './core/organizations/ClinicsManagement'
 import { BranchesManagement } from './core/organizations/BranchesManagement'
 import { BranchDetail } from './core/organizations/BranchDetail'
 import { TeamManagement } from './core/organizations/TeamManagement'
-import { PipelineConfig } from './core/organizations/PipelineConfig'
 import { TaskSequenceConfig } from './core/organizations/TaskSequenceConfig'
 import { CatalogsManagement } from './core/catalogs/CatalogsManagement'
 import { RootDashboard } from './core/dashboards/RootDashboard'
@@ -195,7 +194,6 @@ function App() {
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales" element={<BranchesManagement />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales/:branchId" element={<BranchDetail />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/catalogos" element={<CatalogsManagement />} />}
-                    {currentUser.role === 'Super_Admin' && <Route path="/embudos" element={<PipelineConfig />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/gestion" element={<Management />} />}
 
                     <Route element={<ModuleGuard requiredModule="automations" />}>

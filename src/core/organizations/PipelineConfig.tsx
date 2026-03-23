@@ -4,13 +4,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { LucideSettings2, LucidePlus, LucideTrash2, LucideEdit2, LucideGripVertical, LucideArrowUp, LucideArrowDown, LucideAlertTriangle, LucideCheckCircle2, LucideArchive, LucideArchiveRestore, LucideShieldCheck } from 'lucide-react'
 
-export const PipelineConfig = () => {
+interface PipelineConfigProps {
+    boardType?: 'leads' | 'deals' | 'appointments'
+    embedded?: boolean
+}
+
+export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: PipelineConfigProps = {}) => {
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
     const clinicaId = currentUser?.clinica_id
 
     // Component states
-    const [activeBoard, setActiveBoard] = useState<'leads'|'deals'|'appointments'>('leads')
+    const [activeBoard, setActiveBoard] = useState<'leads'|'deals'|'appointments'>(fixedBoard || 'leads')
     const [selectedStage, setSelectedStage] = useState<any>(null)
     const [isStageModalOpen, setIsStageModalOpen] = useState(false)
     const [isSubstageModalOpen, setIsSubstageModalOpen] = useState(false)
@@ -249,6 +254,7 @@ export const PipelineConfig = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
+            {!embedded && (
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -270,8 +276,25 @@ export const PipelineConfig = () => {
                     <span>Nuevo Estado Principal</span>
                 </button>
             </div>
+            )}
+
+            {embedded && (
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-bold text-gray-900">Estados del Embudo</h3>
+                    <button
+                        onClick={() => {
+                            setStageForm({ id: null as any, name: '', color: 'blue', is_default: false, resolution_type: 'open', rules: [] })
+                            setIsStageModalOpen(true)
+                        }}
+                        className="flex items-center gap-1.5 bg-clinical-600 hover:bg-clinical-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
+                    >
+                        <LucidePlus className="w-3.5 h-3.5" /> Nuevo Estado
+                    </button>
+                </div>
+            )}
 
             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm flex flex-col overflow-hidden">
+                {!fixedBoard && !embedded && (
                 <div className="flex border-b border-gray-100 bg-gray-50/50">
                     <button 
                         onClick={() => setActiveBoard('leads')}
@@ -292,6 +315,7 @@ export const PipelineConfig = () => {
                         Embudo de Citas
                     </button>
                 </div>
+                )}
                 
                 <div className="p-6 space-y-4">
                     {stages.length === 0 && (
