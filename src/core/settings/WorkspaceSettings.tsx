@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
 import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink, LucideImage, LucideType, LucideLayoutList, LucidePalette } from 'lucide-react'
 import { buildTenantUrl } from '../../utils/getTenantSlug'
+import { applyBrandColor } from '../../utils/applyBrandColor'
 
 export const WorkspaceSettings: React.FC = () => {
     const { currentUser } = useStore()
@@ -386,6 +387,7 @@ export const WorkspaceSettings: React.FC = () => {
                                 title={preset.name}
                                 onClick={async () => {
                                     setBrandColor(preset.color)
+                                    applyBrandColor(preset.color)
                                     if (!currentUser?.clinica_id) return
                                     const newTheme = { ...(tenant?.theme || {}), primary_color: preset.color }
                                     const { error } = await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)

@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useStore } from '../store/useStore'
+import { applyBrandColor } from '../utils/applyBrandColor'
 import {
     LucideLayoutDashboard,
     LucideUsers,
@@ -35,7 +36,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             if (!currentUser?.clinica_id) return null
             const { data } = await supabase
                 .from('clinicas')
-                .select('id, name, logo_url, logo_thumb_url, logo_display_mode')
+                .select('id, name, logo_url, logo_thumb_url, logo_display_mode, theme')
                 .eq('id', currentUser.clinica_id)
                 .single()
             return data
@@ -43,6 +44,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         enabled: !!currentUser?.clinica_id,
         staleTime: 1000 * 60 * 10
     })
+
+    // Apply brand color from tenant theme
+    useEffect(() => {
+        if (tenant?.theme?.primary_color) {
+            applyBrandColor(tenant.theme.primary_color)
+        }
+    }, [tenant?.theme?.primary_color])
 
     // Role Helper
     const roleLabel = {
