@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../services/supabase'
 import { useStore } from '../store/useStore'
 import {
     LucideLayoutDashboard,
@@ -26,6 +27,22 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, logout } = useStore()
     const location = useLocation()
     const queryClient = useQueryClient()
+
+    // Fetch tenant logo
+    const { data: tenant } = useQuery({
+        queryKey: ['tenant_settings', currentUser?.clinica_id],
+        queryFn: async () => {
+            if (!currentUser?.clinica_id) return null
+            const { data } = await supabase
+                .from('clinicas')
+                .select('id, name, logo_url')
+                .eq('id', currentUser.clinica_id)
+                .single()
+            return data
+        },
+        enabled: !!currentUser?.clinica_id,
+        staleTime: 1000 * 60 * 10
+    })
 
     // Role Helper
     const roleLabel = {
@@ -93,10 +110,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col z-20">
                 <div className="p-6">
                     <div className="flex items-center space-x-3 text-clinical-600">
-                        <div className="bg-clinical-100 p-2 rounded-lg">
-                            <LucideShieldCheck className="w-8 h-8" />
-                        </div>
-                        <span className="text-xl font-bold text-gray-900 tracking-tight">1Clinic</span>
+                        {tenant?.logo_url ? (
+                            <img src={tenant.logo_url} alt="Logo" className="w-10 h-10 rounded-lg object-contain" />
+                        ) : (
+                            <div className="bg-clinical-100 p-2 rounded-lg">
+                                <LucideShieldCheck className="w-8 h-8" />
+                            </div>
+                        )}
+                        <span className="text-xl font-bold text-gray-900 tracking-tight">{tenant?.name || '1Clinic'}</span>
                     </div>
                 </div>
 
@@ -143,7 +164,11 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 z-10">
                     <div className="flex items-center space-x-4 md:hidden">
                         <LucideMenu className="w-6 h-6 text-gray-500" />
-                        <span className="text-xl font-bold">1Clinic</span>
+                        {tenant?.logo_url ? (
+                            <img src={tenant.logo_url} alt="Logo" className="w-8 h-8 rounded object-contain" />
+                        ) : (
+                            <span className="text-xl font-bold">1Clinic</span>
+                        )}
                     </div>
 
                     <div className="hidden md:block">
