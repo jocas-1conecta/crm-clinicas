@@ -154,33 +154,36 @@ export const WorkspaceSettings: React.FC = () => {
         setUploadingLogo(true)
         try {
             const fileExt = file.name.split('.').pop()
-            const fileName = `tenant-${currentUser.clinica_id}-${Math.random()}.${fileExt}`
-            const filePath = `logos/${fileName}`
+            const fileName = `tenant-${currentUser.clinica_id}-${Date.now()}.${fileExt}`
 
-            let { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('logos')
-                .upload(filePath, file)
+                .upload(fileName, file, { upsert: true })
 
-            if (uploadError) throw uploadError
+            if (uploadError) {
+                console.error('Upload error object:', uploadError)
+                throw new Error(uploadError.message || JSON.stringify(uploadError))
+            }
 
             const { data: { publicUrl } } = supabase.storage
                 .from('logos')
-                .getPublicUrl(filePath)
+                .getPublicUrl(fileName)
 
             const { error: updateError } = await supabase
                 .from('clinicas')
                 .update({ logo_url: publicUrl })
                 .eq('id', currentUser.clinica_id)
                 
-            if (updateError) throw updateError
+            if (updateError) throw new Error(updateError.message || JSON.stringify(updateError))
 
             queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
             
             setSuccessMsg('Logo actualizado correctamente')
             setTimeout(() => setSuccessMsg(''), 4000)
         } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : "Error desconocido"
-            alert('Error subiendo imagen: Asegúrate de que el bucket "logos" exista y sea público. Detalle: ' + errorMessage)
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
+            console.error('Logo upload error:', error)
+            alert('Error subiendo imagen: ' + errorMessage)
         } finally {
             setUploadingLogo(false)
         }
