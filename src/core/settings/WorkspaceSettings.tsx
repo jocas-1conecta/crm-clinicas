@@ -30,6 +30,7 @@ export const WorkspaceSettings: React.FC = () => {
     const [currency, setCurrency] = useState('USD')
     const [uploadingLogo, setUploadingLogo] = useState(false)
     const [logoDisplayMode, setLogoDisplayMode] = useState('logo_text')
+    const [showSlugConfirm, setShowSlugConfirm] = useState(false)
 
     // Slug editing state
     const [slug, setSlug] = useState('')
@@ -178,7 +179,11 @@ export const WorkspaceSettings: React.FC = () => {
 
     const handleSlugSave = () => {
         if (!slug || slug === tenant?.slug || slugAvailable !== true) return
-        if (!confirm(`¿Estás seguro de cambiar tu URL a ${slug}.1clc.app? Se redirigirá automáticamente a tu nuevo subdominio.`)) return
+        setShowSlugConfirm(true)
+    }
+
+    const confirmSlugChange = () => {
+        setShowSlugConfirm(false)
         slugMutation.mutate(slug)
     }
 
@@ -264,6 +269,7 @@ export const WorkspaceSettings: React.FC = () => {
     if (isError) return <div className="text-red-500">Error obteniendo la configuración del equipo.</div>
 
     return (
+        <>
         <div className="max-w-2xl">
             <div className="mb-8 border-b border-gray-100 pb-4">
                 <div className="flex items-center space-x-3">
@@ -506,5 +512,53 @@ export const WorkspaceSettings: React.FC = () => {
                 </form>
             </div>
         </div>
+
+            {/* Custom Slug Confirmation Modal */}
+            {showSlugConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowSlugConfirm(false)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-start space-x-4">
+                            <div className="bg-amber-50 p-3 rounded-xl shrink-0">
+                                <LucideAlertCircle className="w-6 h-6 text-amber-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-1">
+                                    ¿Cambiar URL del espacio de trabajo?
+                                </h3>
+                                <p className="text-sm text-gray-500 leading-relaxed mb-2">
+                                    La dirección de tu plataforma cambiará a:
+                                </p>
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3">
+                                    <span className="text-sm font-bold text-indigo-700">{slug}.1clc.app</span>
+                                </div>
+                                <p className="text-xs text-gray-400 leading-relaxed">
+                                    Los usuarios que accedan a la URL anterior serán redirigidos automáticamente. Se te redirigirá al nuevo subdominio en unos segundos.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100">
+                            <button
+                                onClick={() => setShowSlugConfirm(false)}
+                                className="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmSlugChange}
+                                disabled={slugMutation.isPending}
+                                className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70 flex items-center gap-2"
+                            >
+                                {slugMutation.isPending ? (
+                                    <><LucideLoader2 className="w-4 h-4 animate-spin" /> Cambiando...</>
+                                ) : (
+                                    'Sí, cambiar URL'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     )
 }
