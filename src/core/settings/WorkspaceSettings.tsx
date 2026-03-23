@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
-import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink, LucideImage, LucideType, LucideLayoutList } from 'lucide-react'
+import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink, LucideImage, LucideType, LucideLayoutList, LucidePalette } from 'lucide-react'
 import { buildTenantUrl } from '../../utils/getTenantSlug'
 
 export const WorkspaceSettings: React.FC = () => {
@@ -31,6 +31,7 @@ export const WorkspaceSettings: React.FC = () => {
     const [uploadingLogo, setUploadingLogo] = useState(false)
     const [logoDisplayMode, setLogoDisplayMode] = useState('logo_text')
     const [showSlugConfirm, setShowSlugConfirm] = useState(false)
+    const [brandColor, setBrandColor] = useState('#0d9488')
 
     // Slug editing state
     const [slug, setSlug] = useState('')
@@ -45,6 +46,7 @@ export const WorkspaceSettings: React.FC = () => {
             setCurrency(tenant.currency || 'USD')
             setSlug(tenant.slug || '')
             setLogoDisplayMode(tenant.logo_display_mode || 'logo_text')
+            setBrandColor(tenant.theme?.primary_color || '#0d9488')
         }
     }, [tenant])
 
@@ -355,6 +357,74 @@ export const WorkspaceSettings: React.FC = () => {
                                     {opt.label}
                                 </button>
                             ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Brand Color Section */}
+                <div className="mb-8 pb-8 border-b border-gray-100">
+                    <div className="flex items-center space-x-2 mb-4">
+                        <LucidePalette className="w-4 h-4 text-pink-500" />
+                        <h3 className="text-sm font-bold text-gray-900">Color de Marca</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-4">Se usa en la página de inicio de sesión y otros elementos de tu marca.</p>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {[
+                            { color: '#0d9488', name: 'Teal' },
+                            { color: '#1e40af', name: 'Azul' },
+                            { color: '#7c3aed', name: 'Violeta' },
+                            { color: '#be185d', name: 'Rosa' },
+                            { color: '#dc2626', name: 'Rojo' },
+                            { color: '#ea580c', name: 'Naranja' },
+                            { color: '#16a34a', name: 'Verde' },
+                            { color: '#0f172a', name: 'Oscuro' },
+                        ].map(preset => (
+                            <button
+                                key={preset.color}
+                                type="button"
+                                title={preset.name}
+                                onClick={async () => {
+                                    setBrandColor(preset.color)
+                                    if (!currentUser?.clinica_id) return
+                                    const newTheme = { ...(tenant?.theme || {}), primary_color: preset.color }
+                                    await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
+                                    queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                }}
+                                className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                                    brandColor === preset.color ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-300 scale-110' : 'border-transparent'
+                                }`}
+                                style={{ backgroundColor: preset.color }}
+                            />
+                        ))}
+
+                        {/* Custom color input */}
+                        <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
+                            <input
+                                type="color"
+                                value={brandColor}
+                                onChange={async (e) => {
+                                    const color = e.target.value
+                                    setBrandColor(color)
+                                    if (!currentUser?.clinica_id) return
+                                    const newTheme = { ...(tenant?.theme || {}), primary_color: color }
+                                    await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
+                                    queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                }}
+                                className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0"
+                            />
+                            <span className="text-xs text-gray-400 font-mono uppercase">{brandColor}</span>
+                        </div>
+                    </div>
+
+                    {/* Live preview */}
+                    <div className="mt-4 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                        <div className="h-16 flex items-center px-5 gap-3" style={{ backgroundColor: brandColor }}>
+                            {tenant?.logo_url && (
+                                <img src={tenant.logo_thumb_url || tenant.logo_url} alt="" className="w-8 h-8 rounded object-contain" />
+                            )}
+                            <span className="text-white font-bold text-sm">{tenant?.name || 'Tu Empresa'}</span>
+                            <span className="ml-auto text-white/60 text-xs">Vista previa</span>
                         </div>
                     </div>
                 </div>
