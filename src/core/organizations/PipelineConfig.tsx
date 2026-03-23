@@ -253,172 +253,132 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
     ];
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto">
+        <div className={`${embedded ? 'space-y-3' : 'space-y-4 animate-in fade-in duration-500 max-w-5xl mx-auto'}`}>
             {!embedded && (
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <LucideSettings2 className="w-8 h-8 text-clinical-600" />
-                        Configuración de Embudos (Pipeline)
+                    <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <LucideSettings2 className="w-5 h-5 text-clinical-600" />
+                        Configuración de Embudos
                     </h1>
-                    <p className="text-gray-500 mt-1">
-                        Personaliza las etapas de venta, controla los tiempos máximos (SLA) y define sus comportamientos.
-                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">Personaliza etapas, SLA y comportamientos.</p>
                 </div>
                 <button
                     onClick={() => {
                         setStageForm({ id: null as any, name: '', color: 'blue', is_default: false, resolution_type: 'open', rules: [] })
                         setIsStageModalOpen(true)
                     }}
-                    className="flex items-center space-x-2 bg-clinical-600 hover:bg-clinical-700 text-white px-4 py-2.5 rounded-xl transition-colors shadow-sm font-medium"
+                    className="flex items-center gap-1.5 bg-clinical-600 hover:bg-clinical-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
                 >
-                    <LucidePlus className="w-5 h-5" />
-                    <span>Nuevo Estado Principal</span>
+                    <LucidePlus className="w-3.5 h-3.5" /> Nuevo Estado
                 </button>
             </div>
             )}
 
             {embedded && (
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-base font-bold text-gray-900">Estados del Embudo</h3>
+                <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Etapas</span>
                     <button
                         onClick={() => {
                             setStageForm({ id: null as any, name: '', color: 'blue', is_default: false, resolution_type: 'open', rules: [] })
                             setIsStageModalOpen(true)
                         }}
-                        className="flex items-center gap-1.5 bg-clinical-600 hover:bg-clinical-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium"
+                        className="flex items-center gap-1 text-clinical-600 hover:text-clinical-700 text-[11px] font-medium"
                     >
-                        <LucidePlus className="w-3.5 h-3.5" /> Nuevo Estado
+                        <LucidePlus className="w-3 h-3" /> Añadir
                     </button>
                 </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-3xl shadow-sm flex flex-col overflow-hidden">
+            <div className={`${embedded ? '' : 'bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden'}`}>
                 {!fixedBoard && !embedded && (
-                <div className="flex border-b border-gray-100 bg-gray-50/50">
-                    <button 
-                        onClick={() => setActiveBoard('leads')}
-                        className={`flex-1 px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeBoard === 'leads' ? 'border-clinical-600 text-clinical-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Embudo de Prospectos
-                    </button>
-                    <button 
-                        onClick={() => setActiveBoard('deals')}
-                        className={`flex-1 px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeBoard === 'deals' ? 'border-clinical-600 text-clinical-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Embudo de Pacientes
-                    </button>
-                    <button 
-                        onClick={() => setActiveBoard('appointments')}
-                        className={`flex-1 px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeBoard === 'appointments' ? 'border-clinical-600 text-clinical-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Embudo de Citas
-                    </button>
+                <div className="flex border-b border-gray-100">
+                    {(['leads','deals','appointments'] as const).map(bt => (
+                        <button key={bt} onClick={() => setActiveBoard(bt)}
+                            className={`flex-1 px-4 py-2 text-xs font-bold border-b-2 ${activeBoard === bt ? 'border-clinical-600 text-clinical-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                        >
+                            {bt === 'leads' ? 'Prospectos' : bt === 'deals' ? 'Pacientes' : 'Citas'}
+                        </button>
+                    ))}
                 </div>
                 )}
                 
-                <div className="p-6 space-y-4">
+                <div className={`${embedded ? 'space-y-1.5' : 'p-3 space-y-1.5'}`}>
                     {stages.length === 0 && (
-                        <div className="text-center py-12 text-gray-400">
-                            No hay estados configurados. Empieza creando un Estado Principal.
-                        </div>
+                        <div className="text-center py-6 text-gray-400 text-xs">No hay estados configurados.</div>
                     )}
                     {stages.map((stage: any, index: number) => {
                         const stageSubstages = substages.filter((s:any) => s.stage_id === stage.id).sort((a:any, b:any) => a.sort_order - b.sort_order);
                         
                         return (
-                            <div key={stage.id} className="border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 transition-colors">
-                                {/* Stage Header */}
-                                <div className={`p-4 bg-${stage.color}-50 border-b border-${stage.color}-100 flex items-center justify-between group`}>
-                                    <div className="flex items-center gap-3 flex-1">
-                                        <div className="flex flex-col gap-1 mr-2 opacity-30 hover:opacity-100 transition-opacity cursor-pointer">
-                                            <button onClick={() => moveStage(index, 'up')} disabled={index === 0}><LucideArrowUp className="w-4 h-4" /></button>
-                                            <button onClick={() => moveStage(index, 'down')} disabled={index === stages.length - 1}><LucideArrowDown className="w-4 h-4" /></button>
+                            <div key={stage.id} className="border border-gray-100 rounded-lg overflow-hidden hover:border-gray-200 transition-colors">
+                                <div className="px-3 py-2 bg-gray-50/60 flex items-center justify-between group">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className="flex flex-col opacity-0 group-hover:opacity-60 transition-opacity">
+                                            <button onClick={() => moveStage(index, 'up')} disabled={index === 0}><LucideArrowUp className="w-3 h-3" /></button>
+                                            <button onClick={() => moveStage(index, 'down')} disabled={index === stages.length - 1}><LucideArrowDown className="w-3 h-3" /></button>
                                         </div>
-                                        <div className={`w-3 h-3 rounded-full bg-${stage.color}-500 shadow-sm`} />
-                                        <h4 className={`text-lg font-bold text-${stage.color}-900`}>{stage.name}</h4>
+                                        <div className={`w-2 h-2 rounded-full bg-${stage.color}-500 shrink-0`} />
+                                        <span className="text-[13px] font-semibold text-gray-800 truncate">{stage.name}</span>
                                         {stage.is_default && (
-                                            <span className="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider border border-yellow-200">
-                                                <LucideCheckCircle2 className="w-3 h-3" /> Default
-                                            </span>
+                                            <span className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-px rounded uppercase tracking-wider shrink-0">Default</span>
                                         )}
-                                        <span className={`text-[10px] items-center font-bold px-2 py-0.5 rounded-full uppercase tracking-wider 
-                                            ${stage.resolution_type === 'won' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
-                                              stage.resolution_type === 'lost' ? 'bg-red-100 text-red-700 border-red-200' : 
-                                              'bg-gray-200 text-gray-600 border-gray-300'}`}>
-                                            {stage.resolution_type === 'open' ? 'En Progreso' : stage.resolution_type === 'won' ? 'Ganado' : 'Perdido'}
+                                        <span className={`text-[9px] font-bold px-1.5 py-px rounded uppercase tracking-wider shrink-0
+                                            ${stage.resolution_type === 'won' ? 'bg-emerald-100 text-emerald-600' : 
+                                              stage.resolution_type === 'lost' ? 'bg-red-100 text-red-600' : 
+                                              'bg-gray-100 text-gray-500'}`}>
+                                            {stage.resolution_type === 'open' ? 'Progreso' : stage.resolution_type === 'won' ? 'Ganado' : 'Perdido'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                         <button 
-                                            onClick={() => {
-                                                setSubstageForm({ id: null as any, name: '', stage_id: stage.id, sla_hours: '', rules: [] })
-                                                setIsSubstageModalOpen(true)
-                                            }}
-                                            className="text-sm font-medium text-clinical-600 hover:text-clinical-700 bg-white px-3 py-1.5 rounded-lg border border-clinical-200 shadow-sm flex items-center gap-1"
+                                            onClick={() => { setSubstageForm({ id: null as any, name: '', stage_id: stage.id, sla_hours: '', rules: [] }); setIsSubstageModalOpen(true) }}
+                                            className="text-[10px] font-medium text-clinical-600 hover:bg-clinical-50 px-2 py-1 rounded flex items-center gap-0.5"
                                         >
-                                            <LucidePlus className="w-4 h-4" /> Sub-estado
+                                            <LucidePlus className="w-3 h-3" /> Sub
                                         </button>
                                         <button 
-                                            onClick={() => {
-                                                const existingRule = rules.find((r:any) => r.target_stage_id === stage.id);
-                                                setStageForm({ ...stage, rules: existingRule?.required_fields || [] })
-                                                setIsStageModalOpen(true)
-                                            }}
-                                            className="p-1.5 text-gray-500 hover:bg-white hover:shadow-sm rounded-lg"
+                                            onClick={() => { const r = rules.find((r:any) => r.target_stage_id === stage.id); setStageForm({ ...stage, rules: r?.required_fields || [] }); setIsStageModalOpen(true) }}
+                                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                                         >
-                                            <LucideEdit2 className="w-4 h-4" />
+                                            <LucideEdit2 className="w-3 h-3" />
                                         </button>
-                                        <button 
-                                            onClick={() => archiveMutation.mutate({ type: 'stage', id: stage.id, is_archived: true })}
-                                            className="p-1.5 text-gray-500 hover:bg-orange-50 hover:text-orange-600 rounded-lg"
-                                            title="Archivar"
-                                        >
-                                            <LucideArchive className="w-4 h-4" />
+                                        <button onClick={() => archiveMutation.mutate({ type: 'stage', id: stage.id, is_archived: true })}
+                                            className="p-1 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded" title="Archivar">
+                                            <LucideArchive className="w-3 h-3" />
                                         </button>
-                                        <button 
-                                            onClick={() => setDeleteWarning({ type: 'stage', item: stage })}
-                                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                        >
-                                            <LucideTrash2 className="w-4 h-4" />
+                                        <button onClick={() => setDeleteWarning({ type: 'stage', item: stage })}
+                                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded">
+                                            <LucideTrash2 className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Substages List */}
-                                <div className="p-4 bg-white space-y-2">
-                                    {stageSubstages.length === 0 ? (
-                                        <p className="text-sm text-gray-400 pl-12 py-2 italic">Sin sub-estados. Los prospectos caerán directamente aquí.</p>
-                                    ) : (
-                                        stageSubstages.map((sub:any, subIdx: number) => (
-                                            <div key={sub.id} className="flex items-center justify-between pl-12 pr-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-transparent hover:border-gray-200 group/sub">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex flex-col gap-1 mr-1 opacity-0 group-hover/sub:opacity-100 transition-opacity cursor-pointer">
-                                                        <button onClick={() => moveSubstage(stage.id, subIdx, 'up')} disabled={subIdx === 0}><LucideArrowUp className="w-3 h-3 text-gray-400" /></button>
-                                                        <button onClick={() => moveSubstage(stage.id, subIdx, 'down')} disabled={subIdx === stageSubstages.length - 1}><LucideArrowDown className="w-3 h-3 text-gray-400" /></button>
+                                {stageSubstages.length > 0 && (
+                                    <div className="bg-white divide-y divide-gray-50">
+                                        {stageSubstages.map((sub:any, subIdx: number) => (
+                                            <div key={sub.id} className="flex items-center justify-between pl-8 pr-3 py-1.5 hover:bg-gray-50/50 transition-colors group/sub">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="flex flex-col opacity-0 group-hover/sub:opacity-60 transition-opacity">
+                                                        <button onClick={() => moveSubstage(stage.id, subIdx, 'up')} disabled={subIdx === 0}><LucideArrowUp className="w-2.5 h-2.5 text-gray-400" /></button>
+                                                        <button onClick={() => moveSubstage(stage.id, subIdx, 'down')} disabled={subIdx === stageSubstages.length - 1}><LucideArrowDown className="w-2.5 h-2.5 text-gray-400" /></button>
                                                     </div>
-                                                    <LucideGripVertical className="w-4 h-4 text-gray-300 cursor-grab" />
-                                                    <span className="font-medium text-gray-700">{sub.name}</span>
-                                                    {sub.sla_hours && (
-                                                        <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 flex items-center gap-1">
-                                                            <LucideAlertTriangle className="w-3 h-3" />
-                                                            Máx {sub.sla_hours}h
-                                                        </span>
-                                                    )}
+                                                    <span className="w-1 h-1 rounded-full bg-gray-300 shrink-0" />
+                                                    <span className="text-[12px] text-gray-600">{sub.name}</span>
+                                                    {sub.sla_hours && <span className="text-[9px] font-medium text-orange-500 bg-orange-50 px-1.5 py-px rounded shrink-0">{sub.sla_hours}h</span>}
                                                 </div>
-                                                <div className="flex items-center gap-2 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                                                    <button onClick={() => {
-                                                        const existingRule = rules.find((r:any) => r.target_substage_id === sub.id);
-                                                        setSubstageForm({ ...sub, rules: existingRule?.required_fields || [] })
-                                                        setIsSubstageModalOpen(true)
-                                                    }} className="p-1.5 text-gray-400 hover:text-gray-600"><LucideEdit2 className="w-4 h-4" /></button>
-                                                    <button onClick={() => archiveMutation.mutate({ type: 'substage', id: sub.id, is_archived: true })} className="p-1.5 text-gray-400 hover:text-orange-500"><LucideArchive className="w-4 h-4" /></button>
-                                                    <button onClick={() => setDeleteWarning({ type: 'substage', item: sub })} className="p-1.5 text-gray-400 hover:text-red-500"><LucideTrash2 className="w-4 h-4" /></button>
+                                                <div className="flex items-center gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity shrink-0">
+                                                    <button onClick={() => { const r = rules.find((r:any) => r.target_substage_id === sub.id); setSubstageForm({ ...sub, rules: r?.required_fields || [] }); setIsSubstageModalOpen(true) }} className="p-1 text-gray-400 hover:text-gray-600"><LucideEdit2 className="w-2.5 h-2.5" /></button>
+                                                    <button onClick={() => archiveMutation.mutate({ type: 'substage', id: sub.id, is_archived: true })} className="p-1 text-gray-400 hover:text-orange-500"><LucideArchive className="w-2.5 h-2.5" /></button>
+                                                    <button onClick={() => setDeleteWarning({ type: 'substage', item: sub })} className="p-1 text-gray-400 hover:text-red-500"><LucideTrash2 className="w-2.5 h-2.5" /></button>
                                                 </div>
                                             </div>
-                                        ))
-                                    )}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {stageSubstages.length === 0 && (
+                                    <div className="px-8 py-1.5 text-[11px] text-gray-300 italic bg-white">Sin sub-estados</div>
+                                )}
                             </div>
                         )
                     })}
@@ -427,51 +387,51 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
 
             {/* Modals will go here, currently omitted for brevity but standard logic applies */}
             {isStageModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">{stageForm.id ? 'Editar' : 'Nuevo'} Estado Principal</h3>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl w-full max-w-sm p-5 shadow-xl">
+                        <h3 className="text-sm font-bold text-gray-900 mb-4">{stageForm.id ? 'Editar' : 'Nuevo'} Estado</h3>
+                        <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                                <input type="text" className="w-full px-4 py-2 border rounded-lg" value={stageForm.name} onChange={e => setStageForm({...stageForm, name: e.target.value})} />
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">Nombre</label>
+                                <input type="text" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-clinical-500 outline-none" value={stageForm.name} onChange={e => setStageForm({...stageForm, name: e.target.value})} placeholder="Ej. Nuevo, Calificado..." />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Color VisuaI</label>
-                                    <select className="w-full px-4 py-2 border rounded-lg" value={stageForm.color} onChange={e => setStageForm({...stageForm, color: e.target.value})}>
-                                        <option value="blue">Azul (Nuevos/Proceso)</option>
-                                        <option value="amber">Ambar (Espera/Atención)</option>
-                                        <option value="purple">Morado (Verificación)</option>
-                                        <option value="emerald">Verde (Ganado/Positivo)</option>
-                                        <option value="gray">Gris (Perdido/Cerrado)</option>
+                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Color</label>
+                                    <select className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs" value={stageForm.color} onChange={e => setStageForm({...stageForm, color: e.target.value})}>
+                                        <option value="blue">Azul</option>
+                                        <option value="amber">Ámbar</option>
+                                        <option value="purple">Morado</option>
+                                        <option value="emerald">Verde</option>
+                                        <option value="gray">Gris</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Comportamiento</label>
-                                    <select className="w-full px-4 py-2 border rounded-lg" value={stageForm.resolution_type} onChange={e => setStageForm({...stageForm, resolution_type: e.target.value})}>
-                                        <option value="open">Abierto (En Progreso)</option>
-                                        <option value="won">Ganado (Éxito)</option>
-                                        <option value="lost">Perdido (Fracaso)</option>
+                                    <label className="block text-[11px] font-medium text-gray-500 mb-1">Tipo</label>
+                                    <select className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs" value={stageForm.resolution_type} onChange={e => setStageForm({...stageForm, resolution_type: e.target.value})}>
+                                        <option value="open">En Progreso</option>
+                                        <option value="won">Ganado</option>
+                                        <option value="lost">Perdido</option>
                                     </select>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                                <input type="checkbox" id="is_default" checked={stageForm.is_default} onChange={e => setStageForm({...stageForm, is_default: e.target.checked})} className="w-4 h-4 text-clinical-600 rounded" />
-                                <label htmlFor="is_default" className="text-sm font-medium text-yellow-800 cursor-pointer">Estado por defecto (Entrada inicial)</label>
-                            </div>
+                            <label className="flex items-center gap-2 text-xs text-gray-600 bg-amber-50/60 px-3 py-2 rounded-lg cursor-pointer">
+                                <input type="checkbox" id="is_default" checked={stageForm.is_default} onChange={e => setStageForm({...stageForm, is_default: e.target.checked})} className="w-3.5 h-3.5 text-clinical-600 rounded" />
+                                Estado por defecto (entrada inicial)
+                            </label>
                         </div>
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => setIsStageModalOpen(false)} className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50">Cancelar</button>
-                            <div className="flex-1 flex flex-col gap-1">
+                        <div className="flex gap-2 mt-4">
+                            <button onClick={() => setIsStageModalOpen(false)} className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs hover:bg-gray-50">Cancelar</button>
+                            <div className="flex-1 flex flex-col gap-0.5">
                                 <button 
                                     onClick={() => saveStageMutation.mutate(stageForm)} 
                                     disabled={!stageForm.name.trim() || stages.some((s:any) => s.name.toLowerCase() === stageForm.name.trim().toLowerCase() && s.id !== stageForm.id) || saveStageMutation.isPending}
-                                    className="w-full px-4 py-2 bg-clinical-600 text-white rounded-xl hover:bg-clinical-700 disabled:opacity-50"
+                                    className="w-full px-3 py-1.5 bg-clinical-600 text-white rounded-lg text-xs hover:bg-clinical-700 disabled:opacity-50"
                                 >
                                     {saveStageMutation.isPending ? 'Guardando...' : 'Guardar'}
                                 </button>
                                 {stages.some((s:any) => s.name.toLowerCase() === stageForm.name.trim().toLowerCase() && s.id !== stageForm.id) && (
-                                    <span className="text-red-500 text-xs font-medium text-center">Este nombre ya existe.</span>
+                                    <span className="text-red-500 text-[10px] text-center">Nombre duplicado</span>
                                 )}
                             </div>
                         </div>
@@ -480,29 +440,28 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
             )}
             
             {isSubstageModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <h3 className="text-xl font-bold text-gray-900 mb-6">{substageForm.id ? 'Editar' : 'Nuevo'} Sub-estado</h3>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl w-full max-w-sm p-5 shadow-xl">
+                        <h3 className="text-sm font-bold text-gray-900 mb-4">{substageForm.id ? 'Editar' : 'Nuevo'} Sub-estado</h3>
+                        <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                                <input type="text" className="w-full px-4 py-2 border rounded-lg" value={substageForm.name} onChange={e => setSubstageForm({...substageForm, name: e.target.value})} placeholder="Ej. Esperando respuesta" />
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">Nombre</label>
+                                <input type="text" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-clinical-500 outline-none" value={substageForm.name} onChange={e => setSubstageForm({...substageForm, name: e.target.value})} placeholder="Ej. Esperando respuesta" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">SLA - Tiempo Máximo de Estancamiento (Horas)</label>
-                                <input type="number" className="w-full px-4 py-2 border rounded-lg" value={substageForm.sla_hours} onChange={e => setSubstageForm({...substageForm, sla_hours: e.target.value})} placeholder="Opcional. Ej: 24 (horas)" />
-                                <p className="text-xs text-gray-500 mt-1">Si el lead pasa más de este tiempo aquí, se marcará en ROJO.</p>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">SLA máximo (horas)</label>
+                                <input type="number" className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-clinical-500 outline-none" value={substageForm.sla_hours} onChange={e => setSubstageForm({...substageForm, sla_hours: e.target.value})} placeholder="Ej: 24" />
+                                <p className="text-[10px] text-gray-400 mt-0.5">Se marcará en rojo si excede este tiempo.</p>
                             </div>
                             
-                            <div className="border-t border-gray-100 pt-4 pb-2">
-                                <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
-                                    <LucideShieldCheck className="w-4 h-4 text-clinical-600" />
-                                    Reglas de Transición (Gatekeeping)
+                            <div className="border-t border-gray-100 pt-3">
+                                <h4 className="text-[11px] font-bold text-gray-700 mb-2 flex items-center gap-1">
+                                    <LucideShieldCheck className="w-3 h-3 text-clinical-600" />
+                                    Reglas de Transición
                                 </h4>
-                                <p className="text-xs text-gray-500 mb-3">Selecciona qué campos deben estar obligatoriamente llenos antes de que un lead ingrese a esta sub-etapa.</p>
-                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                <div className="space-y-1">
                                     {ALL_AVAILABLE_FIELDS.map(field => (
-                                        <label key={field.id} className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 p-2 rounded hover:bg-gray-100 cursor-pointer">
+                                        <label key={field.id} className="flex items-center gap-2 text-[11px] text-gray-600 bg-gray-50 px-2 py-1.5 rounded hover:bg-gray-100 cursor-pointer">
                                             <input 
                                                 type="checkbox" 
                                                 checked={substageForm.rules?.includes(field.id) || false}
@@ -512,7 +471,7 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                                         : (substageForm.rules || []).filter(r => r !== field.id);
                                                     setSubstageForm({...substageForm, rules: newRules});
                                                 }}
-                                                className="w-4 h-4 text-clinical-600 rounded border-gray-300" 
+                                                className="w-3 h-3 text-clinical-600 rounded border-gray-300" 
                                             />
                                             {field.label}
                                         </label>
@@ -520,9 +479,9 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                 </div>
                             </div>
                         </div>
-                        <div className="flex gap-3 mt-6">
-                            <button onClick={() => setIsSubstageModalOpen(false)} className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50">Cancelar</button>
-                            <div className="flex-1 flex flex-col gap-1">
+                        <div className="flex gap-2 mt-4">
+                            <button onClick={() => setIsSubstageModalOpen(false)} className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs hover:bg-gray-50">Cancelar</button>
+                            <div className="flex-1 flex flex-col gap-0.5">
                                 <button 
                                     onClick={() => saveSubstageMutation.mutate(substageForm)} 
                                     disabled={
@@ -530,12 +489,12 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                         substages.some((s:any) => s.name.toLowerCase() === substageForm.name.trim().toLowerCase() && s.stage_id === substageForm.stage_id && s.id !== substageForm.id) || 
                                         saveSubstageMutation.isPending
                                     }
-                                    className="w-full px-4 py-2 bg-clinical-600 text-white rounded-xl hover:bg-clinical-700 disabled:opacity-50"
+                                    className="w-full px-3 py-1.5 bg-clinical-600 text-white rounded-lg text-xs hover:bg-clinical-700 disabled:opacity-50"
                                 >
                                     {saveSubstageMutation.isPending ? 'Guardando...' : 'Guardar'}
                                 </button>
                                 {substages.some((s:any) => s.name.toLowerCase() === substageForm.name.trim().toLowerCase() && s.stage_id === substageForm.stage_id && s.id !== substageForm.id) && (
-                                    <span className="text-red-500 text-xs font-medium text-center">Este sub-estado ya existe en este nivel.</span>
+                                    <span className="text-red-500 text-[10px] text-center">Sub-estado duplicado</span>
                                 )}
                             </div>
                         </div>
@@ -543,30 +502,29 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                 </div>
             )}
             {deleteWarning && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4 mx-auto">
-                            <LucideAlertTriangle className="w-6 h-6" />
+                <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl w-full max-w-sm p-5 shadow-xl">
+                        <div className="w-9 h-9 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-3 mx-auto">
+                            <LucideAlertTriangle className="w-4 h-4" />
                         </div>
-                        <h3 className="text-xl font-bold text-center text-gray-900 mb-2">
+                        <h3 className="text-sm font-bold text-center text-gray-900 mb-1">
                             Eliminar {deleteWarning.type === 'stage' ? 'Estado' : 'Sub-estado'}
                         </h3>
-                        <p className="text-center text-gray-500 mb-6">
-                            Estás a punto de eliminar <span className="font-bold text-gray-900">{deleteWarning.item.name}</span>.
+                        <p className="text-center text-xs text-gray-500 mb-4">
+                            <span className="font-semibold text-gray-700">{deleteWarning.item.name}</span> será eliminado.
                         </p>
 
                         {recordsCount !== undefined && recordsCount > 0 ? (
-                            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 mb-6">
-                                <p className="text-sm text-orange-800 font-medium mb-3">
-                                    ⚠️ Hay <strong>{recordsCount} registros</strong> actualmente en esta etapa. Debes reasignarlos a otra etapa antes de poder eliminarla.
+                            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 mb-4">
+                                <p className="text-[11px] text-orange-800 font-medium mb-2">
+                                    ⚠️ {recordsCount} registros deben reasignarse.
                                 </p>
-                                <label className="block text-xs font-bold text-orange-700 uppercase mb-1">Mover registros a:</label>
                                 <select 
-                                    className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-white"
+                                    className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-xs bg-white"
                                     value={reassignDestination}
                                     onChange={e => setReassignDestination(e.target.value)}
                                 >
-                                    <option value="">-- Selecciona el nuevo destino --</option>
+                                    <option value="">Seleccionar destino...</option>
                                     {deleteWarning.type === 'stage' ? 
                                         stages.filter((s:any) => s.id !== deleteWarning.item.id).map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>) :
                                         substages.filter((s:any) => s.id !== deleteWarning.item.id).map((s:any) => <option key={s.id} value={s.id}>{s.name} (Sub-estado)</option>)
@@ -574,15 +532,15 @@ export const PipelineConfig = ({ boardType: fixedBoard, embedded = false }: Pipe
                                 </select>
                             </div>
                         ) : (
-                            <p className="text-center text-sm text-gray-500 mb-6">Esta etapa está vacía. Puede ser eliminada de forma segura.</p>
+                            <p className="text-center text-[11px] text-gray-400 mb-4">Etapa vacía — se puede eliminar.</p>
                         )}
 
-                        <div className="flex gap-3">
-                            <button onClick={() => { setDeleteWarning(null); setReassignDestination('') }} className="flex-1 px-4 py-2 border rounded-xl hover:bg-gray-50">Cancelar</button>
+                        <div className="flex gap-2">
+                            <button onClick={() => { setDeleteWarning(null); setReassignDestination('') }} className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs hover:bg-gray-50">Cancelar</button>
                             <button 
                                 onClick={() => deleteMutation.mutate()} 
                                 disabled={recordsCount !== undefined && recordsCount > 0 && !reassignDestination}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 disabled:opacity-50"
                             >
                                 {deleteMutation.isPending ? 'Procesando...' : 'Eliminar'}
                             </button>
