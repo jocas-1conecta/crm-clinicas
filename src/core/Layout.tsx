@@ -35,7 +35,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             if (!currentUser?.clinica_id) return null
             const { data } = await supabase
                 .from('clinicas')
-                .select('id, name, logo_url')
+                .select('id, name, logo_url, logo_thumb_url, logo_display_mode')
                 .eq('id', currentUser.clinica_id)
                 .single()
             return data
@@ -109,15 +109,23 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             {/* Sidebar */}
             <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col z-20">
                 <div className="p-6">
-                    <div className="flex items-center space-x-3 text-clinical-600">
-                        {tenant?.logo_url ? (
-                            <img src={tenant.logo_url} alt="Logo" className="w-10 h-10 rounded-lg object-contain" />
-                        ) : (
-                            <div className="bg-clinical-100 p-2 rounded-lg">
-                                <LucideShieldCheck className="w-8 h-8" />
-                            </div>
+                    <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? 'justify-center' : 'space-x-3'} text-clinical-600`}>
+                        {tenant?.logo_display_mode !== 'text_only' && (
+                            tenant?.logo_thumb_url || tenant?.logo_url ? (
+                                <img 
+                                    src={tenant.logo_thumb_url || tenant.logo_url} 
+                                    alt="Logo" 
+                                    className={`rounded-lg object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'w-12 h-12' : 'w-10 h-10'}`} 
+                                />
+                            ) : (
+                                <div className="bg-clinical-100 p-2 rounded-lg">
+                                    <LucideShieldCheck className="w-8 h-8" />
+                                </div>
+                            )
                         )}
-                        <span className="text-xl font-bold text-gray-900 tracking-tight">{tenant?.name || '1Clinic'}</span>
+                        {tenant?.logo_display_mode !== 'logo_only' && (
+                            <span className="text-xl font-bold text-gray-900 tracking-tight">{tenant?.name || '1Clinic'}</span>
+                        )}
                     </div>
                 </div>
 

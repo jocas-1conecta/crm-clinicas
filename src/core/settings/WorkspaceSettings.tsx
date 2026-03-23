@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
-import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink } from 'lucide-react'
+import { LucideBuilding, LucideSave, LucideCheckCircle2, LucideAlertCircle, LucideCamera, LucideGlobe, LucideLoader2, LucideExternalLink, LucideImage, LucideType, LucideLayoutList } from 'lucide-react'
 import { buildTenantUrl } from '../../utils/getTenantSlug'
 
 export const WorkspaceSettings: React.FC = () => {
@@ -29,6 +29,7 @@ export const WorkspaceSettings: React.FC = () => {
     const [email, setEmail] = useState('')
     const [currency, setCurrency] = useState('USD')
     const [uploadingLogo, setUploadingLogo] = useState(false)
+    const [logoDisplayMode, setLogoDisplayMode] = useState('logo_text')
 
     // Slug editing state
     const [slug, setSlug] = useState('')
@@ -42,8 +43,44 @@ export const WorkspaceSettings: React.FC = () => {
             setEmail(tenant.email_contacto || '')
             setCurrency(tenant.currency || 'USD')
             setSlug(tenant.slug || '')
+            setLogoDisplayMode(tenant.logo_display_mode || 'logo_text')
         }
     }, [tenant])
+
+    // Compress image using Canvas API (PNG to preserve transparency)
+    const compressImage = (file: File, maxSize: number, quality = 0.9): Promise<Blob> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                let { width, height } = img
+
+                if (width > maxSize || height > maxSize) {
+                    if (width > height) {
+                        height = Math.round((height * maxSize) / width)
+                        width = maxSize
+                    } else {
+                        width = Math.round((width * maxSize) / height)
+                        height = maxSize
+                    }
+                }
+
+                canvas.width = width
+                canvas.height = height
+                const ctx = canvas.getContext('2d')
+                if (!ctx) { reject(new Error('Canvas not supported')); return }
+
+                ctx.drawImage(img, 0, 0, width, height)
+                canvas.toBlob(
+                    (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+                    'image/png',
+                    quality
+                )
+            }
+            img.onerror = () => reject(new Error('Error loading image'))
+            img.src = URL.createObjectURL(file)
+        })
+    }
 
     // Debounced slug availability check
     useEffect(() => {
@@ -146,32 +183,38 @@ export const WorkspaceSettings: React.FC = () => {
         const file = e.target.files?.[0]
         if (!file || !currentUser?.clinica_id) return
 
-        if (file.size > 2 * 1024 * 1024) {
-            alert('El logo seleccionado es demasiado grande. Por favor, asegúrate de que pese menos de 2MB.')
+        if (file.size > 5 * 1024 * 1024) {
+            alert('El logo seleccionado es demasiado grande. Máximo 5MB.')
             return
         }
 
         setUploadingLogo(true)
         try {
-            const fileExt = file.name.split('.').pop()
-            const fileName = `tenant-${currentUser.clinica_id}-${Date.now()}.${fileExt}`
+            // Generate both sizes in parallel
+            const [thumbBlob, fullBlob] = await Promise.all([
+                compressImage(file, 48, 0.9),   // Thumbnail: 48px for sidebar
+                compressImage(file, 512, 0.9),  // Full: 512px for settings/display
+            ])
 
-            const { error: uploadError } = await supabase.storage
-                .from('logos')
-                .upload(fileName, file, { upsert: true })
+            const baseName = `tenant-${currentUser.clinica_id}-${Date.now()}`
+            const thumbPath = `${baseName}_thumb.png`
+            const fullPath = `${baseName}_full.png`
 
-            if (uploadError) {
-                console.error('Upload error object:', uploadError)
-                throw new Error(uploadError.message || JSON.stringify(uploadError))
-            }
+            // Upload both in parallel
+            const [thumbUpload, fullUpload] = await Promise.all([
+                supabase.storage.from('logos').upload(thumbPath, thumbBlob, { contentType: 'image/png', upsert: true }),
+                supabase.storage.from('logos').upload(fullPath, fullBlob, { contentType: 'image/png', upsert: true }),
+            ])
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('logos')
-                .getPublicUrl(fileName)
+            if (thumbUpload.error) throw new Error(thumbUpload.error.message || JSON.stringify(thumbUpload.error))
+            if (fullUpload.error) throw new Error(fullUpload.error.message || JSON.stringify(fullUpload.error))
+
+            const { data: { publicUrl: thumbUrl } } = supabase.storage.from('logos').getPublicUrl(thumbPath)
+            const { data: { publicUrl: fullUrl } } = supabase.storage.from('logos').getPublicUrl(fullPath)
 
             const { error: updateError } = await supabase
                 .from('clinicas')
-                .update({ logo_url: publicUrl })
+                .update({ logo_url: fullUrl, logo_thumb_url: thumbUrl })
                 .eq('id', currentUser.clinica_id)
                 
             if (updateError) throw new Error(updateError.message || JSON.stringify(updateError))
@@ -186,6 +229,21 @@ export const WorkspaceSettings: React.FC = () => {
             alert('Error subiendo imagen: ' + errorMessage)
         } finally {
             setUploadingLogo(false)
+        }
+    }
+
+    const handleDisplayModeChange = async (mode: string) => {
+        if (!currentUser?.clinica_id) return
+        setLogoDisplayMode(mode)
+        try {
+            const { error } = await supabase
+                .from('clinicas')
+                .update({ logo_display_mode: mode })
+                .eq('id', currentUser.clinica_id)
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+        } catch (err) {
+            console.error('Error updating display mode:', err)
         }
     }
 
@@ -227,29 +285,62 @@ export const WorkspaceSettings: React.FC = () => {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden p-6">
                 
                 {/* Logo Upload Section */}
-                <div className="flex items-center space-x-6 mb-8 pb-8 border-b border-gray-100">
-                    <label className={`relative cursor-pointer group ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="w-24 h-24 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
-                            {tenant?.logo_url ? (
-                                <img src={tenant.logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
-                            ) : (
-                                <LucideBuilding className="w-8 h-8 text-gray-300" />
-                            )}
+                <div className="mb-8 pb-8 border-b border-gray-100">
+                    <div className="flex items-center space-x-6 mb-5">
+                        <label className={`relative cursor-pointer group ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="w-24 h-24 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
+                                {tenant?.logo_url ? (
+                                    <img src={tenant.logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
+                                ) : (
+                                    <LucideBuilding className="w-8 h-8 text-gray-300" />
+                                )}
+                            </div>
+                            <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                {uploadingLogo ? (
+                                    <LucideLoader2 className="w-6 h-6 text-white animate-spin" />
+                                ) : (
+                                    <LucideCamera className="w-6 h-6 text-white" />
+                                )}
+                            </div>
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/png,image/jpeg,image/webp,image/svg+xml" 
+                                onChange={handleLogoUpload}
+                                disabled={uploadingLogo}
+                            />
+                        </label>
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900 block mb-1">Logo de la Empresa</h3>
+                            <p className="text-xs text-gray-500">Haz clic en la imagen para cambiarla. Se recomiendan PNGs transparentes.</p>
+                            {uploadingLogo && <p className="text-xs text-blue-500 mt-1 flex items-center gap-1"><LucideLoader2 className="w-3 h-3 animate-spin" /> Optimizando y subiendo...</p>}
                         </div>
-                        <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <LucideCamera className="w-6 h-6 text-white" />
+                    </div>
+
+                    {/* Display Mode Selector */}
+                    <div className="mt-4">
+                        <label className="block text-xs font-medium text-gray-500 mb-2">¿Cómo se muestra en el sidebar?</label>
+                        <div className="flex gap-2">
+                            {[
+                                { value: 'logo_text', label: 'Logo + Texto', icon: LucideLayoutList },
+                                { value: 'logo_only', label: 'Solo Logo', icon: LucideImage },
+                                { value: 'text_only', label: 'Solo Texto', icon: LucideType },
+                            ].map(opt => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => handleDisplayModeChange(opt.value)}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${
+                                        logoDisplayMode === opt.value
+                                            ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                                            : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    <opt.icon className="w-3.5 h-3.5" />
+                                    {opt.label}
+                                </button>
+                            ))}
                         </div>
-                        <input 
-                            type="file" 
-                            className="hidden" 
-                            accept="image/*" 
-                            onChange={handleLogoUpload}
-                            disabled={uploadingLogo}
-                        />
-                    </label>
-                    <div>
-                        <h3 className="text-sm font-bold text-gray-900 block mb-1">Logo de la Empresa</h3>
-                        <p className="text-xs text-gray-500">Haz clic en la imagen para cambiarla. Se recomiendan PNGs transparentes.</p>
                     </div>
                 </div>
 
