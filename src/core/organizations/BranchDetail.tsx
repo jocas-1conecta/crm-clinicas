@@ -77,8 +77,20 @@ export const BranchDetail: React.FC = () => {
     const [name, setName] = useState('')
     const [address, setAddress] = useState('')
     const [slug, setSlug] = useState('')
+    const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
     const [status, setStatus] = useState('Activa')
     const [adminId, setAdminId] = useState<string>('')
+
+    const generateSlug = (text: string) => {
+        return text
+            .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+            .replace(/ñ/g, 'n')
+            .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+            .replace(/\s+/g, '-') // spaces to hyphens
+            .replace(/-+/g, '-') // collapse multiple hyphens
+            .replace(/^-|-$/g, '') // trim hyphens
+    }
 
     useEffect(() => {
         if (branch) {
@@ -86,6 +98,7 @@ export const BranchDetail: React.FC = () => {
             setAddress(branch.address || '')
             setSlug(branch.slug || '')
             setStatus(branch.status || 'Activa')
+            setSlugManuallyEdited(!!branch.slug)
         }
     }, [branch])
 
@@ -241,7 +254,13 @@ export const BranchDetail: React.FC = () => {
                             <input
                                 type="text"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {
+                                    const newName = e.target.value
+                                    setName(newName)
+                                    if (!slugManuallyEdited) {
+                                        setSlug(generateSlug(newName))
+                                    }
+                                }}
                                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                 placeholder="Sede Principal"
                             />
@@ -270,6 +289,7 @@ export const BranchDetail: React.FC = () => {
                                 onChange={(e) => {
                                     const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
                                     setSlug(val)
+                                    setSlugManuallyEdited(true)
                                 }}
                                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium"
                                 placeholder="sede-norte"

@@ -157,7 +157,18 @@ export const BranchesManagement = () => {
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none"
                                     placeholder="Ej. Sede Norte"
                                     value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    onChange={(e) => {
+                                        const newName = e.target.value
+                                        const autoSlug = newName
+                                            .toLowerCase()
+                                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                                            .replace(/ñ/g, 'n')
+                                            .replace(/[^a-z0-9\s-]/g, '')
+                                            .replace(/\s+/g, '-')
+                                            .replace(/-+/g, '-')
+                                            .replace(/^-|-$/g, '')
+                                        setFormData({ ...formData, name: newName, slug: autoSlug })
+                                    }}
                                 />
                             </div>
                             <div>
