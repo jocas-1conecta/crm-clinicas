@@ -388,8 +388,15 @@ export const WorkspaceSettings: React.FC = () => {
                                     setBrandColor(preset.color)
                                     if (!currentUser?.clinica_id) return
                                     const newTheme = { ...(tenant?.theme || {}), primary_color: preset.color }
-                                    await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
-                                    queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                    const { error } = await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
+                                    if (error) {
+                                        console.error('Error saving brand color:', error)
+                                        setSuccessMsg('')
+                                    } else {
+                                        queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                        setSuccessMsg('Color de marca actualizado')
+                                        setTimeout(() => setSuccessMsg(''), 3000)
+                                    }
                                 }}
                                 className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
                                     brandColor === preset.color ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-300 scale-110' : 'border-transparent'
@@ -403,13 +410,18 @@ export const WorkspaceSettings: React.FC = () => {
                             <input
                                 type="color"
                                 value={brandColor}
-                                onChange={async (e) => {
-                                    const color = e.target.value
-                                    setBrandColor(color)
+                                onChange={(e) => setBrandColor(e.target.value)}
+                                onBlur={async () => {
                                     if (!currentUser?.clinica_id) return
-                                    const newTheme = { ...(tenant?.theme || {}), primary_color: color }
-                                    await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
-                                    queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                    const newTheme = { ...(tenant?.theme || {}), primary_color: brandColor }
+                                    const { error } = await supabase.from('clinicas').update({ theme: newTheme }).eq('id', currentUser.clinica_id)
+                                    if (error) {
+                                        console.error('Error saving brand color:', error)
+                                    } else {
+                                        queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+                                        setSuccessMsg('Color de marca actualizado')
+                                        setTimeout(() => setSuccessMsg(''), 3000)
+                                    }
                                 }}
                                 className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0"
                             />
