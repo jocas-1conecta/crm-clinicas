@@ -61,45 +61,61 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
 
     const hasModule = (mod: string) => currentUser?.active_modules?.includes(mod);
 
-    const navItems = [
-        // Shared
-        { name: 'Dashboard', path: '/dashboard', icon: LucideLayoutDashboard, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'] },
-
-        // Platform Owner
-        { name: 'Clinicas', path: '/clinicas', icon: LucideBuilding, roles: ['Platform_Owner'] },
-
-        // Director General (Super_Admin) Only
-        { name: 'Mis Sucursales', path: '/mis-sucursales', icon: LucideMapPin, roles: ['Super_Admin'] },
-        { name: 'Catálogos', path: '/catalogos', icon: LucideBriefcase, roles: ['Super_Admin'] },
-        { name: 'Embudos', path: '/embudos', icon: LucideWaypoints, roles: ['Super_Admin'] },
-        ...(hasModule('automations') ? [
-            { name: 'Automatizaciones', path: '/automatizaciones', icon: LucideZap, roles: ['Super_Admin'] },
-        ] : []),
-
-        // Advisor Specific
-        { name: 'Mi Dashboard', path: '/mi-dashboard', icon: LucideActivity, roles: ['Asesor_Sucursal'] },
-
-        // Operating Roles (Super Admin, Admin & Asesor)
-        { name: 'Leads', path: '/leads', icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        { name: 'Tareas', path: '/tareas', icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        ...(hasModule('chat_whatsapp') ? [
-            { name: 'Chat', path: '/chat', icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        ] : []),
-        ...(hasModule('clinic_core') ? [
-            { name: 'Citas', path: '/citas', icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-            { name: 'Pacientes', path: '/pacientes', icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
-        ] : []),
-
-        // Analytics
-        ...(hasModule('analytics') ? [
-            { name: 'Reportes', path: '/reportes', icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
-        ] : []),
-        { name: 'Configuración', path: '/configuracion/perfil', icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
-
-        { name: 'Gestión', path: '/gestion', icon: LucideWaypoints, roles: ['Super_Admin'] },
+    // Grouped navigation sections
+    const navSections: { label: string | null, items: { name: string, path: string, icon: any, roles: string[] }[] }[] = [
+        {
+            label: null, // No label for top section
+            items: [
+                { name: 'Dashboard', path: '/dashboard', icon: LucideLayoutDashboard, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'] },
+                { name: 'Clinicas', path: '/clinicas', icon: LucideBuilding, roles: ['Platform_Owner'] },
+                { name: 'Mi Dashboard', path: '/mi-dashboard', icon: LucideActivity, roles: ['Asesor_Sucursal'] },
+            ]
+        },
+        {
+            label: 'CRM',
+            items: [
+                { name: 'Leads', path: '/leads', icon: LucideUsers, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+                { name: 'Tareas', path: '/tareas', icon: LucideCheckSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+                ...(hasModule('chat_whatsapp') ? [
+                    { name: 'Chat', path: '/chat', icon: LucideMessageSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+                ] : []),
+                { name: 'Embudos', path: '/embudos', icon: LucideWaypoints, roles: ['Super_Admin'] },
+                ...(hasModule('automations') ? [
+                    { name: 'Automatizaciones', path: '/automatizaciones', icon: LucideZap, roles: ['Super_Admin'] },
+                ] : []),
+            ]
+        },
+        {
+            label: 'Clínica',
+            items: [
+                ...(hasModule('clinic_core') ? [
+                    { name: 'Citas', path: '/citas', icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+                    { name: 'Pacientes', path: '/pacientes', icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
+                ] : []),
+                { name: 'Catálogos', path: '/catalogos', icon: LucideBriefcase, roles: ['Super_Admin'] },
+                { name: 'Recursos Clínicos', path: '/gestion', icon: LucideWaypoints, roles: ['Super_Admin'] },
+            ]
+        },
+        {
+            label: 'Organización',
+            items: [
+                { name: 'Mis Sucursales', path: '/mis-sucursales', icon: LucideMapPin, roles: ['Super_Admin'] },
+                ...(hasModule('analytics') ? [
+                    { name: 'Reportes', path: '/reportes', icon: LucideBarChart3, roles: ['Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+                ] : []),
+            ]
+        },
+        {
+            label: 'Sistema',
+            items: [
+                { name: 'Configuración', path: '/configuracion/perfil', icon: LucideSettings, roles: ['Platform_Owner', 'Super_Admin', 'Admin_Clinica', 'Asesor_Sucursal'] },
+            ]
+        },
     ]
 
-    const activeItem = navItems.find(item => item.path === location.pathname)
+    // Flatten for active item detection
+    const allNavItems = navSections.flatMap(s => s.items)
+    const activeItem = allNavItems.find(item => item.path === location.pathname)
     const activeViewName = location.pathname.includes('/configuracion') 
         ? 'Configuración' 
         : (activeItem ? activeItem.name : '1Clinic')
@@ -129,26 +145,38 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     </div>
                 </div>
 
-                <nav className="flex-1 px-4 space-y-2 mt-4">
-                    {navItems.filter(item => item.roles.includes(currentUser?.role || '')).map((item) => {
-                        // Mark active if pathname starts with the config base path for Settings
-                        const isActive = item.name === 'Configuración' 
-                            ? location.pathname.includes('/configuracion') 
-                            : location.pathname === item.path;
-                            
+                <nav className="flex-1 px-4 mt-2 overflow-y-auto">
+                    {navSections.map((section, sIdx) => {
+                        const visibleItems = section.items.filter(item => item.roles.includes(currentUser?.role || ''))
+                        if (visibleItems.length === 0) return null
                         return (
-                        <Link
-                            key={item.name}
-                            to={item.path}
-                            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${isActive
-                                ? 'bg-clinical-50 text-clinical-700 font-medium shadow-sm'
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                                }`}
-                        >
-                            <item.icon className={`w-5 h-5 ${isActive ? 'text-clinical-600' : 'text-gray-400'}`} />
-                            <span>{item.name}</span>
-                        </Link>
-                    )})}
+                            <div key={sIdx} className={sIdx > 0 ? 'mt-4' : ''}>
+                                {section.label && (
+                                    <p className="px-4 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{section.label}</p>
+                                )}
+                                <div className="space-y-1">
+                                    {visibleItems.map((item) => {
+                                        const isActive = item.name === 'Configuración' 
+                                            ? location.pathname.includes('/configuracion') 
+                                            : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                                        return (
+                                            <Link
+                                                key={item.name}
+                                                to={item.path}
+                                                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all text-sm ${isActive
+                                                    ? 'bg-clinical-50 text-clinical-700 font-medium shadow-sm'
+                                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                                                    }`}
+                                            >
+                                                <item.icon className={`w-5 h-5 ${isActive ? 'text-clinical-600' : 'text-gray-400'}`} />
+                                                <span>{item.name}</span>
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
