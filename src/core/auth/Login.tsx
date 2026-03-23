@@ -29,6 +29,7 @@ export const Login = () => {
     const [tenantReady, setTenantReady] = useState(isGlobalGateway) 
     const [tenantTheme, setTenantTheme] = useState<{ primary_color: string, logo_url: string } | null>(null)
     const [tenantName, setTenantName] = useState<string | null>(null)
+    const [tenantLogoUrl, setTenantLogoUrl] = useState<string | null>(null)
 
     // Slug redirect state
     const [redirectNewSlug, setRedirectNewSlug] = useState<string | null>(null)
@@ -43,7 +44,7 @@ export const Login = () => {
             try {
                 const { data, error } = await supabase
                     .from('clinicas')
-                    .select('name, theme')
+                    .select('name, theme, logo_url')
                     .eq('slug', slug)
                     .single()
                 
@@ -69,6 +70,7 @@ export const Login = () => {
                 }
                 
                 setTenantName(data.name)
+                setTenantLogoUrl(data.logo_url || null)
                 if (data.theme) {
                     setTenantTheme(data.theme)
                 }
@@ -179,7 +181,7 @@ export const Login = () => {
 
     // --- Dynamic Theming Computations ---
     const primaryColor = isGlobalGateway ? '#0f172a' : (tenantTheme?.primary_color || '#0d9488')
-    const displayLogo = isGlobalGateway ? null : tenantTheme?.logo_url
+    const displayLogo = isGlobalGateway ? null : (tenantLogoUrl || tenantTheme?.logo_url || null)
     const displayName = isGlobalGateway ? 'Global Workspace' : (tenantName || 'Plataforma SaaS')
     const displaySubtitle = isGlobalGateway 
         ? 'Ingresa tu correo electrónico corporativo. Te enrutaremos de forma segura a tu espacio de trabajo.'
