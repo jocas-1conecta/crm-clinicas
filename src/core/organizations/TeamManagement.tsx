@@ -185,29 +185,29 @@ export const TeamManagement: React.FC = () => {
                 </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full text-left border-collapse">
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm w-full">
+                <table className="w-full text-left border-collapse table-fixed">
                     <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-medium tracking-wider">
-                            <th className="p-6">Nombre</th>
-                            <th className="p-6">Email</th>
-                            <th className="p-6">Rol</th>
-                            <th className="p-6">Estado</th>
-                            <th className="p-6">Sucursal</th>
-                            <th className="p-6 text-right">Acciones</th>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-[11px] uppercase text-gray-500 font-medium tracking-wider">
+                            <th className="px-4 py-2.5 w-[20%]">Nombre</th>
+                            <th className="px-4 py-2.5 w-[25%]">Email</th>
+                            <th className="px-4 py-2.5 w-[18%]">Rol</th>
+                            <th className="px-4 py-2.5 w-[10%]">Estado</th>
+                            <th className="px-4 py-2.5 w-[15%]">Sucursal</th>
+                            <th className="px-4 py-2.5 w-[12%] text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {filteredTeam.map((member) => (
-                            <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="p-6">
-                                    <div className="flex items-center space-x-3">
-                                        <img src={member.avatar_url || `https://ui-avatars.com/api/?name=${member.name}`} alt="" className="w-10 h-10 rounded-full" />
-                                        <span className="font-medium text-gray-900">{member.name}</span>
+                            <tr key={member.id} className="hover:bg-gray-50/60 transition-colors">
+                                <td className="px-4 py-2.5">
+                                    <div className="flex items-center space-x-2.5">
+                                        <img src={member.avatar_url || `https://ui-avatars.com/api/?name=${member.name}&size=32`} alt="" className="w-8 h-8 rounded-full shrink-0" />
+                                        <span className="font-medium text-sm text-gray-900 truncate">{member.name}</span>
                                     </div>
                                 </td>
-                                <td className="p-6 text-sm text-gray-500">{member.email}</td>
-                                <td className="p-6">
+                                <td className="px-4 py-2.5 text-sm text-gray-500 truncate">{member.email}</td>
+                                <td className="px-4 py-2.5">
                                     {currentUser?.role === 'Super_Admin' ? (
                                         <select
                                             value={member.role}
@@ -216,34 +216,34 @@ export const TeamManagement: React.FC = () => {
                                                     changeRoleMutation.mutate({ id: member.id, newRole: e.target.value });
                                                 }
                                             }}
-                                            className="text-xs font-medium rounded-lg px-2 py-1 border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                            className="text-xs font-medium rounded-lg px-2 py-1.5 border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer w-full"
                                             disabled={changeRoleMutation.isPending}
                                         >
                                             <option value="Asesor_Sucursal">Asesor de Sucursal</option>
                                             <option value="Admin_Clinica">Gerente de Sucursal</option>
                                         </select>
                                     ) : (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
                                             {member.role === 'Admin_Clinica' ? 'Gerente de Sucursal' : 'Asesor de Sucursal'}
                                         </span>
                                     )}
                                 </td>
-                                <td className="p-6">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${member.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                <td className="px-4 py-2.5">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${member.is_active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                                         {member.is_active !== false ? 'Activo' : 'Suspendido'}
                                     </span>
                                 </td>
-                                <td className="p-6">
+                                <td className="px-4 py-2.5 text-sm text-gray-700 truncate">
                                     {myBranches.find(b => b.id === member.sucursal_id)?.name || 'Sin Asignar'}
                                 </td>
-                                <td className="p-6 text-right">
+                                <td className="px-4 py-2.5 text-right">
                                     <button 
                                         onClick={() => toggleStatusMutation.mutate({ id: member.id, newStatus: member.is_active === false ? true : false })}
-                                        className={`transition-colors p-2 rounded-lg ${member.is_active !== false ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                        className={`transition-colors p-1.5 rounded-lg ${member.is_active !== false ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
                                         title={member.is_active !== false ? "Suspender Acceso" : "Restaurar Acceso"}
                                         disabled={toggleStatusMutation.isPending}
                                     >
-                                        <LucidePower className="w-5 h-5" />
+                                        <LucidePower className="w-4 h-4" />
                                     </button>
                                 </td>
                             </tr>
