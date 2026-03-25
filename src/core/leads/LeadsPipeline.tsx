@@ -18,9 +18,12 @@ export const LeadsPipeline = () => {
                 .order('created_at', { ascending: false })
                 .limit(2000);
             
-            // Admin_Clinica and Asesor_Sucursal: scope to their branch
             // Super_Admin: sees all leads across branches (RLS scopes to clinic)
-            if (currentUser?.role !== 'Super_Admin' && branchId) {
+            // Admin_Clinica: sees all leads in their branch
+            // Asesor_Sucursal: sees only leads assigned to them
+            if (currentUser?.role === 'Asesor_Sucursal') {
+                query = query.eq('assigned_to', currentUser.id);
+            } else if (currentUser?.role !== 'Super_Admin' && branchId) {
                 query = query.eq('sucursal_id', branchId);
             }
 

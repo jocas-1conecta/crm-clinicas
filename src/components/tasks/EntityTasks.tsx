@@ -50,6 +50,18 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
     const [dueDate, setDueDate] = useState('')
     const [startTime, setStartTime] = useState('')
     const [endTime, setEndTime] = useState('')
+    const [assignTo, setAssignTo] = useState(currentUser?.id || '')
+
+    // Team members for assignment dropdown
+    const isAdmin = currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica'
+    const { data: teamMembers = [] } = useQuery({
+        queryKey: ['team_for_tasks', currentUser?.clinica_id],
+        queryFn: async () => {
+            const { data } = await supabase.from('profiles').select('id, name').eq('clinica_id', currentUser!.clinica_id)
+            return data || []
+        },
+        enabled: !!currentUser?.clinica_id && isAdmin
+    })
 
     const entityColumn = entityType === 'lead' ? 'lead_id' : 'patient_id'
 
@@ -118,7 +130,7 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
     // ─── Form Helpers ─────────────────────────────────────────
     const resetForm = () => {
         setTitle(''); setDescription(''); setTaskType('otro'); setPriority('normal')
-        setDueDate(''); setStartTime(''); setEndTime('')
+        setDueDate(''); setStartTime(''); setEndTime(''); setAssignTo(currentUser?.id || '')
         setShowForm(false); setEditingTask(null)
     }
 
@@ -153,7 +165,7 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
 
         if (!editingTask) {
             payload[entityColumn] = entityId
-            payload.assigned_to = currentUser?.id
+            payload.assigned_to = isAdmin ? (assignTo || currentUser?.id) : currentUser?.id
             payload.sucursal_id = currentUser?.sucursal_id
         }
 
@@ -246,6 +258,15 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
                                 {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </select>
                         </div>
+                        {isAdmin && (
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Asignar a</label>
+                                <select value={assignTo} onChange={e => setAssignTo(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-clinical-500 cursor-pointer">
+                                    {teamMembers.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {/* Save Button */}

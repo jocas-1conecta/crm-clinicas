@@ -23,13 +23,20 @@ export const LeadsTable = () => {
 
     // Fetch leads
     const { data: leads = [], isLoading } = useQuery({
-        queryKey: ['leads-admin-table', clinicaId],
+        queryKey: ['leads-admin-table', clinicaId, currentUser?.role, currentUser?.id],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('leads')
                 .select('*')
                 .order('created_at', { ascending: false })
                 .limit(5000)
+
+            // Asesor_Sucursal: only their assigned leads
+            if (currentUser?.role === 'Asesor_Sucursal') {
+                query = query.eq('assigned_to', currentUser.id)
+            }
+
+            const { data, error } = await query
             if (error) throw error
             return data
         },
