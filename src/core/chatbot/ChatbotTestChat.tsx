@@ -119,7 +119,7 @@ export const ChatbotTestChat: React.FC<Props> = ({ clinicaId }) => {
   if (isLoadingConfig) {
     return (
       <div className="flex items-center justify-center h-96">
-        <LucideLoader2 className="w-6 h-6 text-violet-500 animate-spin" />
+        <LucideLoader2 className="w-6 h-6 text-clinical-500 animate-spin" />
       </div>
     )
   }
@@ -130,14 +130,14 @@ export const ChatbotTestChat: React.FC<Props> = ({ clinicaId }) => {
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-clinical-500 to-clinical-700 flex items-center justify-center shadow-md">
               <LucideBot className="w-6 h-6 text-white" />
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-gray-900">{botName}</h3>
-            <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+            <p className="text-xs text-clinical-600 font-medium flex items-center gap-1">
               <LucideSparkles className="w-3 h-3" />
               En línea · Powered by Gemini
             </p>
@@ -161,7 +161,7 @@ export const ChatbotTestChat: React.FC<Props> = ({ clinicaId }) => {
             className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-clinical-500 to-clinical-700 flex items-center justify-center shrink-0 shadow-sm">
                 <LucideBot className="w-4 h-4 text-white" />
               </div>
             )}
@@ -185,14 +185,14 @@ export const ChatbotTestChat: React.FC<Props> = ({ clinicaId }) => {
         {/* Typing Indicator */}
         {isTyping && (
           <div className="flex items-end gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-clinical-500 to-clinical-700 flex items-center justify-center shrink-0 shadow-sm">
               <LucideBot className="w-4 h-4 text-white" />
             </div>
             <div className="bg-white px-5 py-3 rounded-2xl rounded-bl-md border border-gray-150 shadow-sm">
               <div className="flex gap-1.5 items-center">
-                <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                <div className="w-2 h-2 bg-clinical-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                <div className="w-2 h-2 bg-clinical-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                <div className="w-2 h-2 bg-clinical-400 rounded-full animate-bounce [animation-delay:300ms]" />
               </div>
             </div>
           </div>
@@ -212,12 +212,12 @@ export const ChatbotTestChat: React.FC<Props> = ({ clinicaId }) => {
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu mensaje..."
             disabled={sendMutation.isPending}
-            className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all disabled:opacity-50 placeholder:text-gray-400"
+            className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent transition-all disabled:opacity-50 placeholder:text-gray-400"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || sendMutation.isPending}
-            className="p-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-violet-200 hover:shadow-lg hover:shadow-violet-300"
+            className="p-3 bg-gradient-to-r from-clinical-500 to-clinical-700 text-white rounded-xl hover:from-clinical-600 hover:to-clinical-800 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-clinical-200 hover:shadow-lg hover:shadow-clinical-300"
           >
             {sendMutation.isPending ? (
               <LucideLoader2 className="w-5 h-5 animate-spin" />

@@ -85,7 +85,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <LucideLoader2 className="w-6 h-6 text-violet-500 animate-spin" />
+        <LucideLoader2 className="w-6 h-6 text-clinical-500 animate-spin" />
       </div>
     )
   }
@@ -103,7 +103,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
       {/* Bot Identity */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <h2 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <LucideBot className="w-4 h-4 text-violet-500" />
+          <LucideBot className="w-4 h-4 text-clinical-500" />
           Identidad del Bot
         </h2>
 
@@ -114,7 +114,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
               type="text"
               value={botName}
               onChange={(e) => setBotName(e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
               placeholder="Ej: Asistente Rangel"
             />
             <p className="text-xs text-gray-400 mt-1">Este nombre se mostrará en el encabezado del chat.</p>
@@ -124,12 +124,12 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-3">Vista Previa</p>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-clinical-500 to-clinical-700 flex items-center justify-center shadow-md">
                 <LucideBot className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-gray-900">{botName || 'Asistente AI'}</h3>
-                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                <p className="text-xs text-clinical-600 font-medium flex items-center gap-1">
                   <LucideSparkles className="w-3 h-3" />
                   En línea · Powered by Gemini
                 </p>
@@ -157,7 +157,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
               onClick={() => setPersonality(preset.prompt)}
               className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
                 personality === preset.prompt
-                  ? 'bg-violet-50 text-violet-700 border-violet-200 shadow-sm'
+                  ? 'bg-clinical-50 text-clinical-700 border-clinical-200 shadow-sm'
                   : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
               }`}
             >
@@ -170,7 +170,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
           value={personality}
           onChange={(e) => setPersonality(e.target.value)}
           rows={5}
-          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent resize-none"
           placeholder="Describe la personalidad y tono del bot..."
         />
         <p className="text-xs text-gray-400 mt-1">
@@ -192,7 +192,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
               value={greeting}
               onChange={(e) => setGreeting(e.target.value)}
               rows={2}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent resize-none"
               placeholder="Primer mensaje que el bot envía al inicio..."
             />
             <p className="text-xs text-gray-400 mt-1">
@@ -209,7 +209,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
               value={fallback}
               onChange={(e) => setFallback(e.target.value)}
               rows={2}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent resize-none"
               placeholder="Mensaje cuando el bot no sabe responder..."
             />
             <p className="text-xs text-gray-400 mt-1">
@@ -224,7 +224,7 @@ export const ChatbotPersonality: React.FC<Props> = ({ clinicaId }) => {
         <button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl text-sm font-medium hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-50 shadow-md shadow-violet-200 hover:shadow-lg"
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-clinical-500 to-clinical-700 text-white rounded-xl text-sm font-medium hover:from-clinical-600 hover:to-clinical-800 transition-all disabled:opacity-50 shadow-md shadow-clinical-200 hover:shadow-lg"
         >
           {saveMutation.isPending ? (
             <LucideLoader2 className="w-4 h-4 animate-spin" />

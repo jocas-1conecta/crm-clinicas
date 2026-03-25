@@ -109,7 +109,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <LucideLoader2 className="w-6 h-6 text-violet-500 animate-spin" />
+        <LucideLoader2 className="w-6 h-6 text-clinical-500 animate-spin" />
       </div>
     )
   }
@@ -133,7 +133,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
         </div>
         <button
           onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl text-sm font-medium hover:from-violet-600 hover:to-purple-700 transition-all shadow-md shadow-violet-200"
+          className="flex items-center gap-2 px-4 py-2.5 bg-clinical-600 text-white rounded-xl text-sm font-medium hover:bg-clinical-700 transition-all shadow-sm"
         >
           <LucidePlus className="w-4 h-4" />
           Agregar
@@ -143,8 +143,8 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
       {/* Empty State */}
       {entries.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mx-auto mb-4">
-            <LucideBookOpen className="w-8 h-8 text-violet-400" />
+          <div className="w-16 h-16 rounded-full bg-clinical-50 flex items-center justify-center mx-auto mb-4">
+            <LucideBookOpen className="w-8 h-8 text-clinical-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Base de conocimiento vacía</h3>
           <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
@@ -152,7 +152,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
           </p>
           <button
             onClick={openNew}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-clinical-600 text-white rounded-xl text-sm font-medium hover:bg-clinical-700 transition-colors"
           >
             <LucidePlus className="w-4 h-4" />
             Agregar primera entrada
@@ -226,7 +226,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
                 <select
                   value={section}
                   onChange={(e) => setSection(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                 >
                   {KB_SECTIONS.map(s => (
                     <option key={s.value} value={s.value}>
@@ -242,7 +242,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                   placeholder="Ej: Nuestra Misión"
                 />
               </div>
@@ -253,7 +253,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={6}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent resize-none"
                   placeholder="Escribe la información que el bot debe conocer sobre este tema..."
                 />
               </div>
@@ -269,7 +269,7 @@ export const KnowledgeBaseManager: React.FC<Props> = ({ clinicaId }) => {
               <button
                 onClick={() => saveMutation.mutate()}
                 disabled={!title.trim() || !content.trim() || saveMutation.isPending}
-                className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 shadow-sm"
+                className="flex items-center gap-2 px-5 py-2.5 bg-clinical-600 text-white rounded-xl text-sm font-medium hover:bg-clinical-700 transition-colors disabled:opacity-50 shadow-sm"
               >
                 {saveMutation.isPending ? (
                   <LucideLoader2 className="w-4 h-4 animate-spin" />

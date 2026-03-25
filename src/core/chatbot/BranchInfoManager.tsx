@@ -154,7 +154,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
   if (isLoadingBranches || isLoadingInfo) {
     return (
       <div className="flex items-center justify-center h-64">
-        <LucideLoader2 className="w-6 h-6 text-violet-500 animate-spin" />
+        <LucideLoader2 className="w-6 h-6 text-clinical-500 animate-spin" />
       </div>
     )
   }
@@ -195,7 +195,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
               className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors text-left"
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${branch.status === 'Activa' ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                <div className={`p-2.5 rounded-xl ${branch.status === 'Activa' ? 'bg-clinical-50 text-clinical-600' : 'bg-gray-100 text-gray-400'}`}>
                   <LucideMapPin className="w-5 h-5" />
                 </div>
                 <div>
@@ -234,7 +234,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                       type="text"
                       value={form.phone}
                       onChange={(e) => updateFormField(branch.id, 'phone', e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                       placeholder="+57 300 123 4567"
                     />
                   </div>
@@ -246,7 +246,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                       type="text"
                       value={form.whatsapp}
                       onChange={(e) => updateFormField(branch.id, 'whatsapp', e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                       placeholder="+57 300 123 4567"
                     />
                   </div>
@@ -260,7 +260,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                     type="text"
                     value={form.address}
                     onChange={(e) => updateFormField(branch.id, 'address', e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                     placeholder="Av. 4 Norte #23-45"
                   />
                 </div>
@@ -273,7 +273,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                     value={form.opening_hours}
                     onChange={(e) => updateFormField(branch.id, 'opening_hours', e.target.value)}
                     rows={2}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent resize-none"
                     placeholder="Lunes a Viernes: 8:00 AM - 6:00 PM&#10;Sábados: 8:00 AM - 1:00 PM"
                   />
                 </div>
@@ -290,7 +290,7 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                             type="text"
                             value={val}
                             onChange={(e) => updateExtraField(branch.id, key, e.target.value)}
-                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                            className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent"
                           />
                         </div>
                         <button
@@ -309,14 +309,14 @@ export const BranchInfoManager: React.FC<Props> = ({ clinicaId }) => {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                   <button
                     onClick={() => addExtraField(branch.id)}
-                    className="text-xs font-medium text-violet-600 hover:text-violet-700 transition-colors"
+                    className="text-xs font-medium text-clinical-600 hover:text-clinical-700 transition-colors"
                   >
                     + Agregar campo adicional
                   </button>
                   <button
                     onClick={() => saveMutation.mutate(branch.id)}
                     disabled={saveMutation.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-colors disabled:opacity-50 shadow-sm"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-clinical-600 text-white rounded-xl text-sm font-medium hover:bg-clinical-700 transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {saveMutation.isPending ? (
                       <LucideLoader2 className="w-4 h-4 animate-spin" />

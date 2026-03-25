@@ -34,7 +34,7 @@ export const ChatbotModule: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-lg shadow-violet-200">
+          <div className="p-3 bg-gradient-to-br from-clinical-500 to-clinical-700 rounded-2xl shadow-lg shadow-clinical-200">
             <LucideBot className="w-7 h-7 text-white" />
           </div>
           <div>
@@ -61,7 +61,7 @@ export const ChatbotModule: React.FC = () => {
                   : 'bg-transparent text-gray-500 border-transparent hover:bg-white/60 hover:text-gray-700'
               }`}
             >
-              <tab.icon className={`w-4.5 h-4.5 ${isActive ? 'text-violet-600' : 'text-gray-400'}`} />
+              <tab.icon className={`w-4.5 h-4.5 ${isActive ? 'text-clinical-600' : 'text-gray-400'}`} />
               <span>{tab.label}</span>
             </button>
           )
