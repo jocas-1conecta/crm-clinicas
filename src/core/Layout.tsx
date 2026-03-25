@@ -42,6 +42,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         }
     }, [tenant?.favicon_url])
 
+    // Apply clinic name as page title
+    useEffect(() => {
+        if (tenant?.name) {
+            document.title = tenant.name
+        }
+    }, [tenant?.name])
+
     // Role Helper
     const roleLabel = {
         'Platform_Owner': 'SaaS Founder',
