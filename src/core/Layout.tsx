@@ -21,7 +21,8 @@ import {
     LucideCheckSquare,
     LucideWaypoints,
     LucideMessageSquare,
-    LucideZap
+    LucideZap,
+    LucideBot
 } from 'lucide-react'
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -90,6 +91,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 ...(hasModule('automations') ? [
                     { name: 'Automatizaciones', path: '/automatizaciones', icon: LucideZap, roles: ['Super_Admin'] },
                 ] : []),
+                { name: 'Chatbot AI', path: '/chatbot', icon: LucideBot, roles: ['Super_Admin'] },
             ]
         },
         {

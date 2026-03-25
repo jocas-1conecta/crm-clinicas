@@ -37,6 +37,7 @@ import { ChatModule } from './core/chat/ChatModule'
 import { IntegrationsSettings } from './core/settings/IntegrationsSettings'
 import { ChatTemplatesSettings } from './core/settings/ChatTemplatesSettings'
 import { useGlobalChatNotifications } from './core/chat/useGlobalChatNotifications'
+import { ChatbotModule } from './core/chatbot/ChatbotModule'
 import { getTenantSlug, buildTenantUrl } from './utils/getTenantSlug'
 
 /** Mounts the global real-time chat notification listener for all authenticated routes */
@@ -56,7 +57,7 @@ function LegacySlugRedirect() {
     if (match && !getTenantSlug()) {
         const possibleSlug = match[1]
         const rest = match[2] || '/dashboard'
-        const reserved = ['login', 'registro', 'join', 'olvide-mi-contrasena', 'actualizar-contrasena', 'dashboard', 'clinicas', 'configuracion', 'leads', 'tareas', 'chat', 'citas', 'pacientes', 'reportes', 'perfil', 'mis-sucursales', 'catalogos', 'embudos', 'automatizaciones', 'gestion', 'mi-dashboard']
+        const reserved = ['login', 'registro', 'join', 'olvide-mi-contrasena', 'actualizar-contrasena', 'dashboard', 'clinicas', 'configuracion', 'leads', 'tareas', 'chat', 'chatbot', 'citas', 'pacientes', 'reportes', 'perfil', 'mis-sucursales', 'catalogos', 'embudos', 'automatizaciones', 'gestion', 'mi-dashboard']
         if (!reserved.includes(possibleSlug)) {
             window.location.href = buildTenantUrl(possibleSlug, rest)
             return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Redirigiendo...</p></div>
@@ -195,6 +196,9 @@ function App() {
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales/:branchId" element={<BranchDetail />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/catalogos" element={<CatalogsManagement />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/gestion" element={<Management />} />}
+
+                    {/* Chatbot AI */}
+                    {currentUser.role === 'Super_Admin' && <Route path="/chatbot" element={<ChatbotModule />} />}
 
                     <Route element={<ModuleGuard requiredModule="automations" />}>
                         {currentUser.role === 'Super_Admin' && <Route path="/automatizaciones" element={<TaskSequenceConfig />} />}
