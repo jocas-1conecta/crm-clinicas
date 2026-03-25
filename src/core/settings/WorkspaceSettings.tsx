@@ -30,6 +30,7 @@ export const WorkspaceSettings: React.FC = () => {
     const [email, setEmail] = useState('')
     const [currency, setCurrency] = useState('USD')
     const [uploadingLogo, setUploadingLogo] = useState(false)
+    const [uploadingFavicon, setUploadingFavicon] = useState(false)
     const [logoDisplayMode, setLogoDisplayMode] = useState('logo_text')
     const [showSlugConfirm, setShowSlugConfirm] = useState(false)
     const [brandColor, setBrandColor] = useState('#0d9488')
@@ -287,6 +288,46 @@ export const WorkspaceSettings: React.FC = () => {
         }
     }
 
+    const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !currentUser?.clinica_id) return
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert('El favicon es demasiado grande. Máximo 2MB.')
+            return
+        }
+
+        setUploadingFavicon(true)
+        try {
+            const blob = await compressImage(file, 64, 0.9)
+            const path = `tenant-${currentUser.clinica_id}-favicon-${Date.now()}.png`
+            const { error: uploadError } = await supabase.storage.from('logos').upload(path, blob, { contentType: 'image/png', upsert: true })
+            if (uploadError) throw new Error(uploadError.message || JSON.stringify(uploadError))
+
+            const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+
+            const { error: updateError } = await supabase
+                .from('clinicas')
+                .update({ favicon_url: publicUrl })
+                .eq('id', currentUser.clinica_id)
+            if (updateError) throw new Error(updateError.message || JSON.stringify(updateError))
+
+            // Apply immediately
+            const link = document.getElementById('app-favicon') as HTMLLinkElement
+            if (link) { link.type = 'image/png'; link.href = publicUrl }
+
+            queryClient.invalidateQueries({ queryKey: ['tenant_settings', currentUser.clinica_id] })
+            setSuccessMsg('Favicon actualizado')
+            setTimeout(() => setSuccessMsg(''), 4000)
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
+            console.error('Favicon upload error:', error)
+            alert('Error subiendo favicon: ' + errorMessage)
+        } finally {
+            setUploadingFavicon(false)
+        }
+    }
+
     const handleDisplayModeChange = async (mode: string) => {
         if (!currentUser?.clinica_id) return
         setLogoDisplayMode(mode)
@@ -438,10 +479,43 @@ export const WorkspaceSettings: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Favicon */}
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900 mb-1">Favicon</h3>
+                            <p className="text-xs text-gray-500 mb-3">Ícono que aparece en la pestaña del navegador.</p>
+                            <div className="flex items-center space-x-4">
+                                <label className={`relative cursor-pointer group ${uploadingFavicon ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-14 h-14 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm">
+                                        {tenant?.favicon_url ? (
+                                            <img src={tenant.favicon_url} alt="Favicon" className="w-full h-full object-contain p-1.5" />
+                                        ) : (
+                                            <LucideGlobe className="w-6 h-6 text-gray-300" />
+                                        )}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingFavicon ? (
+                                            <LucideLoader2 className="w-4 h-4 text-white animate-spin" />
+                                        ) : (
+                                            <LucideCamera className="w-4 h-4 text-white" />
+                                        )}
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/png,image/jpeg,image/svg+xml,image/x-icon" 
+                                        onChange={handleFaviconUpload}
+                                        disabled={uploadingFavicon}
+                                    />
+                                </label>
+                                <div className="text-xs text-gray-400">
+                                    <p>PNG 64×64 recomendado</p>
+                                    {uploadingFavicon && <p className="text-blue-500 mt-1 flex items-center gap-1"><LucideLoader2 className="w-3 h-3 animate-spin" /> Subiendo...</p>}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                {/* Brand Color Section */}
                 <div className="mb-8 pb-8 border-b border-gray-100">
                     <div className="flex items-center space-x-2 mb-4">
                         <LucidePalette className="w-4 h-4 text-pink-500" />

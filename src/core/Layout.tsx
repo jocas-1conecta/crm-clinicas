@@ -18,7 +18,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             if (!currentUser?.clinica_id) return null
             const { data } = await supabase
                 .from('clinicas')
-                .select('id, name, logo_url, logo_thumb_url, logo_display_mode, theme')
+                .select('id, name, logo_url, logo_thumb_url, logo_display_mode, theme, favicon_url')
                 .eq('id', currentUser.clinica_id)
                 .single()
             return data
@@ -33,6 +33,14 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             applyBrandColor(tenant.theme.primary_color)
         }
     }, [tenant?.theme?.primary_color])
+
+    // Apply dynamic favicon
+    useEffect(() => {
+        if (tenant?.favicon_url) {
+            const link = document.getElementById('app-favicon') as HTMLLinkElement
+            if (link) { link.type = 'image/png'; link.href = tenant.favicon_url }
+        }
+    }, [tenant?.favicon_url])
 
     // Role Helper
     const roleLabel = {
