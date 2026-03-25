@@ -4,26 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useStore } from '../store/useStore'
 import { applyBrandColor } from '../utils/applyBrandColor'
-import {
-    LucideLayoutDashboard,
-    LucideUsers,
-    LucideCalendar,
-    LucideUserSquare,
-    LucideSettings,
-    LucideLogOut,
-    LucideShieldCheck,
-    LucideMenu,
-    LucideBuilding,
-    LucideMapPin,
-    LucideBriefcase,
-    LucideActivity,
-    LucideBarChart3,
-    LucideCheckSquare,
-    LucideWaypoints,
-    LucideMessageSquare,
-    LucideZap,
-    LucideBot
-} from 'lucide-react'
+import { LucideLayoutDashboard, LucideUserSquare, LucideCalendar, LucideSettings, LucideMapPin, LucideLogOut, LucideBriefcase, LucideStethoscope, LucideUsers, LucideBarChart3, LucideCheckSquare, LucideMessageSquare, LucideZap, LucideWaypoints, LucideBot, LucideActivity, LucideUsers2, LucideBuilding, LucideShieldCheck, LucideMenu } from 'lucide-react'
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
     const { currentUser, logout } = useStore()
@@ -101,7 +82,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     { name: 'Citas', path: '/citas', icon: LucideCalendar, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
                     { name: 'Pacientes', path: '/pacientes', icon: LucideUserSquare, roles: ['Admin_Clinica', 'Super_Admin', 'Asesor_Sucursal'] },
                 ] : []),
-                { name: 'Catálogos', path: '/catalogos', icon: LucideBriefcase, roles: ['Super_Admin'] },
+                { name: 'Equipo', path: '/equipo', icon: LucideUsers2, roles: ['Super_Admin'] },
+                { name: 'Servicios', path: '/servicios', icon: LucideBriefcase, roles: ['Super_Admin'] },
                 { name: 'Recursos Clínicos', path: '/gestion', icon: LucideWaypoints, roles: ['Super_Admin'] },
             ]
         },

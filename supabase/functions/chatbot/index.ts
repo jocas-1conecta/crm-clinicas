@@ -35,7 +35,7 @@ async function buildSystemPrompt(
   const [kbResult, branchInfoResult, servicesResult, doctorsResult, clinicResult] = await Promise.all([
     supabase.from('chatbot_knowledge_base').select('section, title, content').eq('clinica_id', clinicaId).eq('is_active', true).order('section').order('sort_order'),
     supabase.from('chatbot_branch_info').select('*').eq('clinica_id', clinicaId).eq('is_active', true),
-    supabase.from('services').select('name, price, scripts, support_material').eq('clinica_id', clinicaId),
+    supabase.from('services').select('id, name, price, description, keywords, greeting, scripts, support_material').eq('clinica_id', clinicaId),
     supabase.from('doctors').select('name, specialty, email, phone').eq('clinica_id', clinicaId),
     supabase.from('clinicas').select('name, currency').eq('id', clinicaId).single(),
   ])
@@ -70,17 +70,45 @@ async function buildSystemPrompt(
     prompt += `\n`
   }
 
-  // Services & Products
+  // Services & Products — includes new fields + Q&A knowledge
   if (services.length > 0) {
     const currency = clinic?.currency || 'USD'
-    prompt += `=== SERVICIOS Y PRODUCTOS ===\n`
+    prompt += `=== SERVICIOS Y TRATAMIENTOS ===\n`
+
+    // Fetch Q&A scripts for all services
+    const serviceIds = services.map((s: Record<string, unknown>) => s.id)
+    const { data: allQA } = await supabase
+      .from('service_knowledge')
+      .select('service_id, question, answer')
+      .in('service_id', serviceIds)
+      .eq('is_active', true)
+      .order('sort_order')
+    const qaByService = new Map<string, Array<{ question: string; answer: string }>>()
+    for (const qa of (allQA || [])) {
+      if (!qaByService.has(qa.service_id)) qaByService.set(qa.service_id, [])
+      qaByService.get(qa.service_id)!.push(qa)
+    }
+
     for (const svc of services) {
-      prompt += `• ${svc.name} — Precio: ${currency} ${Number(svc.price).toLocaleString()}\n`
+      prompt += `\n--- ${svc.name} ---\n`
+      prompt += `  Precio: ${currency} ${Number(svc.price).toLocaleString()}\n`
+      if (svc.description) prompt += `  Descripción: ${svc.description}\n`
+      if (svc.keywords?.length > 0) prompt += `  Palabras clave: ${svc.keywords.join(', ')}\n`
+      if (svc.greeting) prompt += `  Saludo: ${svc.greeting}\n`
       if (svc.scripts?.length > 0) {
         prompt += `  Guiones de venta: ${svc.scripts.join(' | ')}\n`
       }
       if (svc.support_material?.length > 0) {
         prompt += `  Material de apoyo: ${svc.support_material.join(', ')}\n`
+      }
+      // Q&A scripts for this service
+      const serviceQA = qaByService.get(svc.id as string)
+      if (serviceQA && serviceQA.length > 0) {
+        prompt += `  --- Preguntas Frecuentes de este servicio ---\n`
+        for (const qa of serviceQA) {
+          prompt += `  P: ${qa.question}\n`
+          prompt += `  R: ${qa.answer}\n\n`
+        }
       }
     }
     prompt += `\n`

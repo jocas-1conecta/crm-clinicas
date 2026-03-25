@@ -27,6 +27,9 @@ import { BranchDetail } from './core/organizations/BranchDetail'
 import { TeamManagement } from './core/organizations/TeamManagement'
 import { TaskSequenceConfig } from './core/organizations/TaskSequenceConfig'
 import { CatalogsManagement } from './core/catalogs/CatalogsManagement'
+import { TeamManagementPage } from './core/catalogs/TeamManagementPage'
+import { ServicesManagementPage } from './core/catalogs/ServicesManagementPage'
+import { ServiceDetail } from './core/catalogs/ServiceDetail'
 import { RootDashboard } from './core/dashboards/RootDashboard'
 import { LeadsPipeline } from './core/leads/LeadsPipeline'
 import { LeadsTable } from './core/leads/LeadsTable'
@@ -57,7 +60,7 @@ function LegacySlugRedirect() {
     if (match && !getTenantSlug()) {
         const possibleSlug = match[1]
         const rest = match[2] || '/dashboard'
-        const reserved = ['login', 'registro', 'join', 'olvide-mi-contrasena', 'actualizar-contrasena', 'dashboard', 'clinicas', 'configuracion', 'leads', 'tareas', 'chat', 'chatbot', 'citas', 'pacientes', 'reportes', 'perfil', 'mis-sucursales', 'catalogos', 'embudos', 'automatizaciones', 'gestion', 'mi-dashboard']
+        const reserved = ['login', 'registro', 'join', 'olvide-mi-contrasena', 'actualizar-contrasena', 'dashboard', 'clinicas', 'configuracion', 'leads', 'tareas', 'chat', 'chatbot', 'citas', 'pacientes', 'reportes', 'perfil', 'mis-sucursales', 'catalogos', 'equipo', 'servicios', 'embudos', 'automatizaciones', 'gestion', 'mi-dashboard']
         if (!reserved.includes(possibleSlug)) {
             window.location.href = buildTenantUrl(possibleSlug, rest)
             return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-400">Redirigiendo...</p></div>
@@ -195,6 +198,9 @@ function App() {
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales" element={<BranchesManagement />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/mis-sucursales/:branchId" element={<BranchDetail />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/catalogos" element={<CatalogsManagement />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/equipo" element={<TeamManagementPage />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/servicios" element={<ServicesManagementPage />} />}
+                    {currentUser.role === 'Super_Admin' && <Route path="/servicios/:id" element={<ServiceDetail />} />}
                     {currentUser.role === 'Super_Admin' && <Route path="/gestion" element={<Management />} />}
 
                     {/* Chatbot AI */}
