@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
 import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock, LucideBuilding } from 'lucide-react'
 import { getTenantSlug, buildTenantUrl, buildPlatformUrl } from '../../utils/getTenantSlug'
+import { applyBrandColor } from '../../utils/applyBrandColor'
 import { SlugRedirectPage } from './SlugRedirectPage'
 
 export const Login = () => {
@@ -37,6 +38,30 @@ export const Login = () => {
     useEffect(() => {
         const fetchTenantBrand = async () => {
             if (isGlobalGateway) {
+                // Fetch platform-level branding for the global login
+                try {
+                    const { data } = await supabase
+                        .from('platform_config')
+                        .select('value')
+                        .eq('key', 'branding')
+                        .single()
+                    if (data?.value) {
+                        const b = data.value as Record<string, any>
+                        setTenantName(b.app_name || '1Clinic')
+                        setTenantLogoUrl(b.login_logo_url || b.logo_url || null)
+                        if (b.primary_color) {
+                            setTenantTheme({ primary_color: b.primary_color, logo_url: b.logo_url || '' })
+                            applyBrandColor(b.primary_color)
+                        }
+                        // Apply favicon on login page too
+                        if (b.favicon_url) {
+                            const link = document.getElementById('app-favicon') as HTMLLinkElement
+                            if (link) { link.type = 'image/png'; link.href = b.favicon_url }
+                        }
+                    }
+                } catch (err) {
+                    // Ignore — fallback to defaults
+                }
                 setTenantReady(true)
                 return;
             }
@@ -180,9 +205,9 @@ export const Login = () => {
     }
 
     // --- Dynamic Theming Computations ---
-    const primaryColor = isGlobalGateway ? '#0f172a' : (tenantTheme?.primary_color || '#0d9488')
-    const displayLogo = isGlobalGateway ? null : (tenantLogoUrl || tenantTheme?.logo_url || null)
-    const displayName = isGlobalGateway ? 'Global Workspace' : (tenantName || 'Plataforma SaaS')
+    const primaryColor = tenantTheme?.primary_color || (isGlobalGateway ? '#0d9488' : '#0d9488')
+    const displayLogo = tenantLogoUrl || null
+    const displayName = tenantName || '1Clinic'
     const displaySubtitle = isGlobalGateway 
         ? 'Ingresa tu correo electrónico corporativo. Te enrutaremos de forma segura a tu espacio de trabajo.'
         : `Acceso protegido a la plataforma administrativa de ${tenantName}.`

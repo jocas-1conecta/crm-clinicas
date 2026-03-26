@@ -12,9 +12,15 @@ INSERT INTO platform_config (key, value) VALUES (
     '{"app_name":"1Clinic","logo_url":null,"login_logo_url":null,"favicon_url":null,"primary_color":"#0d9488"}'::jsonb
 ) ON CONFLICT (key) DO NOTHING;
 
--- RLS: only Platform_Owner can read/write
+-- RLS policies
 ALTER TABLE platform_config ENABLE ROW LEVEL SECURITY;
 
+-- Anyone can READ branding (needed for login page without auth session)
+CREATE POLICY "Anyone can read platform config"
+ON platform_config FOR SELECT
+USING (true);
+
+-- Only Platform_Owner can INSERT/UPDATE/DELETE
 CREATE POLICY "Platform_Owner can manage config"
 ON platform_config FOR ALL
 USING (
