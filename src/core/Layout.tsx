@@ -165,7 +165,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                                 <img 
                                     src={tenant?.logo_display_mode === 'logo_only' ? (tenant.logo_url || tenant.logo_thumb_url) : (tenant.logo_thumb_url || tenant.logo_url)} 
                                     alt="Logo" 
-                                    className={`object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'max-h-10 w-auto' : 'w-8 h-8 rounded-lg'}`} 
+                                    className={`object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'h-7 w-auto' : 'w-8 h-8 rounded-lg'}`} 
                                 />
                             ) : (
                                 <div className="bg-clinical-100 p-2 rounded-lg">
