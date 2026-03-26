@@ -35,6 +35,17 @@ export const SettingsLayout: React.FC = () => {
 
     // Opciones exclusivas para roles administrativos
     const isAdmin = currentUser.role === 'Super_Admin'
+    const isPlatformOwner = currentUser.role === 'Platform_Owner'
+
+    if (isPlatformOwner) {
+        menuItems.push({
+            title: 'Plataforma',
+            path: `${prefix}/configuracion/plataforma`,
+            icon: LucideBuilding,
+            description: 'Branding y configuración global'
+        })
+    }
+
     if (isAdmin) {
         menuItems.push({
             title: 'Espacio de Trabajo',

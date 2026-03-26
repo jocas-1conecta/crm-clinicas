@@ -14,6 +14,7 @@ import { SettingsLayout } from './core/settings/SettingsLayout'
 import { ProfileSettings } from './core/settings/ProfileSettings'
 import { SecuritySettings } from './core/settings/SecuritySettings'
 import { WorkspaceSettings } from './core/settings/WorkspaceSettings'
+import { PlatformBrandingSettings } from './core/settings/PlatformBrandingSettings'
 import { Layout } from './core/Layout'
 import { Patients } from './modules/clinic/patients/Patients'
 import { PatientsTable } from './modules/clinic/patients/PatientsTable'
@@ -260,6 +261,7 @@ function App() {
                         <Route path="perfil" element={<ProfileSettings />} />
                         <Route path="seguridad" element={<SecuritySettings />} />
                         <Route path="empresa" element={<WorkspaceSettings />} />
+                        <Route path="plataforma" element={<PlatformBrandingSettings />} />
                         <Route path="equipo" element={<TeamManagement />} />
                         <Route path="integraciones" element={<IntegrationsSettings />} />
                         <Route path="plantillas-chat" element={<ChatTemplatesSettings />} />
