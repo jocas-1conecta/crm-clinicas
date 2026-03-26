@@ -158,7 +158,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="min-h-screen bg-gray-50 flex">
             {/* Sidebar */}
             <aside className="w-52 bg-white border-r border-gray-200 hidden md:flex flex-col z-20">
-                <div className="p-4">
+                <div className="px-4 py-5">
                     <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? 'justify-center' : 'space-x-3'} text-clinical-600`}>
                         {tenant?.logo_display_mode !== 'text_only' && (
                             tenant?.logo_thumb_url || tenant?.logo_url ? (
