@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../services/supabase'
 import { LucideLock, LucideShieldCheck, LucideCheckCircle2 } from 'lucide-react'
 
-export const UpdatePassword = () => {
+export const UpdatePassword = ({ onComplete }: { onComplete?: () => void }) => {
     // Supabase inyectará un token hash en la URL (#access_token=...) cuando el usuario toque el email
     // Usamos el hook de auth para interceptar esta sesión de reinicio temporal
     const navigate = useNavigate()
@@ -55,8 +55,12 @@ export const UpdatePassword = () => {
                 setSuccess(true)
                 // Redirigir al dashboard/inicio después de un par de segundos
                 setTimeout(() => {
-                   navigate(slug ? `/${slug}` : '/')
-                }, 3000)
+                    if (onComplete) {
+                        onComplete()
+                    } else {
+                        navigate(slug ? `/${slug}` : '/')
+                    }
+                }, 2500)
             }
         } catch (err: any) {
             setError(err.message || 'Error inesperado al actualizar credenciales')

@@ -76,6 +76,7 @@ const queryClient = new QueryClient()
 function App() {
     const { currentUser, setCurrentUser } = useStore()
     const [isAuthLoading, setIsAuthLoading] = useState(true)
+    const [pendingPasswordReset, setPendingPasswordReset] = useState(false)
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -87,7 +88,16 @@ function App() {
             }
         })
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                // User clicked the reset link — force them to change password
+                // before accessing anything else
+                setPendingPasswordReset(true)
+                if (session?.user) {
+                    fetchProfileAndSetUser(session.user)
+                }
+                return
+            }
             if (session?.user) {
                 fetchProfileAndSetUser(session.user)
             } else {
@@ -173,6 +183,16 @@ function App() {
         )
     }
 
+    // If user clicked a password reset link, force them to change password
+    // on a standalone page (no sidebar, no navigation) before accessing the app
+    if (pendingPasswordReset) {
+        return (
+            <QueryClientProvider client={queryClient}>
+                <UpdatePassword onComplete={() => setPendingPasswordReset(false)} />
+            </QueryClientProvider>
+        )
+    }
+
     const getRoleFallback = () => {
         switch(currentUser.role) {
             case 'Platform_Owner': return '/clinicas';
@@ -232,7 +252,7 @@ function App() {
                     </Route>
 
                     <Route path="/perfil" element={<Profile />} />
-                    <Route path="/actualizar-contrasena" element={<UpdatePassword />} />
+                    {/* UpdatePassword is handled standalone above when pendingPasswordReset is true */}
 
                     {/* Settings Hub */}
                     <Route path="/configuracion" element={<SettingsLayout />}>
