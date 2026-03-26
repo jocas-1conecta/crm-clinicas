@@ -12,9 +12,10 @@ export interface UniversalPipelineBoardProps {
     tableName: 'leads' | 'deals' | 'appointments';
     records: any[];
     queryKeyToInvalidate: any[];
+    teamMembers?: { id: string; name: string }[];
 }
 
-export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKeyToInvalidate }: UniversalPipelineBoardProps) => {
+export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKeyToInvalidate, teamMembers = [] }: UniversalPipelineBoardProps) => {
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
     const navigate = useNavigate()
@@ -93,6 +94,16 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeyToInvalidate })
             queryClient.invalidateQueries({ queryKey: ['patients'] }) // always invalidate patients on conversion
+        }
+    })
+
+    const assignMutation = useMutation({
+        mutationFn: async ({ id, assigned_to }: { id: string, assigned_to: string | null }) => {
+            const { error } = await supabase.from(tableName).update({ assigned_to }).eq('id', id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeyToInvalidate })
         }
     })
 
@@ -200,7 +211,9 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                             convertLeadToPatient={(r: any) => convertLeadMutation.mutate(r)} 
                             prioritizeSLA={prioritizeSLA}
                             boardType={boardType}
-                            onCardClick={(id: string) => boardType === 'leads' ? navigate(`/leads/${id}`) : null}
+                            onCardClick={(id: string) => boardType === 'leads' ? navigate(`/leads/${id}`) : (boardType === 'deals' ? navigate(`/pacientes/${id}`) : null)}
+                            teamMembers={teamMembers}
+                            onAssign={(id: string, assigned_to: string | null) => assignMutation.mutate({ id, assigned_to })}
                         />
                     </div>
                 ))}
@@ -294,7 +307,7 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
     )
 }
 
-const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatient, prioritizeSLA, boardType, onCardClick }: { records: any[], col: any, substages: any[], handleMove: any, convertLeadToPatient: any, prioritizeSLA: boolean, boardType: string, onCardClick: (id: string) => void }) => {
+const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatient, prioritizeSLA, boardType, onCardClick, teamMembers, onAssign }: { records: any[], col: any, substages: any[], handleMove: any, convertLeadToPatient: any, prioritizeSLA: boolean, boardType: string, onCardClick: (id: string) => void, teamMembers: { id: string; name: string }[], onAssign: (id: string, assigned_to: string | null) => void }) => {
     const parentRef = useRef<HTMLDivElement>(null)
 
     const sortedRecords = useMemo(() => {
@@ -408,7 +421,22 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                                 )}
                             </div>
 
-                            <div className="flex gap-2 pt-3 border-t border-gray-50 mt-auto">
+                            {/* Assignee */}
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                    <LucideUser className="w-3 h-3 text-gray-400" />
+                                    <select
+                                        value={record.assigned_to || ''}
+                                        onChange={e => { e.stopPropagation(); onAssign(record.id, e.target.value || null) }}
+                                        className="text-[10px] text-gray-500 bg-transparent border-none outline-none cursor-pointer p-0 pr-4 max-w-[100px] truncate"
+                                    >
+                                        <option value="">Sin asignar</option>
+                                        {teamMembers.map(m => (
+                                            <option key={m.id} value={m.id}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex gap-2">
                                 {col.resolution_type === 'open' && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleMove(record); }}
@@ -428,6 +456,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                                         <span>Convertir a Paciente</span>
                                     </button>
                                 )}
+                                </div>
                             </div>
                         </div>
                     )
