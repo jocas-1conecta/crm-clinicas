@@ -427,5 +427,18 @@ export function useMessageStatus(messageUid: string | null) {
     })
 }
 
+/** Find a chat by phone number (for embedding in lead/patient views) */
+export function useChatByPhone(phone: string | null | undefined) {
+    const { data: apiKey } = useApiKey()
+
+    return useQuery({
+        queryKey: ['timelines_chat_by_phone', apiKey, phone],
+        queryFn: () => api.searchChatByPhone(apiKey!, phone!),
+        enabled: !!apiKey && !!phone,
+        staleTime: 60_000,
+        retry: 1,
+    })
+}
+
 export { useApiKey }
 

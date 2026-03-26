@@ -17,6 +17,7 @@ import { WorkspaceSettings } from './core/settings/WorkspaceSettings'
 import { Layout } from './core/Layout'
 import { Patients } from './modules/clinic/patients/Patients'
 import { PatientsTable } from './modules/clinic/patients/PatientsTable'
+import { PatientDetail } from './modules/clinic/patients/PatientDetail'
 import { Management } from './core/organizations/Management'
 import { AppointmentsPipeline } from './modules/clinic/appointments/AppointmentsPipeline'
 import { AppointmentsTable } from './modules/clinic/appointments/AppointmentsTable'
@@ -33,6 +34,7 @@ import { ServiceDetail } from './core/catalogs/ServiceDetail'
 import { RootDashboard } from './core/dashboards/RootDashboard'
 import { LeadsPipeline } from './core/leads/LeadsPipeline'
 import { LeadsTable } from './core/leads/LeadsTable'
+import { LeadDetail } from './core/leads/LeadDetail'
 import { PatientsDirectory } from './modules/clinic/patients/PatientsDirectory'
 import { ReportsDashboard } from './core/analytics/ReportsDashboard'
 import { CalendarTasks } from './core/calendar/CalendarTasks'
@@ -212,6 +214,7 @@ function App() {
 
                     {/* Operation Roles */}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/leads" element={currentUser.role === 'Super_Admin' ? <LeadsTable /> : <LeadsPipeline />} />}
+                    {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/leads/:id" element={<LeadDetail />} />}
                     {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/tareas" element={<CalendarTasks />} />}
 
                     <Route element={<ModuleGuard requiredModule="chat_whatsapp" />}>
@@ -221,6 +224,7 @@ function App() {
                     <Route element={<ModuleGuard requiredModule="clinic_core" />}>
                         {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/citas" element={currentUser.role === 'Super_Admin' ? <AppointmentsTable /> : <AppointmentsPipeline />} />}
                         {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/pacientes" element={currentUser.role === 'Super_Admin' ? <PatientsTable /> : (currentUser.role === 'Asesor_Sucursal' ? <PatientsDirectory /> : <Patients />)} />}
+                        {(currentUser.role === 'Admin_Clinica' || currentUser.role === 'Super_Admin' || currentUser.role === 'Asesor_Sucursal') && <Route path="/pacientes/:id" element={<PatientDetail />} />}
                     </Route>
 
                     <Route element={<ModuleGuard requiredModule="analytics" />}>

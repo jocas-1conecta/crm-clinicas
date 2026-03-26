@@ -1,24 +1,26 @@
 import React, { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2 } from 'lucide-react'
-import { PatientDetail } from './PatientDetail'
+import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus } from 'lucide-react'
 import { PipelineConfig } from '../../../core/organizations/PipelineConfig'
+import { AddPatientModal } from './AddPatientModal'
 
 type SortDir = 'asc' | 'desc' | null
 type SortKey = 'name' | 'status' | 'created_at'
 
 export const PatientsTable = () => {
     const { currentUser } = useStore()
+    const navigate = useNavigate()
     const clinicaId = currentUser?.clinica_id
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
-    const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
     const [showConfig, setShowConfig] = useState(false)
+    const [showAddPatient, setShowAddPatient] = useState(false)
 
     const { data: patients = [], isLoading } = useQuery({
         queryKey: ['patients-admin-table', clinicaId],
@@ -86,9 +88,7 @@ export const PatientsTable = () => {
 
     return (
         <div className="h-full flex flex-col">
-            {selectedPatientId && (
-                <PatientDetail patientId={selectedPatientId} onClose={() => setSelectedPatientId(null)} />
-            )}
+            <AddPatientModal open={showAddPatient} onClose={() => setShowAddPatient(false)} />
 
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -118,6 +118,13 @@ export const PatientsTable = () => {
                 )}
 
                 <span className="text-xs text-gray-400 ml-auto">{sorted.length} pacientes</span>
+                <button
+                    onClick={() => setShowAddPatient(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-clinical-600 text-white text-sm font-bold rounded-xl hover:bg-clinical-700 transition-all shadow-sm"
+                >
+                    <LucideUserPlus className="w-4 h-4" />
+                    Nuevo Paciente
+                </button>
                 <button onClick={() => setShowConfig(true)} className="p-2 text-gray-400 hover:text-clinical-600 hover:bg-clinical-50 rounded-xl transition-colors" title="Configurar embudo de pacientes">
                     <LucideSettings2 className="w-5 h-5" />
                 </button>
@@ -155,7 +162,7 @@ export const PatientsTable = () => {
                                 <tr
                                     key={patient.id}
                                     className="hover:bg-gray-50/60 transition-colors cursor-pointer"
-                                    onClick={() => setSelectedPatientId(patient.id)}
+                                    onClick={() => navigate(`/pacientes/${patient.id}`)}
                                 >
                                     <td className="px-5 py-3">
                                         <div className="flex items-center gap-3">

@@ -1,16 +1,18 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideUserPlus, LucideMoreVertical, LucidePhone, LucideKanban, LucideList } from 'lucide-react'
-import { PatientDetail } from './PatientDetail'
+import { LucideSearch, LucideUserPlus, LucideMoreVertical, LucidePhone, LucideKanban, LucideList, LucideDownload } from 'lucide-react'
 import { DealsPipeline } from './DealsPipeline'
+import { AddPatientModal } from './AddPatientModal'
 
 export const Patients = () => {
     const { currentUser } = useStore()
+    const navigate = useNavigate()
     const [viewMode, setViewMode] = useState<'board' | 'directory'>('board')
     const [searchTerm, setSearchTerm] = useState('')
-    const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+    const [showAddPatient, setShowAddPatient] = useState(false)
 
     const { data: patients = [], isLoading } = useQuery({
         queryKey: ['patients-admin'],
@@ -32,14 +34,32 @@ export const Patients = () => {
         return matchesSearch
     })
 
+    const handleExportCSV = () => {
+        if (filteredPatients.length === 0) return
+        const headers = ['Nombre', 'Teléfono', 'Email', 'Edad', 'Estado', 'Etiquetas', 'Fecha Registro']
+        const rows = filteredPatients.map(p => [
+            p.name || '',
+            p.phone || '',
+            p.email || '',
+            p.age || '',
+            p.status || '',
+            (p.tags || []).join('; '),
+            p.created_at ? new Date(p.created_at).toLocaleDateString() : '',
+        ])
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `pacientes_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+        URL.revokeObjectURL(url)
+    }
+
     return (
         <div className="h-full flex flex-col space-y-6">
-            {selectedPatientId && (
-                <PatientDetail 
-                    patientId={selectedPatientId} 
-                    onClose={() => setSelectedPatientId(null)} 
-                />
-            )}
+            <AddPatientModal open={showAddPatient} onClose={() => setShowAddPatient(false)} />
+
             <div className="flex items-center justify-between">
                 <div className="flex bg-gray-100 p-1 rounded-xl">
                     <button 
@@ -69,11 +89,18 @@ export const Patients = () => {
                 )}
                 <div className="flex items-center space-x-3 ml-auto">
                     {viewMode === 'directory' && (
-                        <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm text-sm">
+                        <button 
+                            onClick={handleExportCSV}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm text-sm"
+                        >
+                            <LucideDownload className="w-4 h-4" />
                             Exportar a CSV
                         </button>
                     )}
-                    <button className="flex items-center space-x-2 px-5 py-2 bg-clinical-600 text-white rounded-xl hover:bg-clinical-700 transition-all shadow-lg shadow-clinical-200 text-sm">
+                    <button 
+                        onClick={() => setShowAddPatient(true)}
+                        className="flex items-center space-x-2 px-5 py-2 bg-clinical-600 text-white rounded-xl hover:bg-clinical-700 transition-all shadow-lg shadow-clinical-200 text-sm"
+                    >
                         <LucideUserPlus className="w-5 h-5" />
                         <span className="font-bold">Nuevo Paciente</span>
                     </button>
@@ -100,7 +127,7 @@ export const Patients = () => {
                             <tr 
                                 key={patient.id} 
                                 className="hover:bg-gray-50/50 transition-colors cursor-pointer"
-                                onClick={() => setSelectedPatientId(patient.id)}
+                                onClick={() => navigate(`/pacientes/${patient.id}`)}
                             >
                                 <td className="px-6 py-4">
                                     <div className="flex items-center space-x-3">

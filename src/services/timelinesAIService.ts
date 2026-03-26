@@ -295,6 +295,26 @@ export async function createNewConversation(
 }
 
 
+/** Search for a chat by phone number. Returns the first matching chat or null. */
+export async function searchChatByPhone(apiKey: string, phone: string): Promise<TimelinesChat | null> {
+  // Normalise: strip spaces, dashes etc but keep the + prefix
+  const cleanPhone = phone.replace(/[\s\-()]/g, '')
+  if (!cleanPhone) return null
+
+  const params = new URLSearchParams({ phone: cleanPhone })
+  const response = await fetch(`${BASE_URL}/chats?${params.toString()}`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+
+  if (!response.ok) return null
+
+  const json = await response.json()
+  const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
+  if (raw.length === 0) return null
+  return normaliseChat(raw[0])
+}
+
 /** Verify an API key by trying to fetch chats. Returns true if valid. */
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
   try {

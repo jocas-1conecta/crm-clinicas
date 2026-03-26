@@ -1,15 +1,19 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideCalendarPlus, LucideUser, LucideFileText, LucideKanban, LucideList } from 'lucide-react'
+import { LucideSearch, LucideCalendarPlus, LucideUser, LucideFileText, LucideKanban, LucideList, LucideUserPlus } from 'lucide-react'
 import { DealsPipeline } from './DealsPipeline'
+import { AddPatientModal } from './AddPatientModal'
 
 export const PatientsDirectory = () => {
     const { currentUser } = useStore()
+    const navigate = useNavigate()
     const [viewMode, setViewMode] = useState<'board' | 'directory'>('board')
     const [searchTerm, setSearchTerm] = useState('')
+    const [showAddPatient, setShowAddPatient] = useState(false)
 
     const branchId = currentUser?.sucursal_id
 
@@ -76,7 +80,17 @@ export const PatientsDirectory = () => {
                         />
                     </div>
                 )}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowAddPatient(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-clinical-600 text-white text-sm font-bold rounded-xl hover:bg-clinical-700 transition-all shadow-sm"
+                    >
+                        <LucideUserPlus className="w-4 h-4" />
+                        Nuevo Paciente
+                    </button>
+                </div>
             </div>
+            <AddPatientModal open={showAddPatient} onClose={() => setShowAddPatient(false)} />
 
             {viewMode === 'board' ? (
                 <DealsPipeline />
@@ -114,7 +128,8 @@ export const PatientsDirectory = () => {
                             return (
                                 <tr
                                     key={patient.id}
-                                    className="hover:bg-gray-50 transition-colors absolute w-full"
+                                    className="hover:bg-gray-50 transition-colors absolute w-full cursor-pointer"
+                                    onClick={() => navigate(`/pacientes/${patient.id}`)}
                                     style={{
                                         display: 'flex',
                                         top: 0,

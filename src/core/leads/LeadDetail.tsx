@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { EntityTasks } from '../../components/tasks/EntityTasks'
+import { useChatByPhone, useChatMessages, useSendMessage, useChatRealtime, useCreateNewConversation } from '../chat/useTimelinesAI'
 import {
     LucideX,
-    LucideUser,
     LucidePhone,
     LucideMail,
     LucideCheckSquare,
@@ -19,44 +20,48 @@ import {
     LucideActivity,
     LucideStickyNote,
     LucidePhoneCall,
-    LucideCalendar,
     LucideMapPin,
     LucideGlobe,
     LucideTag,
     LucideConstruction,
     LucideLoader2,
-    LucideExternalLink,
     LucidePencil,
-    LucideSave,
     LucideHeart,
     LucideUserCheck,
+    LucideMessageCircle,
+    LucideTrash2,
 } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────────
-   LeadDetail — Kirrivin-inspired 3-column layout
+   LeadDetail — Full-page 3-column layout
    Left:   Contact card + lead info fields
-   Center: Tabbed content (Activity, Notes, Emails, Calls, Tasks)
-   Right:  Service, Deals, Assignee, Resolution
+   Center: Tabbed content (Activity, Notes, WhatsApp, Tasks, etc.)
+   Right:  Service, Pipeline, Assignee, Deals, Resolution
    ────────────────────────────────────────────────────────────── */
 
-export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () => void }) => {
+export const LeadDetail = () => {
+    const { id: leadId } = useParams<{ id: string }>()
+    const navigate = useNavigate()
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
+
+    const goBack = () => navigate('/leads')
 
     /* ── Data ────────────────────────────────────────────── */
     const { data: lead } = useQuery({
         queryKey: ['lead', leadId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('leads').select('*').eq('id', leadId).single()
+            const { data, error } = await supabase.from('leads').select('*').eq('id', leadId!).single()
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!leadId
     })
 
     const { data: stages = [] } = useQuery({
-        queryKey: ['pipeline_stages', currentUser?.clinica_id],
+        queryKey: ['pipeline_stages_leads', currentUser?.clinica_id],
         queryFn: async () => {
-            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', currentUser!.clinica_id).order('position')
+            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', currentUser!.clinica_id).eq('board_type', 'leads').order('sort_order')
             return data || []
         },
         enabled: !!currentUser?.clinica_id
@@ -95,11 +100,12 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                     from_stage:pipeline_stages!from_stage_id(name),
                     to_stage:pipeline_stages!to_stage_id(name)
                 `)
-                .eq('lead_id', leadId)
+                .eq('lead_id', leadId!)
                 .order('changed_at', { ascending: false })
             if (error) throw error
             return data
-        }
+        },
+        enabled: !!leadId
     })
 
     const { data: teamMembers = [] } = useQuery({
@@ -121,10 +127,30 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
     const [noteContent, setNoteContent] = useState('')
     const [savingField, setSavingField] = useState('')
 
+    // Notes stored in localStorage (no DB table yet)
+    const notesKey = `lead_notes_${leadId}`
+    const [notes, setNotes] = useState<Array<{ id: string, title: string, content: string, created_at: string }>>([])
+    useEffect(() => {
+        try { const raw = localStorage.getItem(notesKey); if (raw) setNotes(JSON.parse(raw)) } catch { /* skip */ }
+    }, [notesKey])
+    const saveNote = () => {
+        if (!noteTitle.trim() && !noteContent.trim()) return
+        const newNote = { id: Date.now().toString(), title: noteTitle.trim(), content: noteContent.trim(), created_at: new Date().toISOString() }
+        const updated = [newNote, ...notes]
+        setNotes(updated)
+        localStorage.setItem(notesKey, JSON.stringify(updated))
+        setNoteTitle(''); setNoteContent('')
+    }
+    const deleteNote = (id: string) => {
+        const updated = notes.filter(n => n.id !== id)
+        setNotes(updated)
+        localStorage.setItem(notesKey, JSON.stringify(updated))
+    }
+
     /* ── Mutations ──────────────────────────────────────── */
     const updateField = useMutation({
         mutationFn: async (updates: Record<string, unknown>) => {
-            const { error } = await supabase.from('leads').update(updates).eq('id', leadId)
+            const { error } = await supabase.from('leads').update(updates).eq('id', leadId!)
             if (error) throw error
         },
         onSuccess: () => {
@@ -141,7 +167,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                 substage_id: null,
                 closed_at: new Date().toISOString(),
                 ...data
-            }).eq('id', leadId)
+            }).eq('id', leadId!)
             if (error) throw error
         },
         onSuccess: () => {
@@ -157,7 +183,36 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
         updateField.mutate({ [field]: value })
     }, [updateField])
 
-    if (!lead) return null
+    // ── Convert to Patient ──
+    const convertToPatientMutation = useMutation({
+        mutationFn: async () => {
+            const { error: insertError } = await supabase.from('patients').insert([{
+                name: lead.name,
+                status: 'Activo',
+                assigned_to: lead.assigned_to,
+                sucursal_id: lead.sucursal_id,
+                email: lead.email,
+                phone: lead.phone,
+                tags: lead.service ? [lead.service] : []
+            }])
+            if (insertError) throw insertError
+            const { error: deleteError } = await supabase.from('leads').delete().eq('id', leadId!)
+            if (deleteError) throw deleteError
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['leads'] })
+            queryClient.invalidateQueries({ queryKey: ['patients'] })
+            navigate('/leads')
+        }
+    })
+
+    if (!lead) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <LucideLoader2 className="w-8 h-8 text-clinical-400 animate-spin" />
+            </div>
+        )
+    }
 
     const currentStage = stages.find((s: any) => s.id === lead.stage_id)
     const currentSubstage = substages.find((s: any) => s.id === lead.substage_id)
@@ -168,64 +223,84 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
     const tabs = [
         { id: 'activity', name: 'Actividad', icon: LucideActivity },
         { id: 'notes', name: 'Notas', icon: LucideStickyNote },
+        { id: 'whatsapp', name: 'WhatsApp', icon: LucideMessageCircle },
+        { id: 'tasks', name: 'Tareas', icon: LucideCheckSquare },
         { id: 'emails', name: 'Correos', icon: LucideMail },
         { id: 'calls', name: 'Llamadas', icon: LucidePhoneCall },
-        { id: 'tasks', name: 'Tareas', icon: LucideCheckSquare },
     ]
 
     /* ================================================================ */
     return (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-2">
-            <div className="bg-white w-full max-w-[1440px] h-[92vh] rounded-2xl shadow-2xl flex overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        <div className="h-full flex flex-col bg-gray-50">
+            {/* ── Top Bar ── */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
+                <button onClick={goBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors group">
+                    <LucideChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                    <span>Volver a Leads</span>
+                </button>
+                <div className="flex items-center gap-3">
+                    {currentStage && (
+                        <span
+                            className="text-xs font-bold px-3 py-1 rounded-lg"
+                            style={{ backgroundColor: (currentStage as any).color + '18', color: (currentStage as any).color }}
+                        >
+                            {currentStage.name}
+                        </span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                        ID: {leadId?.substring(0, 8)}...
+                    </span>
+                </div>
+            </div>
+
+            {/* ── 3-Column Layout ── */}
+            <div className="flex-1 flex overflow-hidden">
 
                 {/* ═══════════════════ LEFT COLUMN ═══════════════════ */}
-                <div className="w-72 border-r border-gray-100 flex flex-col shrink-0 overflow-y-auto bg-white">
-                    {/* Back + Close */}
-                    <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
-                        <button onClick={onClose} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                            <LucideChevronLeft className="w-4 h-4" />
-                            <span>Volver a Leads</span>
-                        </button>
-                    </div>
-
+                <div className="w-80 border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto bg-white">
                     {/* Contact Card */}
-                    <div className="flex flex-col items-center px-6 py-6 border-b border-gray-100">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-clinical-100 to-clinical-200 flex items-center justify-center text-clinical-700 text-2xl font-bold shadow-md mb-3">
+                    <div className="flex flex-col items-center px-8 py-8 border-b border-gray-100">
+                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-clinical-100 to-clinical-200 flex items-center justify-center text-clinical-700 text-3xl font-bold shadow-lg mb-4 ring-4 ring-clinical-50">
                             {lead.name?.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()}
                         </div>
-                        <h2 className="text-lg font-bold text-gray-900 text-center">{lead.name}</h2>
+                        <h2 className="text-xl font-bold text-gray-900 text-center">{lead.name}</h2>
                         {lead.source && (
-                            <span className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                            <span className="text-xs text-gray-400 flex items-center gap-1 mt-1.5">
                                 <LucideGlobe className="w-3 h-3" />
                                 {lead.source}
                             </span>
                         )}
                         {/* Quick Actions */}
-                        <div className="flex items-center gap-3 mt-4">
+                        <div className="flex items-center gap-4 mt-5">
                             {[
                                 { icon: LucideStickyNote, label: 'Nota', action: () => setActiveTab('notes') },
-                                { icon: LucideMail, label: 'Email', action: () => setActiveTab('emails') },
+                                { icon: LucideMessageCircle, label: 'WhatsApp', action: () => setActiveTab('whatsapp') },
                                 { icon: LucidePhoneCall, label: 'Llamar', action: () => setActiveTab('calls') },
+                                { icon: LucideMail, label: 'Email', action: () => setActiveTab('emails') },
                             ].map((btn, i) => (
                                 <button key={i} onClick={btn.action} className="flex flex-col items-center group">
-                                    <div className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center group-hover:bg-clinical-50 group-hover:border-clinical-200 transition-colors">
+                                    <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center group-hover:bg-clinical-50 group-hover:border-clinical-200 group-hover:shadow-sm transition-all">
                                         <btn.icon className="w-4 h-4 text-gray-500 group-hover:text-clinical-600 transition-colors" />
                                     </div>
-                                    <span className="text-[10px] text-gray-400 mt-1">{btn.label}</span>
+                                    <span className="text-[10px] text-gray-400 mt-1.5 group-hover:text-clinical-600 transition-colors">{btn.label}</span>
                                 </button>
                             ))}
                         </div>
 
                         {/* Convert to Patient */}
-                        <button className="mt-4 w-full py-2 bg-clinical-600 text-white text-sm font-semibold rounded-xl hover:bg-clinical-700 transition-colors flex items-center justify-center gap-1.5 shadow-sm">
-                            <LucideUserCheck className="w-4 h-4" />
+                        <button
+                            onClick={() => { if (confirm('¿Convertir este lead a paciente? El lead será eliminado.')) convertToPatientMutation.mutate() }}
+                            disabled={convertToPatientMutation.isPending}
+                            className="mt-5 w-full py-2.5 bg-clinical-600 text-white text-sm font-semibold rounded-xl hover:bg-clinical-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
+                        >
+                            {convertToPatientMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideUserCheck className="w-4 h-4" />}
                             Convertir a Paciente
                         </button>
 
                         {lead.created_at && (
-                            <p className="text-[10px] text-gray-400 mt-3 flex items-center gap-1">
+                            <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
                                 <LucideClock className="w-3 h-3" />
-                                Creado: {new Date(lead.created_at).toLocaleDateString()}
+                                Creado: {new Date(lead.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
                         )}
                     </div>
@@ -236,7 +311,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                             <button
                                 key={t}
                                 onClick={() => setLeftTab(t)}
-                                className={`flex-1 py-2.5 text-xs font-semibold text-center transition-colors ${leftTab === t ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 py-3 text-xs font-semibold text-center transition-colors ${leftTab === t ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
                             >
                                 {t === 'info' ? 'Info del Lead' : 'Dirección'}
                             </button>
@@ -244,7 +319,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                     </div>
 
                     {/* Lead Info Fields */}
-                    <div className="px-5 py-4 space-y-3.5 flex-1">
+                    <div className="px-6 py-5 space-y-4 flex-1">
                         {leftTab === 'info' && (<>
                             <Field label="Email" icon={LucideMail}>
                                 <EditableText value={lead.email || ''} field="email" saving={savingField} onSave={handleFieldChange} />
@@ -256,7 +331,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                 <select
                                     value={lead.stage_id || ''}
                                     onChange={(e) => handleFieldChange('stage_id', e.target.value)}
-                                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer hover:border-gray-300 transition-colors"
                                 >
                                     {activeStages.map((s: any) => (
                                         <option key={s.id} value={s.id}>{s.name}</option>
@@ -268,7 +343,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                 <select
                                     value={lead.substage_id || ''}
                                     onChange={(e) => handleFieldChange('substage_id', e.target.value || null)}
-                                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer hover:border-gray-300 transition-colors"
                                 >
                                     <option value="">Sin sub-estado</option>
                                     {substages.filter((ss: any) => ss.stage_id === lead.stage_id).map((ss: any) => (
@@ -281,7 +356,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                 <select
                                     value={lead.service || ''}
                                     onChange={(e) => handleFieldChange('service', e.target.value)}
-                                    className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer hover:border-gray-300 transition-colors"
                                 >
                                     <option value="">Sin servicio</option>
                                     {services.map((s: any) => (
@@ -295,26 +370,28 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                             </Field>
                         </>)}
                         {leftTab === 'address' && (
-                            <div className="text-center py-8 text-gray-400">
-                                <LucideMapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                <p className="text-sm">Sin dirección registrada</p>
-                                <p className="text-xs mt-1">Próximamente podrá agregar dirección</p>
+                            <div className="text-center py-10 text-gray-400">
+                                <LucideMapPin className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                                <p className="text-sm font-medium">Sin dirección registrada</p>
+                                <p className="text-xs mt-1 text-gray-300">Próximamente podrá agregar dirección</p>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* ═══════════════════ CENTER COLUMN ═══════════════════ */}
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
                     {/* Tabs */}
-                    <div className="px-6 border-b border-gray-100 flex items-center gap-1 shrink-0">
+                    <div className="px-8 bg-white border-b border-gray-200 flex items-center gap-1 shrink-0">
                         {tabs.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`py-3.5 px-4 flex items-center gap-1.5 text-sm font-medium border-b-2 transition-all ${
+                                className={`py-3.5 px-4 flex items-center gap-2 text-sm font-medium border-b-2 transition-all ${
                                     activeTab === tab.id
-                                        ? 'border-gray-900 text-gray-900'
+                                        ? tab.id === 'whatsapp'
+                                            ? 'border-green-500 text-green-600'
+                                            : 'border-gray-900 text-gray-900'
                                         : 'border-transparent text-gray-400 hover:text-gray-600'
                                 }`}
                             >
@@ -325,19 +402,19 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                     </div>
 
                     {/* Tab Content */}
-                    <div className="flex-1 overflow-y-auto p-6">
+                    <div className="flex-1 overflow-y-auto">
 
                         {/* ── Activity Tab ── */}
                         {activeTab === 'activity' && (
-                            <div className="max-w-2xl">
-                                <div className="flex items-center justify-between mb-6">
+                            <div className="max-w-2xl mx-auto p-8">
+                                <div className="flex items-center justify-between mb-8">
                                     <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
                                         <LucideActivity className="w-5 h-5 text-clinical-600" />
                                         Actividad Reciente
                                     </h3>
                                 </div>
 
-                                <div className="relative pl-6 space-y-6 border-l-2 border-gray-100 ml-2">
+                                <div className="relative pl-8 space-y-6 border-l-2 border-gray-200 ml-3">
                                     {/* Creation event */}
                                     {lead.created_at && (
                                         <TimelineItem
@@ -348,14 +425,14 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                         />
                                     )}
                                     {history.length === 0 && !lead.created_at && (
-                                        <div className="text-center py-10">
+                                        <div className="text-center py-12">
                                             <p className="text-sm text-gray-400 italic">No hay actividad registrada aún.</p>
                                         </div>
                                     )}
                                     {history.map((log: any) => (
                                         <div key={log.id} className="relative group">
-                                            <div className="absolute -left-[29px] top-1.5 w-3 h-3 bg-white border-[2.5px] border-clinical-500 rounded-full group-hover:scale-125 transition-transform"></div>
-                                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 transition-all hover:bg-white hover:shadow-sm">
+                                            <div className="absolute -left-[33px] top-2 w-3.5 h-3.5 bg-white border-[2.5px] border-clinical-500 rounded-full group-hover:scale-125 transition-transform"></div>
+                                            <div className="bg-white p-5 rounded-xl border border-gray-100 transition-all hover:shadow-sm">
                                                 <div className="flex items-center gap-2 text-sm mb-2">
                                                     <span className="font-semibold text-gray-800">Cambio de etapa</span>
                                                     <span className="text-[10px] text-gray-400">
@@ -367,7 +444,7 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                                         {log.from_stage?.name || 'Nuevo'} {log.from_substage?.name ? `(${log.from_substage.name})` : ''}
                                                     </span>
                                                     <LucideArrowRight className="w-3.5 h-3.5 text-clinical-400" />
-                                                    <span className="text-clinical-700 bg-clinical-50 px-2 py-0.5 rounded">
+                                                    <span className="text-clinical-700 bg-clinical-50 px-2.5 py-0.5 rounded-md">
                                                         {log.to_stage?.name} {log.to_substage?.name ? `(${log.to_substage.name})` : ''}
                                                     </span>
                                                 </div>
@@ -380,27 +457,28 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
 
                         {/* ── Notes Tab ── */}
                         {activeTab === 'notes' && (
-                            <div className="max-w-2xl space-y-6">
-                                <h3 className="font-bold text-gray-900">Agregar nueva nota</h3>
-                                <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <div className="max-w-2xl mx-auto p-8 space-y-6">
+                                <h3 className="font-bold text-gray-900 text-lg">Agregar nueva nota</h3>
+                                <div className="space-y-3 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                                     <input
                                         type="text"
                                         placeholder="Título de la nota"
                                         value={noteTitle}
                                         onChange={e => setNoteTitle(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none"
+                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none"
                                     />
                                     <textarea
                                         placeholder="Descripción de la nota..."
                                         value={noteContent}
                                         onChange={e => setNoteContent(e.target.value)}
                                         rows={3}
-                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none resize-none"
+                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none resize-none"
                                     />
                                     <div className="flex justify-end">
                                         <button
-                                            onClick={() => { setNoteTitle(''); setNoteContent('') }}
-                                            className="px-4 py-2 bg-clinical-600 text-white text-sm font-semibold rounded-lg hover:bg-clinical-700 transition-colors"
+                                            onClick={saveNote}
+                                            disabled={!noteTitle.trim() && !noteContent.trim()}
+                                            className="px-5 py-2.5 bg-clinical-600 text-white text-sm font-semibold rounded-lg hover:bg-clinical-700 transition-colors shadow-sm disabled:opacity-40"
                                         >
                                             Agregar nota
                                         </button>
@@ -408,50 +486,71 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                 </div>
 
                                 <div className="pt-4">
-                                    <h4 className="text-sm font-semibold text-gray-500 mb-4">Notas</h4>
-                                    <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
-                                        <LucideStickyNote className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                        <p className="text-sm">No hay notas registradas</p>
-                                    </div>
+                                    <h4 className="text-sm font-semibold text-gray-500 mb-4">Notas ({notes.length})</h4>
+                                    {notes.length === 0 ? (
+                                        <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-white">
+                                            <LucideStickyNote className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                            <p className="text-sm">No hay notas registradas</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {notes.map(note => (
+                                                <div key={note.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm group relative">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1 min-w-0">
+                                                            {note.title && <h5 className="text-sm font-bold text-gray-900 mb-1">{note.title}</h5>}
+                                                            {note.content && <p className="text-sm text-gray-600 whitespace-pre-wrap">{note.content}</p>}
+                                                        </div>
+                                                        <button onClick={() => deleteNote(note.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0 ml-2">
+                                                            <LucideTrash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 mt-2">
+                                                        {new Date(note.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })} • {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
 
+                        {/* ── WhatsApp Tab ── */}
+                        {activeTab === 'whatsapp' && (
+                            <EmbeddedWhatsAppChat phone={lead.phone} leadName={lead.name} />
+                        )}
+
                         {/* ── Emails Tab (Coming Soon) ── */}
                         {activeTab === 'emails' && (
-                            <ComingSoonPlaceholder icon={LucideMail} title="Correos Electrónicos" />
+                            <div className="p-8"><ComingSoonPlaceholder icon={LucideMail} title="Correos Electrónicos" /></div>
                         )}
 
                         {/* ── Calls Tab (Coming Soon) ── */}
                         {activeTab === 'calls' && (
-                            <ComingSoonPlaceholder icon={LucidePhoneCall} title="Registro de Llamadas" />
+                            <div className="p-8"><ComingSoonPlaceholder icon={LucidePhoneCall} title="Registro de Llamadas" /></div>
                         )}
 
                         {/* ── Tasks Tab ── */}
                         {activeTab === 'tasks' && (
-                            <EntityTasks entityType="lead" entityId={leadId} entityPhone={lead.phone} />
+                            <div className="p-8">
+                                <EntityTasks entityType="lead" entityId={leadId!} entityPhone={lead.phone} />
+                            </div>
                         )}
                     </div>
                 </div>
 
                 {/* ═══════════════════ RIGHT COLUMN ═══════════════════ */}
-                <div className="w-72 border-l border-gray-100 bg-gray-50/40 flex flex-col shrink-0 overflow-y-auto">
-                    {/* Close button */}
-                    <div className="px-4 py-3 flex justify-end border-b border-gray-100">
-                        <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors">
-                            <LucideX className="w-4 h-4 text-gray-400" />
-                        </button>
-                    </div>
-
-                    <div className="px-5 py-5 space-y-6 flex-1">
+                <div className="w-80 border-l border-gray-200 bg-white flex flex-col shrink-0 overflow-y-auto">
+                    <div className="px-6 py-6 space-y-6 flex-1">
                         {/* Service */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Servicio de Interés</h4>
-                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                            <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Servicio de Interés</h4>
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                 {lead.service ? (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg bg-clinical-50 flex items-center justify-center">
-                                            <LucideHeart className="w-4 h-4 text-clinical-600" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-clinical-50 flex items-center justify-center">
+                                            <LucideHeart className="w-5 h-5 text-clinical-600" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold text-gray-900">{lead.service}</p>
@@ -465,11 +564,11 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
 
                         {/* Pipeline Status */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Estado del Pipeline</h4>
-                            <div className="bg-white p-3 rounded-xl border border-gray-100 space-y-2">
+                            <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Estado del Pipeline</h4>
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-500">Etapa</span>
-                                    <span className="text-xs font-bold text-clinical-700 bg-clinical-50 px-2 py-0.5 rounded">
+                                    <span className="text-xs font-bold text-clinical-700 bg-clinical-50 px-2.5 py-1 rounded-md">
                                         {currentStage?.name || 'Sin etapa'}
                                     </span>
                                 </div>
@@ -482,16 +581,16 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                                 {lead.stage_entered_at && (
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-500">Tiempo</span>
-                                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
                                             <LucideClock className="w-3 h-3" />
                                             {Math.floor((new Date().getTime() - new Date(lead.stage_entered_at).getTime()) / (1000 * 60 * 60))}h
                                         </span>
                                     </div>
                                 )}
                                 {/* Progress bar */}
-                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-1">
                                     <div
-                                        className="h-full bg-clinical-500 rounded-full transition-all"
+                                        className="h-full bg-gradient-to-r from-clinical-400 to-clinical-600 rounded-full transition-all"
                                         style={{
                                             width: `${activeStages.length > 0
                                                 ? ((activeStages.findIndex((s: any) => s.id === lead.stage_id) + 1) / activeStages.length) * 100
@@ -504,12 +603,12 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
 
                         {/* Assigned To */}
                         <div>
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Asignado a</h4>
-                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                            <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Asignado a</h4>
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                 <div className="flex items-center gap-3">
                                     <img
-                                        src={assignee?.avatar_url || `https://ui-avatars.com/api/?name=${assignee?.name || 'NA'}&size=32`}
-                                        className="w-8 h-8 rounded-full ring-2 ring-clinical-100"
+                                        src={assignee?.avatar_url || `https://ui-avatars.com/api/?name=${assignee?.name || 'NA'}&size=40`}
+                                        className="w-10 h-10 rounded-full ring-2 ring-clinical-100"
                                         alt=""
                                     />
                                     <div>
@@ -524,9 +623,9 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                         {/* Deals (placeholder) */}
                         <div>
                             <div className="flex items-center justify-between mb-3">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Deals</h4>
+                                <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Deals</h4>
                             </div>
-                            <div className="bg-white p-3 rounded-xl border border-gray-100 text-center">
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
                                 <p className="text-xs text-gray-400 italic">Sin deals vinculados</p>
                                 <button className="mt-2 text-xs text-clinical-600 font-semibold hover:underline flex items-center gap-1 mx-auto">
                                     <LucidePlus className="w-3 h-3" />
@@ -537,15 +636,15 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
                     </div>
 
                     {/* Resolution Buttons */}
-                    <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+                    <div className="px-6 py-5 border-t border-gray-100 space-y-2">
                         {stages.filter((s: any) => s.resolution_type === 'won').map((s: any) => (
-                            <button key={s.id} onClick={() => setShowWonModal(true)} className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-all">
+                            <button key={s.id} onClick={() => setShowWonModal(true)} className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-all hover:shadow-sm">
                                 <LucideCheckCircle2 className="w-4 h-4" />
                                 Ganado
                             </button>
                         ))}
                         {stages.filter((s: any) => s.resolution_type === 'lost').map((s: any) => (
-                            <button key={s.id} onClick={() => setShowLostModal(true)} className="w-full py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-xl transition-all">
+                            <button key={s.id} onClick={() => setShowLostModal(true)} className="w-full py-3 text-sm font-bold text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-xl transition-all">
                                 Descartar
                             </button>
                         ))}
@@ -601,11 +700,206 @@ export const LeadDetail = ({ leadId, onClose }: { leadId: string, onClose: () =>
     )
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Embedded WhatsApp Chat — uses TimelinesAI to find chat by phone
+   ═══════════════════════════════════════════════════════════════ */
+
+function formatChatTime(isoOrTimestamp: string | number | undefined): string {
+    if (!isoOrTimestamp) return ''
+    const d = new Date(
+        typeof isoOrTimestamp === 'number' ? isoOrTimestamp * 1000 : isoOrTimestamp
+    )
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+    if (diffDays === 1) return 'Ayer'
+    return d.toLocaleDateString('es', { day: '2-digit', month: 'short' })
+}
+
+const EmbeddedWhatsAppChat = ({ phone, leadName }: { phone: string | null, leadName: string }) => {
+    const { data: chat, isLoading: loadingChat } = useChatByPhone(phone)
+    const { data: messages, isLoading: loadingMessages } = useChatMessages(chat?.id ?? null)
+    const sendMutation = useSendMessage()
+    const createMutation = useCreateNewConversation()
+    const [draft, setDraft] = useState('')
+    const [newChatText, setNewChatText] = useState('')
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    // Real-time updates
+    useChatRealtime(chat?.id ?? null)
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [messages])
+
+    const handleSend = () => {
+        if (!draft.trim() || !chat) return
+        const text = draft.trim()
+        setDraft('')
+        sendMutation.mutate({ chatId: chat.id, text })
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSend()
+        }
+    }
+
+    const handleStartConversation = () => {
+        if (!phone || !newChatText.trim()) return
+        createMutation.mutate(
+            { phone: phone.trim(), text: newChatText.trim() },
+            { onSuccess: () => setNewChatText('') }
+        )
+    }
+
+    // No phone number
+    if (!phone) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                    <LucidePhone className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Sin número de teléfono</h3>
+                <p className="text-sm text-gray-400 max-w-xs text-center">
+                    Agrega un número de teléfono al lead para poder ver o iniciar conversaciones de WhatsApp.
+                </p>
+            </div>
+        )
+    }
+
+    // Searching for chat
+    if (loadingChat) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-20">
+                <LucideLoader2 className="w-8 h-8 text-green-500 animate-spin mb-4" />
+                <p className="text-sm text-gray-400">Buscando conversación de WhatsApp...</p>
+            </div>
+        )
+    }
+
+    // No chat found — offer to start one
+    if (!chat) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-20 px-8">
+                <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                    <LucideMessageCircle className="w-8 h-8 text-green-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Sin conversación</h3>
+                <p className="text-sm text-gray-400 max-w-xs text-center mb-6">
+                    No se encontró una conversación de WhatsApp con {phone}. Puedes iniciar una nueva.
+                </p>
+                <div className="w-full max-w-sm space-y-3">
+                    <textarea
+                        placeholder="Escribe el primer mensaje..."
+                        value={newChatText}
+                        onChange={e => setNewChatText(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                    />
+                    <button
+                        onClick={handleStartConversation}
+                        disabled={!newChatText.trim() || createMutation.isPending}
+                        className="w-full py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                        {createMutation.isPending
+                            ? <LucideLoader2 className="w-4 h-4 animate-spin" />
+                            : <LucideSend className="w-4 h-4" />
+                        }
+                        Iniciar conversación
+                    </button>
+                    {createMutation.isSuccess && (
+                        <p className="text-xs text-green-600 text-center">✓ Mensaje enviado — la conversación aparecerá en segundos</p>
+                    )}
+                    {createMutation.isError && (
+                        <p className="text-xs text-red-500 text-center">{String((createMutation.error as Error)?.message ?? 'Error')}</p>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
+    // Chat found — render messages
+    return (
+        <div className="flex flex-col h-full">
+            {/* Chat header */}
+            <div className="bg-[#075e54] text-white px-6 py-3 flex items-center gap-3 shrink-0">
+                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
+                    {(chat.name || leadName || '?').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <p className="text-sm font-semibold leading-tight">{chat.name || leadName}</p>
+                    <p className="text-[11px] text-white/70">{chat.phone}</p>
+                </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-2" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'400\' height=\'400\' viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%239C92AC\' fill-opacity=\'0.02\'%3E%3Ccircle cx=\'200\' cy=\'200\' r=\'1\'/%3E%3C/g%3E%3C/svg%3E")', backgroundColor: '#f0ebe3' }}>
+                {loadingMessages && (
+                    <div className="flex justify-center py-8">
+                        <LucideLoader2 className="w-6 h-6 text-green-500 animate-spin" />
+                    </div>
+                )}
+
+                {!loadingMessages && (!messages || messages.length === 0) && (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400 text-sm">
+                        <LucideMessageSquare className="w-8 h-8 text-gray-300" />
+                        <span>No hay mensajes en esta conversación</span>
+                    </div>
+                )}
+
+                {[...(messages ?? [])].reverse().map((msg) => {
+                    const isMine = msg.from_me
+                    return (
+                        <div key={msg.uid || msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                                isMine
+                                    ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none'
+                                    : 'bg-white text-gray-800 rounded-tl-none'
+                            }`}>
+                                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                                <p className={`text-[10px] mt-1 ${isMine ? 'text-gray-500 text-right' : 'text-gray-400'}`}>
+                                    {formatChatTime(msg.timestamp)}
+                                    {isMine && <span className="ml-1 text-blue-500">✓✓</span>}
+                                </p>
+                            </div>
+                        </div>
+                    )
+                })}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="bg-[#f0f0f0] px-4 py-3 flex items-center gap-3 shrink-0 border-t border-gray-200">
+                <textarea
+                    placeholder="Escribe un mensaje..."
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-full text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                />
+                <button
+                    onClick={handleSend}
+                    disabled={!draft.trim() || sendMutation.isPending}
+                    className="w-10 h-10 rounded-full bg-[#075e54] hover:bg-[#064e46] disabled:opacity-40 text-white flex items-center justify-center transition-colors shrink-0"
+                >
+                    {sendMutation.isPending
+                        ? <LucideLoader2 className="w-4 h-4 animate-spin" />
+                        : <LucideSend className="w-4 h-4" />
+                    }
+                </button>
+            </div>
+        </div>
+    )
+}
+
 /* ── Reusable Subcomponents ────────────────────────────────── */
 
 const Field = ({ label, icon: Icon, children }: { label: string, icon: any, children: React.ReactNode }) => (
-    <div className="space-y-1">
-        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+    <div className="space-y-1.5">
+        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
             <Icon className="w-3 h-3" />
             {label}
         </label>
@@ -624,7 +918,7 @@ const EditableText = ({ value, field, saving, onSave }: { value: string, field: 
                     autoFocus
                     value={localVal}
                     onChange={e => setLocalVal(e.target.value)}
-                    className="flex-1 text-sm border border-clinical-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-clinical-500 outline-none"
+                    className="flex-1 text-sm border border-clinical-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-clinical-500 outline-none"
                     onKeyDown={e => {
                         if (e.key === 'Enter') { onSave(field, localVal); setEditing(false) }
                         if (e.key === 'Escape') { setLocalVal(value); setEditing(false) }
@@ -637,7 +931,7 @@ const EditableText = ({ value, field, saving, onSave }: { value: string, field: 
     return (
         <div
             onClick={() => { setLocalVal(value); setEditing(true) }}
-            className="text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg px-2.5 py-1.5 border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group"
+            className="text-sm text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group"
         >
             <span className={value ? '' : 'text-gray-400 italic'}>{value || 'Sin definir'}</span>
             <LucidePencil className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -652,7 +946,7 @@ const SavingIndicator = () => (
 
 const TimelineItem = ({ title, description, date, color = 'clinical' }: { title: string, description: string, date: string, color?: string }) => (
     <div className="relative">
-        <div className={`absolute -left-[29px] top-1.5 w-3 h-3 bg-white border-[2.5px] ${color === 'emerald' ? 'border-emerald-500' : 'border-clinical-500'} rounded-full`}></div>
+        <div className={`absolute -left-[33px] top-2 w-3.5 h-3.5 bg-white border-[2.5px] ${color === 'emerald' ? 'border-emerald-500' : 'border-clinical-500'} rounded-full`}></div>
         <div className="pb-2">
             <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold text-gray-800">{title}</span>
@@ -666,7 +960,7 @@ const TimelineItem = ({ title, description, date, color = 'clinical' }: { title:
 )
 
 const ComingSoonPlaceholder = ({ icon: Icon, title }: { icon: any, title: string }) => (
-    <div className="flex flex-col items-center justify-center h-full py-20">
+    <div className="flex flex-col items-center justify-center py-20">
         <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mb-4">
             <LucideConstruction className="w-8 h-8 text-amber-500" />
         </div>

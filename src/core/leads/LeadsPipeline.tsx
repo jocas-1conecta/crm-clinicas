@@ -1,13 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { UniversalPipelineBoard } from '../../components/pipeline/UniversalPipelineBoard'
+import { AddLeadModal } from './AddLeadModal'
+import { LucideUserPlus } from 'lucide-react'
 
 export const LeadsPipeline = () => {
     const { currentUser } = useStore()
     const branchId = currentUser?.sucursal_id
     const clinicaId = currentUser?.clinica_id
+    const [showAddLead, setShowAddLead] = useState(false)
 
     const { data: dbLeads = [], isLoading: loadingLeads } = useQuery({
         queryKey: ['leads', branchId || clinicaId, currentUser?.role],
@@ -39,11 +42,23 @@ export const LeadsPipeline = () => {
     }
 
     return (
-        <UniversalPipelineBoard 
-            boardType="leads" 
-            tableName="leads" 
-            records={dbLeads} 
-            queryKeyToInvalidate={['leads', branchId || clinicaId]} 
-        />
+        <div className="h-full flex flex-col">
+            <AddLeadModal open={showAddLead} onClose={() => setShowAddLead(false)} />
+            <div className="flex items-center justify-end mb-4 pr-2">
+                <button
+                    onClick={() => setShowAddLead(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-clinical-600 text-white text-sm font-bold rounded-xl hover:bg-clinical-700 transition-all shadow-sm"
+                >
+                    <LucideUserPlus className="w-4 h-4" />
+                    Nuevo Lead
+                </button>
+            </div>
+            <UniversalPipelineBoard 
+                boardType="leads" 
+                tableName="leads" 
+                records={dbLeads} 
+                queryKeyToInvalidate={['leads', branchId || clinicaId]} 
+            />
+        </div>
     )
 }

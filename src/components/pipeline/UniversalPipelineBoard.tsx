@@ -1,9 +1,10 @@
 import { useRef, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
-import { LeadDetail } from '../../core/leads/LeadDetail'
+
 import { LucidePhone, LucideMessageCircle, LucideArrowRight, LucideCheck, LucideAlertTriangle, LucideClock, LucideX, LucideUser, LucideCalendar } from 'lucide-react'
 
 export interface UniversalPipelineBoardProps {
@@ -16,13 +17,14 @@ export interface UniversalPipelineBoardProps {
 export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKeyToInvalidate }: UniversalPipelineBoardProps) => {
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
+    const navigate = useNavigate()
     const clinicaId = currentUser?.clinica_id
 
     // Modals
     const [gatekeepingModal, setGatekeepingModal] = useState<{ record: any, nextStage: any, rules: string[] } | null>(null)
     const [gatekeepingForm, setGatekeepingForm] = useState<any>({})
     const [prioritizeSLA, setPrioritizeSLA] = useState(false)
-    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+
 
     const { data: stages = [], isLoading: loadingStages } = useQuery({
         queryKey: ['pipeline_stages', clinicaId, boardType],
@@ -198,7 +200,7 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                             convertLeadToPatient={(r: any) => convertLeadMutation.mutate(r)} 
                             prioritizeSLA={prioritizeSLA}
                             boardType={boardType}
-                            onCardClick={(id: string) => boardType === 'leads' ? setSelectedLeadId(id) : null}
+                            onCardClick={(id: string) => boardType === 'leads' ? navigate(`/leads/${id}`) : null}
                         />
                     </div>
                 ))}
@@ -288,10 +290,6 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                 </div>
             )}
 
-            {/* Lead Detail Modal */}
-            {selectedLeadId && boardType === 'leads' && (
-                <LeadDetail leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} />
-            )}
         </div>
     )
 }

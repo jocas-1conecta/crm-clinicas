@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
-import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2 } from 'lucide-react'
-import { LeadDetail } from './LeadDetail'
+import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus } from 'lucide-react'
+import { AddLeadModal } from './AddLeadModal'
 import { PipelineConfig } from '../organizations/PipelineConfig'
 
 type SortDir = 'asc' | 'desc' | null
@@ -11,6 +12,7 @@ type SortKey = 'name' | 'source' | 'stage' | 'created_at'
 
 export const LeadsTable = () => {
     const { currentUser } = useStore()
+    const navigate = useNavigate()
     const clinicaId = currentUser?.clinica_id
 
     const [search, setSearch] = useState('')
@@ -18,8 +20,8 @@ export const LeadsTable = () => {
     const [filterAdvisor, setFilterAdvisor] = useState<string>('all')
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
-    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
     const [showConfig, setShowConfig] = useState(false)
+    const [showAddLead, setShowAddLead] = useState(false)
 
     // Fetch leads
     const { data: leads = [], isLoading } = useQuery({
@@ -150,9 +152,7 @@ export const LeadsTable = () => {
 
     return (
         <div className="h-full flex flex-col">
-            {selectedLeadId && (
-                <LeadDetail leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} />
-            )}
+            <AddLeadModal open={showAddLead} onClose={() => setShowAddLead(false)} />
 
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -209,6 +209,13 @@ export const LeadsTable = () => {
 
                 <span className="text-xs text-gray-400 ml-auto">{sorted.length} leads</span>
                 <button
+                    onClick={() => setShowAddLead(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-clinical-600 text-white text-sm font-bold rounded-xl hover:bg-clinical-700 transition-all shadow-sm"
+                >
+                    <LucideUserPlus className="w-4 h-4" />
+                    Nuevo Lead
+                </button>
+                <button
                     onClick={() => setShowConfig(true)}
                     className="p-2 text-gray-400 hover:text-clinical-600 hover:bg-clinical-50 rounded-xl transition-colors"
                     title="Configurar embudo de leads"
@@ -256,7 +263,7 @@ export const LeadsTable = () => {
                                     <tr
                                         key={lead.id}
                                         className="hover:bg-gray-50/60 transition-colors cursor-pointer"
-                                        onClick={() => setSelectedLeadId(lead.id)}
+                                        onClick={() => navigate(`/leads/${lead.id}`)}
                                     >
                                         <td className="px-5 py-3">
                                             <span className="text-[13px] font-semibold text-gray-900">{lead.name}</span>
