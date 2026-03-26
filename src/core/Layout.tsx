@@ -159,13 +159,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             {/* Sidebar */}
             <aside className="w-52 bg-white border-r border-gray-200 hidden md:flex flex-col z-20">
                 <div className="p-4">
-                    <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? '' : 'space-x-3'} text-clinical-600`}>
+                    <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? 'justify-center' : 'space-x-3'} text-clinical-600`}>
                         {tenant?.logo_display_mode !== 'text_only' && (
                             tenant?.logo_thumb_url || tenant?.logo_url ? (
                                 <img 
                                     src={tenant?.logo_display_mode === 'logo_only' ? (tenant.logo_url || tenant.logo_thumb_url) : (tenant.logo_thumb_url || tenant.logo_url)} 
                                     alt="Logo" 
-                                    className={`object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'h-7 w-auto' : 'w-8 h-8 rounded-lg'}`} 
+                                    className={`object-contain ${tenant?.logo_display_mode === 'logo_only' ? 'h-5 w-auto' : 'w-8 h-8 rounded-lg'}`} 
                                 />
                             ) : (
                                 <div className="bg-clinical-100 p-2 rounded-lg">
