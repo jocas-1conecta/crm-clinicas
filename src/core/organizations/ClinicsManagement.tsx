@@ -3,7 +3,7 @@ import {
     LucideSearch, LucideCheckCircle, LucidePauseCircle, LucidePlus, LucideX,
     LucideBuilding, LucideLoader2, LucideCheck, LucideAlertCircle,
     LucideSave, LucideToggleLeft, LucideToggleRight, LucideChevronRight,
-    LucideMapPin, LucideMail, LucideGlobe, LucidePackage
+    LucideMapPin, LucideMail, LucideGlobe, LucidePackage, LucideCamera, LucidePalette
 } from 'lucide-react'
 import { useStore, Clinic } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -186,24 +186,143 @@ const CreateClinicModal = ({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 // ─── Edit Clinic Drawer ───────────────────────────────────────
+const BRAND_COLORS = [
+    { color: '#0d9488', name: 'Teal' },
+    { color: '#1e40af', name: 'Azul' },
+    { color: '#7c3aed', name: 'Violeta' },
+    { color: '#be185d', name: 'Rosa' },
+    { color: '#dc2626', name: 'Rojo' },
+    { color: '#ea580c', name: 'Naranja' },
+    { color: '#16a34a', name: 'Verde' },
+    { color: '#0f172a', name: 'Oscuro' },
+]
+
+const compressImageForDrawer = (file: File, maxSize: number, quality = 0.9): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+            const canvas = document.createElement('canvas')
+            let { width, height } = img
+            if (width > maxSize || height > maxSize) {
+                if (width > height) { height = Math.round((height * maxSize) / width); width = maxSize }
+                else { width = Math.round((width * maxSize) / height); height = maxSize }
+            }
+            canvas.width = width; canvas.height = height
+            const ctx = canvas.getContext('2d')
+            if (!ctx) { reject(new Error('Canvas not supported')); return }
+            ctx.drawImage(img, 0, 0, width, height)
+            canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compression failed')), 'image/png', quality)
+        }
+        img.onerror = () => reject(new Error('Error loading image'))
+        img.src = URL.createObjectURL(file)
+    })
+}
+
 const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolean; onClose: () => void }) => {
     const queryClient = useQueryClient()
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [modules, setModules] = useState<string[]>([])
     const [successMsg, setSuccessMsg] = useState('')
+    const [uploadingLogo, setUploadingLogo] = useState(false)
+    const [uploadingLoginLogo, setUploadingLoginLogo] = useState(false)
+    const [uploadingFavicon, setUploadingFavicon] = useState(false)
+    const [brandColor, setBrandColor] = useState('#0d9488')
 
     useEffect(() => {
         if (clinic) {
             setName(clinic.name || '')
             setEmail(clinic.email_contacto || '')
             setModules(clinic.active_modules || [])
+            setBrandColor(clinic.theme?.primary_color || '#0d9488')
             setSuccessMsg('')
         }
     }, [clinic])
 
     const toggleModule = (moduleId: string) => {
         setModules(prev => prev.includes(moduleId) ? prev.filter(m => m !== moduleId) : [...prev, moduleId])
+    }
+
+    const showSuccess = (msg: string) => {
+        setSuccessMsg(msg)
+        setTimeout(() => setSuccessMsg(''), 3000)
+    }
+
+    // ─── Logo Uploads ─────────────────────────────────────────
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !clinic?.id) return
+        if (file.size > 5 * 1024 * 1024) { alert('Máximo 5MB.'); return }
+        setUploadingLogo(true)
+        try {
+            const [thumbBlob, fullBlob] = await Promise.all([
+                compressImageForDrawer(file, 48, 0.9),
+                compressImageForDrawer(file, 512, 0.9),
+            ])
+            const baseName = `tenant-${clinic.id}-${Date.now()}`
+            const [thumbUp, fullUp] = await Promise.all([
+                supabase.storage.from('logos').upload(`${baseName}_thumb.png`, thumbBlob, { contentType: 'image/png', upsert: true }),
+                supabase.storage.from('logos').upload(`${baseName}_full.png`, fullBlob, { contentType: 'image/png', upsert: true }),
+            ])
+            if (thumbUp.error) throw new Error(thumbUp.error.message)
+            if (fullUp.error) throw new Error(fullUp.error.message)
+            const { data: { publicUrl: thumbUrl } } = supabase.storage.from('logos').getPublicUrl(`${baseName}_thumb.png`)
+            const { data: { publicUrl: fullUrl } } = supabase.storage.from('logos').getPublicUrl(`${baseName}_full.png`)
+            const { error } = await supabase.from('clinicas').update({ logo_url: fullUrl, logo_thumb_url: thumbUrl }).eq('id', clinic.id)
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['clinicas'] })
+            showSuccess('Logo actualizado')
+        } catch (err: any) { alert('Error: ' + (err.message || err)) }
+        finally { setUploadingLogo(false) }
+    }
+
+    const handleLoginLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !clinic?.id) return
+        if (file.size > 5 * 1024 * 1024) { alert('Máximo 5MB.'); return }
+        setUploadingLoginLogo(true)
+        try {
+            const blob = await compressImageForDrawer(file, 512, 0.9)
+            const path = `tenant-${clinic.id}-login-${Date.now()}.png`
+            const { error: upErr } = await supabase.storage.from('logos').upload(path, blob, { contentType: 'image/png', upsert: true })
+            if (upErr) throw new Error(upErr.message)
+            const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+            const { error } = await supabase.from('clinicas').update({ login_logo_url: publicUrl }).eq('id', clinic.id)
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['clinicas'] })
+            showSuccess('Logo de login actualizado')
+        } catch (err: any) { alert('Error: ' + (err.message || err)) }
+        finally { setUploadingLoginLogo(false) }
+    }
+
+    const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !clinic?.id) return
+        if (file.size > 2 * 1024 * 1024) { alert('Máximo 2MB.'); return }
+        setUploadingFavicon(true)
+        try {
+            const blob = await compressImageForDrawer(file, 64, 0.9)
+            const path = `tenant-${clinic.id}-favicon-${Date.now()}.png`
+            const { error: upErr } = await supabase.storage.from('logos').upload(path, blob, { contentType: 'image/png', upsert: true })
+            if (upErr) throw new Error(upErr.message)
+            const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+            const { error } = await supabase.from('clinicas').update({ favicon_url: publicUrl }).eq('id', clinic.id)
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['clinicas'] })
+            showSuccess('Favicon actualizado')
+        } catch (err: any) { alert('Error: ' + (err.message || err)) }
+        finally { setUploadingFavicon(false) }
+    }
+
+    const handleBrandColorChange = async (color: string) => {
+        if (!clinic?.id) return
+        setBrandColor(color)
+        const newTheme = { ...(clinic.theme || {}), primary_color: color }
+        const { error } = await supabase.from('clinicas').update({ theme: newTheme }).eq('id', clinic.id)
+        if (!error) {
+            queryClient.invalidateQueries({ queryKey: ['clinicas'] })
+            showSuccess('Color de marca actualizado')
+        }
     }
 
     const updateMutation = useMutation({
@@ -217,8 +336,7 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['clinicas'] })
-            setSuccessMsg('Cambios guardados')
-            setTimeout(() => setSuccessMsg(''), 3000)
+            showSuccess('Cambios guardados')
         }
     })
 
@@ -257,7 +375,7 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
                             <LucideBuilding className="w-3.5 h-3.5" /><span>Información General</span>
                         </h4>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la App</label>
                             <input type="text" value={name} onChange={e => setName(e.target.value)}
                                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none text-sm" />
                         </div>
@@ -266,6 +384,93 @@ const EditClinicDrawer = ({ clinic, open, onClose }: { clinic: any; open: boolea
                             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none text-sm"
                                 placeholder="contacto@clinica.com" />
+                        </div>
+                    </div>
+
+                    {/* Branding */}
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center space-x-2">
+                            <LucidePalette className="w-3.5 h-3.5" /><span>Branding</span>
+                        </h4>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            {/* Sidebar Logo */}
+                            <div>
+                                <p className="text-[11px] font-medium text-gray-500 mb-1.5">Logo Sidebar</p>
+                                <label className={`relative cursor-pointer group block ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-full aspect-square rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                        {clinic.logo_url
+                                            ? <img src={clinic.logo_url} alt="" className="w-full h-full object-contain p-2" />
+                                            : <LucideBuilding className="w-6 h-6 text-gray-300" />}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingLogo ? <LucideLoader2 className="w-4 h-4 text-white animate-spin" /> : <LucideCamera className="w-4 h-4 text-white" />}
+                                    </div>
+                                    <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                                </label>
+                            </div>
+
+                            {/* Login Logo */}
+                            <div>
+                                <p className="text-[11px] font-medium text-gray-500 mb-1.5">Logo Login</p>
+                                <label className={`relative cursor-pointer group block ${uploadingLoginLogo ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-full aspect-square rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                        {(clinic.login_logo_url || clinic.logo_url)
+                                            ? <img src={clinic.login_logo_url || clinic.logo_url} alt="" className="w-full h-full object-contain p-2" />
+                                            : <LucideBuilding className="w-6 h-6 text-gray-300" />}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingLoginLogo ? <LucideLoader2 className="w-4 h-4 text-white animate-spin" /> : <LucideCamera className="w-4 h-4 text-white" />}
+                                    </div>
+                                    <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLoginLogoUpload} disabled={uploadingLoginLogo} />
+                                </label>
+                            </div>
+
+                            {/* Favicon */}
+                            <div>
+                                <p className="text-[11px] font-medium text-gray-500 mb-1.5">Favicon</p>
+                                <label className={`relative cursor-pointer group block ${uploadingFavicon ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div className="w-full aspect-square rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                        {clinic.favicon_url
+                                            ? <img src={clinic.favicon_url} alt="" className="w-full h-full object-contain p-2" />
+                                            : <LucideGlobe className="w-6 h-6 text-gray-300" />}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {uploadingFavicon ? <LucideLoader2 className="w-4 h-4 text-white animate-spin" /> : <LucideCamera className="w-4 h-4 text-white" />}
+                                    </div>
+                                    <input type="file" className="hidden" accept="image/png,image/jpeg,image/svg+xml,image/x-icon" onChange={handleFaviconUpload} disabled={uploadingFavicon} />
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Brand Color */}
+                        <div>
+                            <p className="text-[11px] font-medium text-gray-500 mb-2">Color de Marca</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {BRAND_COLORS.map(preset => (
+                                    <button key={preset.color} type="button" title={preset.name}
+                                        onClick={() => handleBrandColorChange(preset.color)}
+                                        className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${
+                                            brandColor === preset.color ? 'border-gray-900 ring-2 ring-offset-1 ring-gray-300 scale-110' : 'border-transparent'
+                                        }`}
+                                        style={{ backgroundColor: preset.color }} />
+                                ))}
+                                <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-gray-200">
+                                    <input type="color" value={brandColor}
+                                        onChange={e => setBrandColor(e.target.value)}
+                                        onBlur={() => handleBrandColorChange(brandColor)}
+                                        className="w-7 h-7 rounded-lg border border-gray-200 cursor-pointer p-0" />
+                                    <span className="text-[10px] text-gray-400 font-mono uppercase">{brandColor}</span>
+                                </div>
+                            </div>
+                            {/* Mini preview */}
+                            <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                                <div className="h-9 flex items-center px-3 gap-2" style={{ backgroundColor: brandColor }}>
+                                    {clinic.logo_thumb_url && <img src={clinic.logo_thumb_url} alt="" className="w-5 h-5 rounded object-contain" />}
+                                    <span className="text-white font-bold text-xs">{name || 'App'}</span>
+                                    <span className="ml-auto text-white/50 text-[10px]">Preview</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
