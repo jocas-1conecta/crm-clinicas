@@ -11,8 +11,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation()
     const queryClient = useQueryClient()
 
-    // Fetch tenant logo
-    const { data: tenant } = useQuery({
+    // Fetch tenant branding (for clinic users)
+    const { data: clinicTenant } = useQuery({
         queryKey: ['tenant_settings', currentUser?.clinica_id],
         queryFn: async () => {
             if (!currentUser?.clinica_id) return null
@@ -26,6 +26,34 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         enabled: !!currentUser?.clinica_id,
         staleTime: 1000 * 60 * 10
     })
+
+    // Fetch platform branding (for Platform Owner)
+    const { data: platformConfig } = useQuery({
+        queryKey: ['platform_config_branding'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('platform_config')
+                .select('value')
+                .eq('key', 'branding')
+                .single()
+            return data?.value as Record<string, any> | null
+        },
+        enabled: currentUser?.role === 'Platform_Owner',
+        staleTime: 1000 * 60 * 10
+    })
+
+    // Merge: Platform Owner uses platform_config, others use clinicas
+    const tenant = currentUser?.role === 'Platform_Owner' && platformConfig
+        ? {
+            id: 'platform',
+            name: platformConfig.app_name || '1Clinic',
+            logo_url: platformConfig.logo_url,
+            logo_thumb_url: platformConfig.logo_url,
+            logo_display_mode: 'logo_text',
+            theme: { primary_color: platformConfig.primary_color || '#0d9488' },
+            favicon_url: platformConfig.favicon_url
+        }
+        : clinicTenant
 
     // Apply brand color from tenant theme
     useEffect(() => {
