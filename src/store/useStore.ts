@@ -84,9 +84,8 @@ export interface Lead {
     service: string;
     phone: string;
     email: string;
-    assignedTo: string;
     assigned_to?: string;
-    createdAt: string;
+    created_at: string;
     sucursal_id: string;
     documents?: Document[];
     source?: 'Bot WhatsApp' | 'Manual' | 'Web';
@@ -113,18 +112,19 @@ interface Message {
 
 export interface Appointment {
     id: string;
-    patientName: string;
-    patientId: string;
-    doctorName: string;
-    doctorId?: string;
+    patient_name: string;
+    patient_id: string;
+    doctor_name: string;
+    doctor_id?: string;
     specialty: string;
-    serviceName: string;
-    serviceId?: string;
-    date: string;
-    time: string;
+    service_name: string;
+    service_id?: string;
+    appointment_date: string;
+    appointment_time: string;
+    phone?: string;
     status?: string; // Legacy fallback
-    avatar: string;
     sucursal_id: string;
+    assigned_to?: string;
     // Pipeline fields
     stage_id?: string;
     substage_id?: string;
@@ -136,9 +136,9 @@ export interface Appointment {
 export interface Deal {
     id: string;
     title: string;
-    estimatedValue: number;
+    estimated_value: number;
     status?: string; // Legacy fallback
-    createdAt: string;
+    created_at: string;
     patient_id?: string;
     // Pipeline fields
     stage_id?: string;

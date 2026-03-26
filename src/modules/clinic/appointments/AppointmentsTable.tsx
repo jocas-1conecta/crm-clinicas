@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideCalendar, LucideSettings2 } from 'lucide-react'
+import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideCalendar, LucideSettings2, LucideCalendarPlus } from 'lucide-react'
 import { PipelineConfig } from '../../../core/organizations/PipelineConfig'
+import { AddAppointmentModal } from './AddAppointmentModal'
 
 type SortDir = 'asc' | 'desc' | null
 type SortKey = 'patient_name' | 'stage' | 'date' | 'created_at'
@@ -18,6 +19,7 @@ export const AppointmentsTable = () => {
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [showConfig, setShowConfig] = useState(false)
+    const [showAddAppt, setShowAddAppt] = useState(false)
 
     const { data: appointments = [], isLoading } = useQuery({
         queryKey: ['appointments-admin-table', clinicaId],
@@ -125,6 +127,7 @@ export const AppointmentsTable = () => {
 
     return (
         <div className="h-full flex flex-col">
+            <AddAppointmentModal open={showAddAppt} onClose={() => setShowAddAppt(false)} />
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div className="relative flex-1 min-w-[240px] max-w-md">
@@ -159,6 +162,13 @@ export const AppointmentsTable = () => {
                 )}
 
                 <span className="text-xs text-gray-400 ml-auto">{sorted.length} citas</span>
+                <button
+                    onClick={() => setShowAddAppt(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-clinical-600 text-white text-sm font-bold rounded-xl hover:bg-clinical-700 transition-all shadow-sm"
+                >
+                    <LucideCalendarPlus className="w-4 h-4" />
+                    Agendar Cita
+                </button>
                 <button onClick={() => setShowConfig(true)} className="p-2 text-gray-400 hover:text-clinical-600 hover:bg-clinical-50 rounded-xl transition-colors" title="Configurar embudo de citas">
                     <LucideSettings2 className="w-5 h-5" />
                 </button>
@@ -196,7 +206,7 @@ export const AppointmentsTable = () => {
                             ) : sorted.map((appt) => {
                                 const stage = stageMap[appt.stage_id]
                                 return (
-                                    <tr key={appt.id} className="hover:bg-gray-50/60 transition-colors cursor-pointer">
+                                    <tr key={appt.id} className="hover:bg-gray-50/60 transition-colors">
                                         <td className="px-5 py-3">
                                             <span className="text-[13px] font-semibold text-gray-900">{appt.patient_name || appt.name || '—'}</span>
                                         </td>
