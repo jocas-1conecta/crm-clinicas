@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
-import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus } from 'lucide-react'
+import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus, LucideChevronLeft, LucideChevronRight } from 'lucide-react'
 import { AddLeadModal } from './AddLeadModal'
 import { PipelineConfig } from '../organizations/PipelineConfig'
 
@@ -22,6 +22,8 @@ export const LeadsTable = () => {
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [showConfig, setShowConfig] = useState(false)
     const [showAddLead, setShowAddLead] = useState(false)
+    const [page, setPage] = useState(1)
+    const PAGE_SIZE = 50
 
     // Fetch leads
     const { data: leads = [], isLoading } = useQuery({
@@ -126,6 +128,13 @@ export const LeadsTable = () => {
             return 0
         })
     }, [filtered, sortKey, sortDir, stageMap])
+
+    // Pagination
+    const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+    const paginated = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
+
+    // Reset page when filters change
+    useEffect(() => { setPage(1) }, [search, filterStatus, filterAdvisor])
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -255,9 +264,9 @@ export const LeadsTable = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {sorted.length === 0 ? (
+                            {paginated.length === 0 ? (
                                 <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">No se encontraron leads con los filtros actuales.</td></tr>
-                            ) : sorted.map((lead) => {
+                            ) : paginated.map((lead) => {
                                 const stage = stageMap[lead.stage_id]
                                 return (
                                     <tr
@@ -318,6 +327,23 @@ export const LeadsTable = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination Footer */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 mt-2">
+                    <span className="text-xs text-gray-400">{sorted.length} leads · Página {page} de {totalPages}</span>
+                    <div className="flex items-center gap-2">
+                        <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                            <LucideChevronLeft className="w-4 h-4" /> Anterior
+                        </button>
+                        <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                            Siguiente <LucideChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Pipeline Config Drawer */}
             {showConfig && (

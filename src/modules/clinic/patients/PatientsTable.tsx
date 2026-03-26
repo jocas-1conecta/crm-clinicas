@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../../store/useStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
-import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus } from 'lucide-react'
+import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus, LucideChevronLeft, LucideChevronRight } from 'lucide-react'
 import { PipelineConfig } from '../../../core/organizations/PipelineConfig'
 import { AddPatientModal } from './AddPatientModal'
 
@@ -21,6 +21,8 @@ export const PatientsTable = () => {
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [showConfig, setShowConfig] = useState(false)
     const [showAddPatient, setShowAddPatient] = useState(false)
+    const [page, setPage] = useState(1)
+    const PAGE_SIZE = 50
 
     const { data: patients = [], isLoading } = useQuery({
         queryKey: ['patients-admin-table', clinicaId],
@@ -67,6 +69,13 @@ export const PatientsTable = () => {
             return 0
         })
     }, [filtered, sortKey, sortDir])
+
+    // Pagination
+    const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+    const paginated = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
+
+    // Reset page on filter change
+    useEffect(() => { setPage(1) }, [search, filterStatus])
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -156,9 +165,9 @@ export const PatientsTable = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {sorted.length === 0 ? (
+                            {paginated.length === 0 ? (
                                 <tr><td colSpan={5} className="px-5 py-12 text-center text-sm text-gray-400">No se encontraron pacientes.</td></tr>
-                            ) : sorted.map((patient) => (
+                            ) : paginated.map((patient) => (
                                 <tr
                                     key={patient.id}
                                     className="hover:bg-gray-50/60 transition-colors cursor-pointer"
@@ -203,6 +212,22 @@ export const PatientsTable = () => {
                 </div>
             </div>
 
+            {/* Pagination Footer */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 mt-2">
+                    <span className="text-xs text-gray-400">{sorted.length} pacientes · Página {page} de {totalPages}</span>
+                    <div className="flex items-center gap-2">
+                        <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                            <LucideChevronLeft className="w-4 h-4" /> Anterior
+                        </button>
+                        <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                            Siguiente <LucideChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
             {showConfig && (
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <div className="absolute inset-0 bg-black/30" onClick={() => setShowConfig(false)} />
