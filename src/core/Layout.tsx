@@ -49,7 +49,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             name: platformConfig.app_name || '1Clinic',
             logo_url: platformConfig.logo_url,
             logo_thumb_url: platformConfig.logo_url,
-            logo_display_mode: 'logo_text',
+            logo_display_mode: 'logo_only',
             theme: { primary_color: platformConfig.primary_color || '#0d9488' },
             favicon_url: platformConfig.favicon_url
         }
@@ -159,7 +159,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             {/* Sidebar */}
             <aside className="w-52 bg-white border-r border-gray-200 hidden md:flex flex-col z-20">
                 <div className="p-4">
-                    <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? 'justify-center' : 'space-x-3'} text-clinical-600`}>
+                    <div className={`flex items-center ${tenant?.logo_display_mode === 'logo_only' ? '' : 'space-x-3'} text-clinical-600`}>
                         {tenant?.logo_display_mode !== 'text_only' && (
                             tenant?.logo_thumb_url || tenant?.logo_url ? (
                                 <img 
