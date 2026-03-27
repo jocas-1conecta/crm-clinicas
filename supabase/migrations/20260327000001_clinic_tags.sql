@@ -47,7 +47,7 @@ USING (
         SELECT 1 FROM profiles
         WHERE id = auth.uid()
         AND clinica_id = clinic_tags.clinica_id
-        AND role IN ('Admin_Clinica', 'Director_Clinica', 'Super_Admin')
+        AND role IN ('Admin_Clinica', 'Super_Admin')
     )
 )
 WITH CHECK (
@@ -55,7 +55,7 @@ WITH CHECK (
         SELECT 1 FROM profiles
         WHERE id = auth.uid()
         AND clinica_id = clinic_tags.clinica_id
-        AND role IN ('Admin_Clinica', 'Director_Clinica', 'Super_Admin')
+        AND role IN ('Admin_Clinica', 'Super_Admin')
     )
 );
 

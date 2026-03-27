@@ -45,13 +45,13 @@ export function useEntityTags(entityType: string, entityId: string | undefined) 
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('entity_tags')
-                .select('*, clinic_tag:clinic_tags(*)')
+                .select('*, clinic_tag:tag_id(id, name, color, clinica_id)')
                 .eq('entity_type', entityType)
                 .eq('entity_id', entityId!)
             if (error) throw error
             return (data || []).map((et: any) => ({
                 ...et,
-                clinic_tag: et.clinic_tag || undefined,
+                clinic_tag: Array.isArray(et.clinic_tag) ? et.clinic_tag[0] : et.clinic_tag || undefined,
             }))
         },
         enabled: !!entityId,
@@ -66,13 +66,25 @@ export function useAllEntityTags(entityType: string) {
     return useQuery<EntityTag[]>({
         queryKey: ['all_entity_tags', entityType, clinicaId],
         queryFn: async () => {
+            // First get all tags for this clinic
+            const { data: tags, error: tagErr } = await supabase
+                .from('clinic_tags')
+                .select('id')
+                .eq('clinica_id', clinicaId!)
+            if (tagErr) throw tagErr
+            const tagIds = (tags || []).map((t: any) => t.id)
+            if (tagIds.length === 0) return []
+
             const { data, error } = await supabase
                 .from('entity_tags')
-                .select('*, clinic_tag:clinic_tags!inner(id, name, color, clinica_id)')
+                .select('*, clinic_tag:tag_id(id, name, color, clinica_id)')
                 .eq('entity_type', entityType)
-                .eq('clinic_tags.clinica_id', clinicaId!)
+                .in('tag_id', tagIds)
             if (error) throw error
-            return data || []
+            return (data || []).map((et: any) => ({
+                ...et,
+                clinic_tag: Array.isArray(et.clinic_tag) ? et.clinic_tag[0] : et.clinic_tag || undefined,
+            }))
         },
         enabled: !!clinicaId,
     })
