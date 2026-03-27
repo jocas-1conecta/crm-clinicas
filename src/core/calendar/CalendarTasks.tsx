@@ -20,7 +20,7 @@ const TASK_TYPES: { value: TaskCategory; label: string; icon: React.ElementType;
 const getTypeConfig = (type: TaskCategory) => TASK_TYPES.find(t => t.value === type) || TASK_TYPES[4]
 const isOverdue = (task: CrmTask) => !task.is_completed && new Date(task.due_date) < new Date()
 
-type StatusFilter = 'todas' | 'alta' | 'completadas'
+type StatusFilter = 'todas' | 'pendientes' | 'alta' | 'completadas'
 type DateFilter = 'todas' | 'hoy' | 'manana' | 'semana' | 'proximas'
 
 const PAGE_SIZE = 25
@@ -60,13 +60,14 @@ export const CalendarTasks = () => {
             }
 
             // Status filters
-            if (statusFilter === 'todas') {
+            if (statusFilter === 'pendientes') {
                 query = query.eq('is_completed', false)
             } else if (statusFilter === 'alta') {
                 query = query.eq('is_completed', false).eq('priority', 'alta')
             } else if (statusFilter === 'completadas') {
                 query = query.eq('is_completed', true)
             }
+            // 'todas' → no filter, shows everything
 
             // Date filters
             const now = new Date()
@@ -166,6 +167,7 @@ export const CalendarTasks = () => {
     // ─── Status Filter Pills ─────────────────────────────────
     const statusPills: { value: StatusFilter; label: string; emoji: string }[] = [
         { value: 'todas', label: 'Todas', emoji: '📋' },
+        { value: 'pendientes', label: 'Pendientes', emoji: '⏳' },
         { value: 'alta', label: 'Prioritarias', emoji: '🔴' },
         { value: 'completadas', label: 'Completadas', emoji: '✅' },
     ]

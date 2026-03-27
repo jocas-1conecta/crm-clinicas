@@ -358,7 +358,7 @@ const TaskCard = ({ task, onToggle, onEdit, onDelete }: {
         >
             <div className="flex items-start p-4 space-x-3">
                 {/* Toggle Circle */}
-                <button onClick={onToggle} className="mt-0.5 shrink-0 transition-transform hover:scale-110">
+                <button onClick={(e) => { e.stopPropagation(); onToggle() }} className="mt-0.5 shrink-0 transition-transform hover:scale-110" title={task.is_completed ? 'Marcar como pendiente' : 'Marcar como realizada'}>
                     {task.is_completed ? (
                         <LucideCheckCircle2 className="w-5 h-5 text-clinical-500" />
                     ) : (
