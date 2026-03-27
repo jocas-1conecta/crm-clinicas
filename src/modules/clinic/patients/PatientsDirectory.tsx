@@ -16,16 +16,25 @@ export const PatientsDirectory = () => {
     const [showAddPatient, setShowAddPatient] = useState(false)
 
     const branchId = currentUser?.sucursal_id
+    const isAdvisor = currentUser?.role === 'Asesor_Sucursal'
 
     const { data: dbPatients = [], isLoading } = useQuery({
-        queryKey: ['patients', branchId],
+        queryKey: ['patients', branchId, currentUser?.id, currentUser?.role],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase
+            let query = supabase
                 .from('patients')
                 .select('*')
-                .eq('sucursal_id', branchId)
                 .order('created_at', { ascending: false });
+
+            if (isAdvisor) {
+                // Advisors only see patients assigned to them
+                query = query.eq('assigned_to', currentUser!.id)
+            } else {
+                query = query.eq('sucursal_id', branchId)
+            }
+
+            const { data, error } = await query;
             if (error) throw error;
             return data;
         },

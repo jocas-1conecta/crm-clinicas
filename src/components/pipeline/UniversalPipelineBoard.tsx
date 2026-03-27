@@ -77,6 +77,7 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
 
     const convertLeadMutation = useMutation({
         mutationFn: async (lead: any) => {
+            // Create patient linked to original lead
             const { error: insertError } = await supabase.from('patients').insert([{
                 name: lead.name,
                 status: 'Activo',
@@ -84,16 +85,20 @@ export const UniversalPipelineBoard = ({ boardType, tableName, records, queryKey
                 sucursal_id: lead.sucursal_id,
                 email: lead.email,
                 phone: lead.phone,
-                tags: lead.service ? [lead.service] : []
+                converted_from_lead_id: lead.id,
             }]);
             if (insertError) throw insertError;
             
-            const { error: deleteError } = await supabase.from('leads').delete().eq('id', lead.id);
-            if (deleteError) throw deleteError;
+            // Mark lead as converted (preserve for reports)
+            const { error: updateError } = await supabase.from('leads').update({
+                is_converted: true,
+                converted_at: new Date().toISOString(),
+            }).eq('id', lead.id);
+            if (updateError) throw updateError;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeyToInvalidate })
-            queryClient.invalidateQueries({ queryKey: ['patients'] }) // always invalidate patients on conversion
+            queryClient.invalidateQueries({ queryKey: ['patients'] })
         }
     })
 

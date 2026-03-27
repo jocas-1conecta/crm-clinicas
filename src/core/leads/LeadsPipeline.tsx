@@ -36,6 +36,7 @@ export const LeadsPipeline = () => {
         queryKey: ['leads', branchId || clinicaId, currentUser?.role],
         queryFn: async () => {
             let query = supabase.from('leads').select('*')
+                .or('is_converted.is.null,is_converted.eq.false')
                 .order('created_at', { ascending: false })
                 .limit(2000);
             

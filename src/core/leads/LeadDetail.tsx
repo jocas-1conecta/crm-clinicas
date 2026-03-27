@@ -187,6 +187,7 @@ export const LeadDetail = () => {
     // ── Convert to Patient ──
     const convertToPatientMutation = useMutation({
         mutationFn: async () => {
+            // Create patient linked to original lead
             const { error: insertError } = await supabase.from('patients').insert([{
                 name: lead.name,
                 status: 'Activo',
@@ -194,11 +195,16 @@ export const LeadDetail = () => {
                 sucursal_id: lead.sucursal_id,
                 email: lead.email,
                 phone: lead.phone,
-                tags: lead.service ? [lead.service] : []
+                converted_from_lead_id: leadId,
             }])
             if (insertError) throw insertError
-            const { error: deleteError } = await supabase.from('leads').delete().eq('id', leadId!)
-            if (deleteError) throw deleteError
+
+            // Mark lead as converted (don't delete — preserves history for reports)
+            const { error: updateError } = await supabase.from('leads').update({
+                is_converted: true,
+                converted_at: new Date().toISOString(),
+            }).eq('id', leadId!)
+            if (updateError) throw updateError
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['leads'] })
@@ -290,7 +296,7 @@ export const LeadDetail = () => {
 
                         {/* Convert to Patient */}
                         <button
-                            onClick={() => { if (confirm('¿Convertir este lead a paciente? El lead será eliminado.')) convertToPatientMutation.mutate() }}
+                            onClick={() => { if (confirm('¿Convertir este lead a paciente? El lead se marcará como convertido y su historial se preservará para reportes.')) convertToPatientMutation.mutate() }}
                             disabled={convertToPatientMutation.isPending}
                             className="mt-5 w-full py-2.5 bg-clinical-600 text-white text-sm font-semibold rounded-xl hover:bg-clinical-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
                         >

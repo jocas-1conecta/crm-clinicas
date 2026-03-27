@@ -40,6 +40,7 @@ export const LeadsTable = () => {
             let query = supabase
                 .from('leads')
                 .select('*')
+                .or('is_converted.is.null,is_converted.eq.false')
                 .order('created_at', { ascending: false })
                 .limit(5000)
 
