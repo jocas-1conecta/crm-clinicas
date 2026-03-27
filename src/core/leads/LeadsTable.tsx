@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
-import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus, LucideChevronLeft, LucideChevronRight } from 'lucide-react'
+import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus, LucideChevronLeft, LucideChevronRight, LucideUsers } from 'lucide-react'
 import { AddLeadModal } from './AddLeadModal'
 import { PipelineConfig } from '../organizations/PipelineConfig'
 
@@ -24,6 +24,12 @@ export const LeadsTable = () => {
     const [showAddLead, setShowAddLead] = useState(false)
     const [page, setPage] = useState(1)
     const PAGE_SIZE = 50
+    const queryClient = useQueryClient()
+
+    // Bulk selection state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [bulkAssignTo, setBulkAssignTo] = useState<string>('')
+    const [bulkAssigning, setBulkAssigning] = useState(false)
 
     // Fetch leads
     const { data: leads = [], isLoading } = useQuery({
@@ -103,7 +109,9 @@ export const LeadsTable = () => {
         if (filterStatus !== 'all') {
             list = list.filter(l => l.stage_id === filterStatus)
         }
-        if (filterAdvisor !== 'all') {
+        if (filterAdvisor === 'unassigned') {
+            list = list.filter(l => !l.assigned_to)
+        } else if (filterAdvisor !== 'all') {
             list = list.filter(l => l.assigned_to === filterAdvisor)
         }
         return list
@@ -134,7 +142,45 @@ export const LeadsTable = () => {
     const paginated = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
 
     // Reset page when filters change
-    useEffect(() => { setPage(1) }, [search, filterStatus, filterAdvisor])
+    useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [search, filterStatus, filterAdvisor])
+
+    // Toggle selection helpers
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+        })
+    }
+    const toggleSelectAll = () => {
+        if (selectedIds.size === paginated.length) {
+            setSelectedIds(new Set())
+        } else {
+            setSelectedIds(new Set(paginated.map(l => l.id)))
+        }
+    }
+
+    // Bulk assign mutation
+    const handleBulkAssign = async () => {
+        if (!bulkAssignTo || selectedIds.size === 0) return
+        setBulkAssigning(true)
+        try {
+            const assignValue = bulkAssignTo === 'none' ? null : bulkAssignTo
+            const ids = Array.from(selectedIds)
+            const { error } = await supabase
+                .from('leads')
+                .update({ assigned_to: assignValue })
+                .in('id', ids)
+            if (error) throw error
+            queryClient.invalidateQueries({ queryKey: ['leads-admin-table'] })
+            setSelectedIds(new Set())
+            setBulkAssignTo('')
+        } catch (err: any) {
+            alert('Error: ' + (err.message || err))
+        } finally {
+            setBulkAssigning(false)
+        }
+    }
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -201,6 +247,7 @@ export const LeadsTable = () => {
                     className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none shadow-sm"
                 >
                     <option value="all">Todos los asesores</option>
+                    <option value="unassigned">⚠ Sin asignar</option>
                     {advisors.map((a: any) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
@@ -239,6 +286,14 @@ export const LeadsTable = () => {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50/80 border-b border-gray-100">
                             <tr>
+                                <th className="px-3 py-3 w-10">
+                                    <input
+                                        type="checkbox"
+                                        checked={paginated.length > 0 && selectedIds.size === paginated.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 rounded border-gray-300 text-clinical-600 focus:ring-clinical-500 cursor-pointer"
+                                    />
+                                </th>
                                 <th className="px-5 py-3">
                                     <button onClick={() => toggleSort('name')} className="flex items-center gap-1 text-[11px] font-bold text-gray-500 uppercase tracking-wider hover:text-gray-700">
                                         Nombre <SortIcon col="name" />
@@ -265,15 +320,23 @@ export const LeadsTable = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {paginated.length === 0 ? (
-                                <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">No se encontraron leads con los filtros actuales.</td></tr>
+                                <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-400">No se encontraron leads con los filtros actuales.</td></tr>
                             ) : paginated.map((lead) => {
                                 const stage = stageMap[lead.stage_id]
                                 return (
                                     <tr
                                         key={lead.id}
-                                        className="hover:bg-gray-50/60 transition-colors cursor-pointer"
+                                        className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${selectedIds.has(lead.id) ? 'bg-clinical-50/40' : ''}`}
                                         onClick={() => navigate(`/leads/${lead.id}`)}
                                     >
+                                        <td className="px-3 py-3" onClick={e => { e.stopPropagation(); toggleSelect(lead.id) }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(lead.id)}
+                                                onChange={() => toggleSelect(lead.id)}
+                                                className="w-4 h-4 rounded border-gray-300 text-clinical-600 focus:ring-clinical-500 cursor-pointer"
+                                            />
+                                        </td>
                                         <td className="px-5 py-3">
                                             <span className="text-[13px] font-semibold text-gray-900">{lead.name}</span>
                                         </td>
@@ -342,6 +405,43 @@ export const LeadsTable = () => {
                             Siguiente <LucideChevronRight className="w-4 h-4" />
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Bulk Action Bar */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+                    <span className="text-sm font-medium">
+                        {selectedIds.size} lead{selectedIds.size > 1 ? 's' : ''} seleccionado{selectedIds.size > 1 ? 's' : ''}
+                    </span>
+                    <div className="w-px h-5 bg-gray-600" />
+                    <div className="flex items-center gap-2">
+                        <LucideUsers className="w-4 h-4 text-gray-400" />
+                        <select
+                            value={bulkAssignTo}
+                            onChange={e => setBulkAssignTo(e.target.value)}
+                            className="bg-gray-800 text-white text-sm rounded-lg border border-gray-600 px-3 py-1.5 focus:ring-2 focus:ring-clinical-500 outline-none"
+                        >
+                            <option value="">Asignar a...</option>
+                            <option value="none">❌ Quitar asignación</option>
+                            {advisors.map((a: any) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleBulkAssign}
+                            disabled={!bulkAssignTo || bulkAssigning}
+                            className="px-4 py-1.5 bg-clinical-600 text-white text-sm font-bold rounded-lg hover:bg-clinical-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                            {bulkAssigning ? 'Asignando...' : 'Aplicar'}
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => { setSelectedIds(new Set()); setBulkAssignTo('') }}
+                        className="ml-2 p-1.5 hover:bg-gray-700 rounded-lg transition-colors"
+                    >
+                        <LucideX className="w-4 h-4" />
+                    </button>
                 </div>
             )}
 
