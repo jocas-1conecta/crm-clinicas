@@ -7,7 +7,8 @@ import {
     LucideBuilding, 
     LucideUsers,
     LucidePlugZap,
-    LucideMessageSquare
+    LucideMessageSquare,
+    LucideTag
 } from 'lucide-react'
 
 export const SettingsLayout: React.FC = () => {
@@ -70,6 +71,12 @@ export const SettingsLayout: React.FC = () => {
             path: `${prefix}/configuracion/plantillas-chat`,
             icon: LucideMessageSquare,
             description: 'Mensajes predefinidos de WhatsApp'
+        })
+        menuItems.push({
+            title: 'Etiquetas',
+            path: `${prefix}/configuracion/etiquetas`,
+            icon: LucideTag,
+            description: 'Etiquetas para clasificar leads, pacientes y citas'
         })
     }
 

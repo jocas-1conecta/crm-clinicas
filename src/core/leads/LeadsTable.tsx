@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabase'
 import { LucideSearch, LucideFilter, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideSettings2, LucideUserPlus, LucideChevronLeft, LucideChevronRight, LucideUsers } from 'lucide-react'
 import { AddLeadModal } from './AddLeadModal'
 import { PipelineConfig } from '../organizations/PipelineConfig'
+import { useClinicTags, useAllEntityTags } from '../../hooks/useClinicTags'
 
 type SortDir = 'asc' | 'desc' | null
 type SortKey = 'name' | 'source' | 'stage' | 'created_at'
@@ -18,6 +19,7 @@ export const LeadsTable = () => {
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [filterAdvisor, setFilterAdvisor] = useState<string>('all')
+    const [filterTag, setFilterTag] = useState<string>('all')
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [showConfig, setShowConfig] = useState(false)
@@ -93,6 +95,18 @@ export const LeadsTable = () => {
         return map
     }, [advisors])
 
+    // Tags for filtering
+    const { data: clinicTags = [] } = useClinicTags()
+    const { data: allLeadTags = [] } = useAllEntityTags('lead')
+    const leadTagMap = useMemo(() => {
+        const map: Record<string, string[]> = {}
+        allLeadTags.forEach((et: any) => {
+            if (!map[et.entity_id]) map[et.entity_id] = []
+            map[et.entity_id].push(et.tag_id)
+        })
+        return map
+    }, [allLeadTags])
+
     // Filter + search
     const filtered = useMemo(() => {
         let list = [...leads]
@@ -114,8 +128,11 @@ export const LeadsTable = () => {
         } else if (filterAdvisor !== 'all') {
             list = list.filter(l => l.assigned_to === filterAdvisor)
         }
+        if (filterTag !== 'all') {
+            list = list.filter(l => (leadTagMap[l.id] || []).includes(filterTag))
+        }
         return list
-    }, [leads, search, filterStatus, filterAdvisor])
+    }, [leads, search, filterStatus, filterAdvisor, filterTag, leadTagMap])
 
     // Sort
     const sorted = useMemo(() => {
@@ -142,7 +159,7 @@ export const LeadsTable = () => {
     const paginated = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
 
     // Reset page when filters change
-    useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [search, filterStatus, filterAdvisor])
+    useEffect(() => { setPage(1); setSelectedIds(new Set()) }, [search, filterStatus, filterAdvisor, filterTag])
 
     // Toggle selection helpers
     const toggleSelect = (id: string) => {
@@ -199,7 +216,7 @@ export const LeadsTable = () => {
             : <LucideChevronDown className="w-3.5 h-3.5 text-clinical-600" />
     }
 
-    const activeFilters = (filterStatus !== 'all' ? 1 : 0) + (filterAdvisor !== 'all' ? 1 : 0)
+    const activeFilters = (filterStatus !== 'all' ? 1 : 0) + (filterAdvisor !== 'all' ? 1 : 0) + (filterTag !== 'all' ? 1 : 0)
 
     if (isLoading) {
         return <div className="p-8 text-center text-gray-400 text-sm">Cargando leads...</div>
@@ -253,9 +270,23 @@ export const LeadsTable = () => {
                     ))}
                 </select>
 
+                {/* Tag Filter */}
+                {clinicTags.length > 0 && (
+                    <select
+                        value={filterTag}
+                        onChange={(e) => setFilterTag(e.target.value)}
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none shadow-sm"
+                    >
+                        <option value="all">Todas las etiquetas</option>
+                        {clinicTags.map((t: any) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                )}
+
                 {activeFilters > 0 && (
                     <button
-                        onClick={() => { setFilterStatus('all'); setFilterAdvisor('all') }}
+                        onClick={() => { setFilterStatus('all'); setFilterAdvisor('all'); setFilterTag('all') }}
                         className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"
                     >
                         <LucideX className="w-3 h-3" />

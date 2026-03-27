@@ -4,6 +4,7 @@ import { useStore } from '../../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
 import { EntityTasks } from '../../../components/tasks/EntityTasks'
+import { useClinicTags, useEntityTags, useAddEntityTag, useRemoveEntityTag } from '../../../hooks/useClinicTags'
 import {
     LucideX,
     LucidePhone,
@@ -123,7 +124,12 @@ export const PatientDetail = () => {
     const [showNewDeal, setShowNewDeal] = useState(false)
     const [dealTitle, setDealTitle] = useState('')
     const [dealValue, setDealValue] = useState(0)
-    const [newTag, setNewTag] = useState('')
+
+    // Structured tags
+    const { data: clinicTags = [] } = useClinicTags()
+    const { data: entityTags = [] } = useEntityTags('patient', patientId)
+    const addEntityTag = useAddEntityTag()
+    const removeEntityTag = useRemoveEntityTag()
 
     /* ── Mutations ──────────────────────────────────── */
     const updateField = useMutation({
@@ -177,18 +183,7 @@ export const PatientDetail = () => {
         setShowNewDeal(false); setDealTitle(''); setDealValue(0)
     }
 
-    const handleAddTag = () => {
-        if (!newTag.trim() || !patient) return
-        const tags = [...(patient.tags || []), newTag.trim()]
-        handleFieldChange('tags', tags)
-        setNewTag('')
-    }
 
-    const handleRemoveTag = (tag: string) => {
-        if (!patient) return
-        const tags = (patient.tags || []).filter((t: string) => t !== tag)
-        handleFieldChange('tags', tags)
-    }
 
     if (!patient) {
         return (
@@ -268,10 +263,9 @@ export const PatientDetail = () => {
 
                         {/* Tags under name */}
                         <div className="flex flex-wrap gap-1 mt-2 justify-center">
-                            {(patient.tags || []).map((tag: string) => (
-                                <span key={tag} className="group text-[10px] font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    {tag}
-                                    <button onClick={() => handleRemoveTag(tag)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">×</button>
+                            {entityTags.map((et: any) => (
+                                <span key={et.id} className="text-[10px] font-medium text-white px-2 py-0.5 rounded-full" style={{ backgroundColor: et.clinic_tag?.color || '#6b7280' }}>
+                                    {et.clinic_tag?.name || '?'}
                                 </span>
                             ))}
                         </div>
@@ -571,25 +565,35 @@ export const PatientDetail = () => {
                             <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Etiquetas</h4>
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
                                 <div className="flex flex-wrap gap-1.5">
-                                    {(patient.tags || []).length === 0 && <span className="text-xs text-gray-400 italic">Sin etiquetas</span>}
-                                    {(patient.tags || []).map((tag: string) => (
-                                        <span key={tag} className="group text-xs font-medium bg-white text-gray-700 px-2.5 py-1 rounded-lg border border-gray-200 flex items-center gap-1">
-                                            {tag}
-                                            <button onClick={() => handleRemoveTag(tag)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">×</button>
+                                    {entityTags.length === 0 && <span className="text-xs text-gray-400 italic">Sin etiquetas</span>}
+                                    {entityTags.map((et: any) => (
+                                        <span
+                                            key={et.id}
+                                            className="group text-xs font-medium text-white px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm"
+                                            style={{ backgroundColor: et.clinic_tag?.color || '#6b7280' }}
+                                        >
+                                            {et.clinic_tag?.name || '?'}
+                                            <button
+                                                onClick={() => removeEntityTag.mutate({ id: et.id, entityType: 'patient', entityId: patientId! })}
+                                                className="opacity-60 hover:opacity-100 transition-opacity"
+                                            >×</button>
                                         </span>
                                     ))}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text" placeholder="Nueva etiqueta..."
-                                        value={newTag} onChange={e => setNewTag(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') handleAddTag() }}
-                                        className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-clinical-500 outline-none"
-                                    />
-                                    <button onClick={handleAddTag} disabled={!newTag.trim()} className="p-1.5 bg-clinical-600 text-white rounded-lg disabled:opacity-30 hover:bg-clinical-700 transition-colors">
-                                        <LucidePlus className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                                {clinicTags.filter(t => !entityTags.some((et: any) => et.tag_id === t.id)).length > 0 && (
+                                    <select
+                                        value=""
+                                        onChange={e => {
+                                            if (e.target.value) addEntityTag.mutate({ tagId: e.target.value, entityType: 'patient', entityId: patientId! })
+                                        }}
+                                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                                    >
+                                        <option value="">+ Agregar etiqueta...</option>
+                                        {clinicTags.filter(t => !entityTags.some((et: any) => et.tag_id === t.id)).map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                         </div>
                     </div>

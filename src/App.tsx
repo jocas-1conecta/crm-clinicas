@@ -15,6 +15,7 @@ import { ProfileSettings } from './core/settings/ProfileSettings'
 import { SecuritySettings } from './core/settings/SecuritySettings'
 import { WorkspaceSettings } from './core/settings/WorkspaceSettings'
 import { PlatformBrandingSettings } from './core/settings/PlatformBrandingSettings'
+import { TagsManagement } from './core/settings/TagsManagement'
 import { Layout } from './core/Layout'
 import { Patients } from './modules/clinic/patients/Patients'
 import { PatientsTable } from './modules/clinic/patients/PatientsTable'
@@ -265,6 +266,7 @@ function App() {
                         <Route path="equipo" element={<TeamManagement />} />
                         <Route path="integraciones" element={<IntegrationsSettings />} />
                         <Route path="plantillas-chat" element={<ChatTemplatesSettings />} />
+                        <Route path="etiquetas" element={<TagsManagement />} />
                     </Route>
                     
                     {/* Fallback */}

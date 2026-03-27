@@ -5,6 +5,7 @@ import { supabase } from '../../services/supabase'
 import { UniversalPipelineBoard } from '../../components/pipeline/UniversalPipelineBoard'
 import { AddLeadModal } from './AddLeadModal'
 import { LucideUserPlus, LucideSearch, LucideFilter, LucideX } from 'lucide-react'
+import { useClinicTags, useAllEntityTags } from '../../hooks/useClinicTags'
 
 export const LeadsPipeline = () => {
     const { currentUser } = useStore()
@@ -17,6 +18,19 @@ export const LeadsPipeline = () => {
     const [showFilters, setShowFilters] = useState(false)
     const [filterAdvisor, setFilterAdvisor] = useState('all')
     const [filterSource, setFilterSource] = useState('all')
+    const [filterTag, setFilterTag] = useState('all')
+
+    // Tags
+    const { data: clinicTags = [] } = useClinicTags()
+    const { data: allLeadTags = [] } = useAllEntityTags('lead')
+    const leadTagMap = useMemo(() => {
+        const map: Record<string, string[]> = {}
+        allLeadTags.forEach((et: any) => {
+            if (!map[et.entity_id]) map[et.entity_id] = []
+            map[et.entity_id].push(et.tag_id)
+        })
+        return map
+    }, [allLeadTags])
 
     const { data: dbLeads = [], isLoading: loadingLeads } = useQuery({
         queryKey: ['leads', branchId || clinicaId, currentUser?.role],
@@ -56,11 +70,12 @@ export const LeadsPipeline = () => {
         }
         if (filterAdvisor !== 'all') list = list.filter(l => l.assigned_to === filterAdvisor)
         if (filterSource !== 'all') list = list.filter(l => l.source === filterSource)
+        if (filterTag !== 'all') list = list.filter(l => (leadTagMap[l.id] || []).includes(filterTag))
         return list
-    }, [dbLeads, search, filterAdvisor, filterSource])
+    }, [dbLeads, search, filterAdvisor, filterSource, filterTag, leadTagMap])
 
     const sources = useMemo(() => [...new Set(dbLeads.map(l => l.source).filter(Boolean))], [dbLeads])
-    const activeFilters = (filterAdvisor !== 'all' ? 1 : 0) + (filterSource !== 'all' ? 1 : 0)
+    const activeFilters = (filterAdvisor !== 'all' ? 1 : 0) + (filterSource !== 'all' ? 1 : 0) + (filterTag !== 'all' ? 1 : 0)
 
     if (loadingLeads) {
         return <div className="p-8 text-center text-gray-500">Cargando leads desde el servidor...</div>;
@@ -109,8 +124,15 @@ export const LeadsPipeline = () => {
                         <option value="all">Todas las fuentes</option>
                         {sources.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    {clinicTags.length > 0 && (
+                        <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
+                            className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none">
+                            <option value="all">Todas las etiquetas</option>
+                            {clinicTags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                    )}
                     {activeFilters > 0 && (
-                        <button onClick={() => { setFilterAdvisor('all'); setFilterSource('all') }}
+                        <button onClick={() => { setFilterAdvisor('all'); setFilterSource('all'); setFilterTag('all') }}
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100">
                             <LucideX className="w-3 h-3" /> Limpiar ({activeFilters})
                         </button>

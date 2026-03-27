@@ -5,6 +5,7 @@ import { supabase } from '../../../services/supabase'
 import { LucideSearch, LucideChevronUp, LucideChevronDown, LucideChevronsUpDown, LucidePhone, LucideMail, LucideX, LucideCalendar, LucideSettings2, LucideCalendarPlus, LucideChevronLeft, LucideChevronRight } from 'lucide-react'
 import { PipelineConfig } from '../../../core/organizations/PipelineConfig'
 import { AddAppointmentModal } from './AddAppointmentModal'
+import { useClinicTags, useAllEntityTags } from '../../../hooks/useClinicTags'
 
 type SortDir = 'asc' | 'desc' | null
 type SortKey = 'patient_name' | 'stage' | 'date' | 'created_at'
@@ -16,6 +17,7 @@ export const AppointmentsTable = () => {
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [filterAdvisor, setFilterAdvisor] = useState<string>('all')
+    const [filterTag, setFilterTag] = useState<string>('all')
     const [sortKey, setSortKey] = useState<SortKey>('created_at')
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [showConfig, setShowConfig] = useState(false)
@@ -72,6 +74,18 @@ export const AppointmentsTable = () => {
         return map
     }, [advisors])
 
+    // Tags for filtering
+    const { data: clinicTags = [] } = useClinicTags()
+    const { data: allApptTags = [] } = useAllEntityTags('appointment')
+    const apptTagMap = useMemo(() => {
+        const map: Record<string, string[]> = {}
+        allApptTags.forEach((et: any) => {
+            if (!map[et.entity_id]) map[et.entity_id] = []
+            map[et.entity_id].push(et.tag_id)
+        })
+        return map
+    }, [allApptTags])
+
     const filtered = useMemo(() => {
         let list = [...appointments]
         if (search) {
@@ -85,8 +99,9 @@ export const AppointmentsTable = () => {
         }
         if (filterStatus !== 'all') list = list.filter(a => a.stage_id === filterStatus)
         if (filterAdvisor !== 'all') list = list.filter(a => a.assigned_to === filterAdvisor)
+        if (filterTag !== 'all') list = list.filter(a => (apptTagMap[a.id] || []).includes(filterTag))
         return list
-    }, [appointments, search, filterStatus, filterAdvisor])
+    }, [appointments, search, filterStatus, filterAdvisor, filterTag, apptTagMap])
 
     const sorted = useMemo(() => {
         if (!sortKey || !sortDir) return filtered
@@ -112,7 +127,7 @@ export const AppointmentsTable = () => {
     const paginated = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
 
     // Reset page on filter change
-    useEffect(() => { setPage(1) }, [search, filterStatus, filterAdvisor])
+    useEffect(() => { setPage(1) }, [search, filterStatus, filterAdvisor, filterTag])
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -130,7 +145,7 @@ export const AppointmentsTable = () => {
             : <LucideChevronDown className="w-3.5 h-3.5 text-clinical-600" />
     }
 
-    const activeFilters = (filterStatus !== 'all' ? 1 : 0) + (filterAdvisor !== 'all' ? 1 : 0)
+    const activeFilters = (filterStatus !== 'all' ? 1 : 0) + (filterAdvisor !== 'all' ? 1 : 0) + (filterTag !== 'all' ? 1 : 0)
 
     if (isLoading) return <div className="p-8 text-center text-gray-400 text-sm">Cargando citas...</div>
 
@@ -163,8 +178,16 @@ export const AppointmentsTable = () => {
                     {advisors.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
 
+                {clinicTags.length > 0 && (
+                    <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none shadow-sm">
+                        <option value="all">Todas las etiquetas</option>
+                        {clinicTags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                )}
+
                 {activeFilters > 0 && (
-                    <button onClick={() => { setFilterStatus('all'); setFilterAdvisor('all') }}
+                    <button onClick={() => { setFilterStatus('all'); setFilterAdvisor('all'); setFilterTag('all') }}
                         className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-xl hover:bg-red-100">
                         <LucideX className="w-3 h-3" /> Limpiar ({activeFilters})
                     </button>

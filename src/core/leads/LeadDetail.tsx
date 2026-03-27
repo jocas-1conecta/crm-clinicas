@@ -4,6 +4,7 @@ import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { EntityTasks } from '../../components/tasks/EntityTasks'
+import { useClinicTags, useEntityTags, useAddEntityTag, useRemoveEntityTag } from '../../hooks/useClinicTags'
 import { useChatByPhone, useChatMessages, useSendMessage, useChatRealtime, useCreateNewConversation } from '../chat/useTimelinesAI'
 import {
     LucideX,
@@ -620,6 +621,9 @@ export const LeadDetail = () => {
                             </div>
                         </div>
 
+                        {/* Tags */}
+                        <LeadTagsSection leadId={leadId!} />
+
                         {/* Deals (placeholder) */}
                         <div>
                             <div className="flex items-center justify-between mb-3">
@@ -969,3 +973,53 @@ const ComingSoonPlaceholder = ({ icon: Icon, title }: { icon: any, title: string
         <p className="text-xs text-gray-300 mt-2">Esta funcionalidad estará disponible próximamente</p>
     </div>
 )
+
+/* ── Tags Section for Lead Right Column ──────────────────────── */
+const LeadTagsSection = ({ leadId }: { leadId: string }) => {
+    const { data: clinicTags = [] } = useClinicTags()
+    const { data: entityTags = [] } = useEntityTags('lead', leadId)
+    const addTag = useAddEntityTag()
+    const removeTag = useRemoveEntityTag()
+
+    const assignedTagIds = new Set(entityTags.map(et => et.tag_id))
+    const availableTags = clinicTags.filter(t => !assignedTagIds.has(t.id))
+
+    return (
+        <div>
+            <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Etiquetas</h4>
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
+                <div className="flex flex-wrap gap-1.5">
+                    {entityTags.length === 0 && <span className="text-xs text-gray-400 italic">Sin etiquetas</span>}
+                    {entityTags.map(et => (
+                        <span
+                            key={et.id}
+                            className="group text-xs font-medium text-white px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm"
+                            style={{ backgroundColor: et.clinic_tag?.color || '#6b7280' }}
+                        >
+                            {et.clinic_tag?.name || '?'}
+                            <button
+                                onClick={() => removeTag.mutate({ id: et.id, entityType: 'lead', entityId: leadId })}
+                                className="opacity-60 hover:opacity-100 transition-opacity"
+                            >×</button>
+                        </span>
+                    ))}
+                </div>
+                {availableTags.length > 0 && (
+                    <select
+                        value=""
+                        onChange={e => {
+                            if (e.target.value) addTag.mutate({ tagId: e.target.value, entityType: 'lead', entityId: leadId })
+                        }}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-clinical-500 outline-none cursor-pointer"
+                    >
+                        <option value="">+ Agregar etiqueta...</option>
+                        {availableTags.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                )}
+            </div>
+        </div>
+    )
+}
+
