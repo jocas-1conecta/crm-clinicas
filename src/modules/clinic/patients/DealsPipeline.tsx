@@ -14,16 +14,22 @@ export const DealsPipeline = () => {
     const [search, setSearch] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [filterAdvisor, setFilterAdvisor] = useState('all')
+    const isAdvisor = currentUser?.role === 'Asesor_Sucursal'
 
     const { data: dbDeals = [], isLoading: loadingDeals } = useQuery({
-        queryKey: ['deals_board', branchId],
+        queryKey: ['deals_board', branchId, currentUser?.id, currentUser?.role],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase
+            let query = supabase
                 .from('deals')
                 .select('*, patients!inner(name, phone, email, sucursal_id)')
                 .eq('patients.sucursal_id', branchId);
-            
+
+            if (isAdvisor) {
+                query = query.eq('assigned_to', currentUser!.id)
+            }
+
+            const { data, error } = await query;
             if (error) throw error;
             
             return data.map((d:any) => ({

@@ -295,14 +295,21 @@ export const LeadDetail = () => {
                         </div>
 
                         {/* Convert to Patient */}
-                        <button
-                            onClick={() => { if (confirm('¿Convertir este lead a paciente? El lead se marcará como convertido y su historial se preservará para reportes.')) convertToPatientMutation.mutate() }}
-                            disabled={convertToPatientMutation.isPending}
-                            className="mt-5 w-full py-2.5 bg-clinical-600 text-white text-sm font-semibold rounded-xl hover:bg-clinical-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
-                        >
-                            {convertToPatientMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideUserCheck className="w-4 h-4" />}
-                            Convertir a Paciente
-                        </button>
+                        {lead.is_converted ? (
+                            <div className="mt-5 w-full py-2.5 bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-xl flex items-center justify-center gap-2 border border-emerald-200">
+                                <LucideUserCheck className="w-4 h-4" />
+                                Ya convertido a Paciente
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => { if (confirm('¿Convertir este lead a paciente? El lead se marcará como convertido y su historial se preservará para reportes.')) convertToPatientMutation.mutate() }}
+                                disabled={convertToPatientMutation.isPending}
+                                className="mt-5 w-full py-2.5 bg-clinical-600 text-white text-sm font-semibold rounded-xl hover:bg-clinical-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
+                            >
+                                {convertToPatientMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideUserCheck className="w-4 h-4" />}
+                                Convertir a Paciente
+                            </button>
+                        )}
 
                         {lead.created_at && (
                             <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
