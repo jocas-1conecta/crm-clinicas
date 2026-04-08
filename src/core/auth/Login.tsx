@@ -233,10 +233,7 @@ export const Login = () => {
                                 {isGlobalGateway ? <LucideBuilding className="w-8 h-8 text-white" /> : <LucideShieldCheck className="w-8 h-8 text-white" />}
                             </div>
                         )}
-                        <h1 className="text-4xl font-bold mb-6 tracking-tight drop-shadow-md">
-                            {displayName}
-                        </h1>
-                        <p className="text-white/80 text-lg leading-relaxed max-w-sm font-light">
+                        <p className="text-white/80 text-lg leading-relaxed max-w-sm font-light mt-2">
                             {displaySubtitle}
                         </p>
                     </div>
