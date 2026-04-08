@@ -179,6 +179,15 @@ export const Login = () => {
             }
 
             // Auth listener en App.tsx procesa el inicio de sesión real instantáneamente.
+            // Safety timeout: si el listener falla, reseteamos el botón para permitir reintento
+            setTimeout(() => {
+                setIsLoading(prev => {
+                    if (prev) {
+                        setError('La sesión no se pudo establecer. Intenta limpiar tu caché o contacta soporte.')
+                    }
+                    return false
+                })
+            }, 10000)
         } catch (err: any) {
             setError(err.message || 'Error grave de autenticación')
             setIsLoading(false)

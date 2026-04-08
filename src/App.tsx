@@ -117,11 +117,18 @@ function App() {
 
             if (error) {
                 console.error("Error fetching profile:", error)
+                // If profile fetch fails (corrupt session, RLS error, etc.),
+                // sign out to clear invalid tokens and prevent infinite retry loops
+                await supabase.auth.signOut()
+                setCurrentUser(null)
                 setIsAuthLoading(false)
                 return
             }
 
             if (!data) {
+                // Profile not found for this auth user — sign out gracefully
+                await supabase.auth.signOut()
+                setCurrentUser(null)
                 setIsAuthLoading(false)
                 return
             }
@@ -157,6 +164,9 @@ function App() {
             })
         } catch (err) {
             console.error("Error setting user:", err)
+            // On unexpected errors, also clean up to avoid stuck states
+            await supabase.auth.signOut().catch(() => {})
+            setCurrentUser(null)
         } finally {
             setIsAuthLoading(false)
         }
