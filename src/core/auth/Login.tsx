@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
-import { supabase } from '../../services/supabase'
+import { supabase, setRememberSession } from '../../services/supabase'
 import { LucideShieldCheck, LucideChevronRight, LucideCheckCircle2, LucideMail, LucideLock, LucideBuilding } from 'lucide-react'
 import { getTenantSlug, buildTenantUrl, buildPlatformUrl } from '../../utils/getTenantSlug'
 import { applyBrandColor } from '../../utils/applyBrandColor'
@@ -19,6 +19,7 @@ export const Login = () => {
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState('')
+    const [rememberMe, setRememberMe] = useState(false)
 
     // Fallback: If no slug in URL, it's the Global Gateway (Step 1)
     const isGlobalGateway = !slug
@@ -167,6 +168,9 @@ export const Login = () => {
         setIsLoading(true)
 
         try {
+            // Set session persistence BEFORE signing in
+            setRememberSession(rememberMe)
+
             const { error: authError } = await supabase.auth.signInWithPassword({
                 email: email.trim().toLowerCase(),
                 password,
@@ -378,6 +382,8 @@ export const Login = () => {
                                         <input
                                             id="remember-me"
                                             type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
                                             className="h-4.5 w-4.5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
                                         />
                                         <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
