@@ -156,9 +156,11 @@ export const ProfileSettings: React.FC = () => {
         }
     }
 
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+
     const handleAvatarDelete = async () => {
         if (!currentUser?.id) return
-        if (!confirm('¿Eliminar la foto de perfil?')) return
+        setShowDeleteModal(false)
         setUploadingAvatar(true)
         try {
             // Remove from storage
@@ -226,7 +228,7 @@ export const ProfileSettings: React.FC = () => {
                         {currentUser?.avatarUrl && !currentUser.avatarUrl.includes('ui-avatars.com') && (
                             <button
                                 type="button"
-                                onClick={handleAvatarDelete}
+                                onClick={() => setShowDeleteModal(true)}
                                 className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all z-10"
                                 title="Eliminar foto"
                             >
@@ -319,5 +321,34 @@ export const ProfileSettings: React.FC = () => {
                 </form>
             </div>
         </div>
+
+            {/* Delete Avatar Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 text-center">
+                            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <LucideX className="w-7 h-7 text-red-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">¿Eliminar foto de perfil?</h3>
+                            <p className="text-sm text-gray-500">Se removerá tu foto actual y se mostrarán tus iniciales como avatar.</p>
+                        </div>
+                        <div className="flex border-t border-gray-100">
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                className="flex-1 py-3.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors rounded-bl-2xl"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAvatarDelete}
+                                className="flex-1 py-3.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors rounded-br-2xl border-l border-gray-100"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
     )
 }
