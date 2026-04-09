@@ -185,6 +185,7 @@ export const ProfileSettings: React.FC = () => {
     if (isError) return <div className="text-red-500">Error cargando información del perfil.</div>
 
     return (
+        <>
         <div className="max-w-2xl">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">Perfil Personal</h1>
@@ -350,5 +351,6 @@ export const ProfileSettings: React.FC = () => {
                     </div>
                 </div>
             )}
+        </>
     )
 }
