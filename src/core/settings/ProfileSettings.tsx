@@ -171,6 +171,9 @@ export const ProfileSettings: React.FC = () => {
             }
             // Set avatar_url to null in profile
             await supabase.from('profiles').update({ avatar_url: null }).eq('id', currentUser.id)
+            // Update store so header avatar refreshes instantly
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'U')}&size=128&background=e0e7ff&color=4f46e5&bold=true`
+            setCurrentUser({ ...currentUser, avatarUrl: defaultAvatar, avatarThumbUrl: defaultAvatar })
             queryClient.invalidateQueries({ queryKey: ['profile'] })
             setSuccessMsg('Foto eliminada')
             setTimeout(() => setSuccessMsg(''), 3000)
