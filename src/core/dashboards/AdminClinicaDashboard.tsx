@@ -14,7 +14,7 @@ export const AdminClinicaDashboard: React.FC = () => {
         queryKey: ['leads-admin', clinicaId],
         queryFn: async () => {
             // leads table has no clinica_id — RLS scopes by clinic automatically
-            const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(500);
+            const { data, error } = await supabase.from('leads').select('id, name, status, source, service, stage_id, assigned_to, sucursal_id, created_at').order('created_at', { ascending: false }).limit(500);
             if (error) throw error;
             return data;
         }
@@ -24,7 +24,7 @@ export const AdminClinicaDashboard: React.FC = () => {
         queryKey: ['pipeline_stages', clinicaId],
         queryFn: async () => {
             if (!clinicaId) return [];
-            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', clinicaId);
+            const { data } = await supabase.from('pipeline_stages').select('id, name, color, sort_order, resolution_type, board_type, clinica_id').eq('clinica_id', clinicaId);
             return data || [];
         },
         enabled: !!clinicaId
@@ -33,7 +33,7 @@ export const AdminClinicaDashboard: React.FC = () => {
     const { data: appointments = [] } = useQuery({
         queryKey: ['appointments-admin', clinicaId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('appointments').select('*').limit(500);
+            const { data, error } = await supabase.from('appointments').select('id, status, sucursal_id, assigned_to, appointment_date, created_at').limit(500);
             if (error) throw error;
             return data;
         }
@@ -43,7 +43,7 @@ export const AdminClinicaDashboard: React.FC = () => {
         queryKey: ['services', clinicaId],
         queryFn: async () => {
             if (!clinicaId) return [];
-            const { data, error } = await supabase.from('services').select('*').eq('clinica_id', clinicaId);
+            const { data, error } = await supabase.from('services').select('id, name, price, clinica_id').eq('clinica_id', clinicaId);
             if (error) throw error;
             return data;
         },

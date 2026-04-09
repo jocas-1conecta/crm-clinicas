@@ -3,6 +3,7 @@ import { LucideBriefcase, LucidePlus, LucideStethoscope, LucideX, LucideUser } f
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
+import { PhoneInput } from '../../components/PhoneInput'
 
 export const CatalogsManagement = () => {
     const { currentUser } = useStore()
@@ -210,8 +211,12 @@ export const CatalogsManagement = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                                        <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none"
-                                            value={docForm.phone} onChange={e => setDocForm({ ...docForm, phone: e.target.value })} />
+                                        <PhoneInput
+                                            value={docForm.phone}
+                                            onChange={(v) => setDocForm({ ...docForm, phone: v })}
+                                            size="sm"
+                                            id="catalog-doctor-phone"
+                                        />
                                     </div>
                                     <button onClick={handleSaveDoctor} disabled={addDoctorMutation.isPending} className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4 disabled:opacity-50">
                                         {addDoctorMutation.isPending ? 'Guardando...' : 'Guardar Doctor'}

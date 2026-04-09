@@ -13,12 +13,9 @@ function useApiKey() {
         queryFn: async () => {
             if (!currentUser?.clinica_id) return null
             const { data, error } = await supabase
-                .from('clinicas')
-                .select('timelines_ai_api_key')
-                .eq('id', currentUser.clinica_id)
-                .single()
+                .rpc('get_timelines_api_key')
             if (error) throw error
-            return (data?.timelines_ai_api_key as string | null) ?? null
+            return (data as string | null) ?? null
         },
         enabled: !!currentUser?.clinica_id,
         staleTime: 5 * 60 * 1000,

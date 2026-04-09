@@ -3,6 +3,7 @@ import { LucidePlus, LucideStethoscope, LucideX, LucideUser, LucideUsers2 } from
 import { useStore } from '../../store/useStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
+import { PhoneInput } from '../../components/PhoneInput'
 
 export const TeamManagementPage = () => {
     const { currentUser } = useStore()
@@ -118,8 +119,12 @@ export const TeamManagementPage = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                                <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent text-sm"
-                                    value={docForm.phone} onChange={e => setDocForm({ ...docForm, phone: e.target.value })} />
+                                <PhoneInput
+                                    value={docForm.phone}
+                                    onChange={(v) => setDocForm({ ...docForm, phone: v })}
+                                    size="sm"
+                                    id="team-doctor-phone"
+                                />
                             </div>
                             <button onClick={handleSaveDoctor} disabled={addDoctorMutation.isPending}
                                 className="w-full bg-clinical-600 hover:bg-clinical-700 text-white font-medium py-3 rounded-xl mt-4 disabled:opacity-50 transition-colors">

@@ -21,7 +21,7 @@ export const AppointmentsPipeline = () => {
         queryKey: ['appointments', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId).limit(2000);
+            const { data, error } = await supabase.from('appointments').select('id, patient_name, name, phone, email, service, service_name, doctor_name, stage_id, assigned_to, sucursal_id, date, appointment_date, appointment_time, status, created_at').eq('sucursal_id', branchId).limit(2000);
             if (error) throw error;
             return data;
         },

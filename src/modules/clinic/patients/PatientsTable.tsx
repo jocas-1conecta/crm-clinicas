@@ -29,7 +29,7 @@ export const PatientsTable = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('patients')
-                .select('*')
+                .select('id, name, phone, email, age, status, tags, assigned_to, sucursal_id, last_visit, created_at')
                 .order('created_at', { ascending: false })
                 .limit(5000)
             if (error) throw error

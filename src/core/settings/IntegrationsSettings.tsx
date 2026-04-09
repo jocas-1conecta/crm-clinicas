@@ -14,8 +14,9 @@ import {
     LucideExternalLink,
 } from 'lucide-react'
 
-interface ClinicaIntegrations {
-    timelines_ai_api_key: string | null
+interface TenantKeyStatus {
+    hasKey: boolean
+    currentKey: string | null
 }
 
 export const IntegrationsSettings: React.FC = () => {
@@ -27,39 +28,37 @@ export const IntegrationsSettings: React.FC = () => {
     const [isVerifying, setIsVerifying] = useState(false)
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
-    const { data: tenant, isLoading } = useQuery<ClinicaIntegrations | null>({
+    const { data: tenant, isLoading } = useQuery<TenantKeyStatus | null>({
         queryKey: ['tenant_integrations', currentUser?.clinica_id],
         queryFn: async () => {
             if (!currentUser?.clinica_id) return null
-            const { data, error } = await supabase
-                .from('clinicas')
-                .select('timelines_ai_api_key')
-                .eq('id', currentUser.clinica_id)
-                .single()
-            if (error) throw error
-            return data as ClinicaIntegrations
+            // Check if key exists
+            const { data: hasKey } = await supabase.rpc('has_timelines_api_key')
+            // Get the actual key for the input field
+            const { data: currentKey } = await supabase.rpc('get_timelines_api_key')
+            return { hasKey: !!hasKey, currentKey: currentKey as string | null }
         },
         enabled: !!currentUser?.clinica_id,
     })
 
     // Initialize the api key from tenant data when it loads
     React.useEffect(() => {
-        if (tenant?.timelines_ai_api_key) {
-            setApiKey(tenant.timelines_ai_api_key)
+        if (tenant?.currentKey && tenant.currentKey !== '***ENCRYPTED***') {
+            setApiKey(tenant.currentKey)
         }
-    }, [tenant?.timelines_ai_api_key])
+    }, [tenant?.currentKey])
 
     const saveMutation = useMutation({
         mutationFn: async (key: string) => {
             if (!currentUser?.clinica_id) throw new Error('No tenant id')
-            const { error } = await supabase
-                .from('clinicas')
-                .update({ timelines_ai_api_key: key || null })
-                .eq('id', currentUser.clinica_id)
+            const { error } = await supabase.rpc('set_timelines_api_key', {
+                p_key: key || null
+            })
             if (error) throw error
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenant_integrations', currentUser?.clinica_id] })
+            queryClient.invalidateQueries({ queryKey: ['timelines_api_key', currentUser?.clinica_id] })
             setSuccessMsg('API Key guardada correctamente')
             setTimeout(() => setSuccessMsg(''), 4000)
         }
@@ -78,8 +77,8 @@ export const IntegrationsSettings: React.FC = () => {
         setIsVerifying(false)
     }
 
-    const hasKey = !!tenant?.timelines_ai_api_key
-    const isPristine = apiKey === (tenant?.timelines_ai_api_key || '')
+    const hasKey = !!tenant?.hasKey
+    const isPristine = apiKey === (tenant?.currentKey || '')
 
     return (
         <div className="max-w-2xl">

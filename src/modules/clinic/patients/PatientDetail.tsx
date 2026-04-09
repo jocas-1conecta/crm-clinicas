@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../services/supabase'
 import { EntityTasks } from '../../../components/tasks/EntityTasks'
 import { useClinicTags, useEntityTags, useAddEntityTag, useRemoveEntityTag } from '../../../hooks/useClinicTags'
+import { PhoneInput } from '../../../components/PhoneInput'
 import {
     LucideX,
     LucidePhone,
@@ -57,7 +58,7 @@ export const PatientDetail = () => {
     const { data: patient } = useQuery({
         queryKey: ['patient', patientId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('patients').select('*').eq('id', patientId!).single()
+            const { data, error } = await supabase.from('patients').select('id, name, phone, email, age, status, assigned_to, sucursal_id, source, last_visit, converted_from_lead_id, created_at').eq('id', patientId!).single()
             if (error) throw error
             return data
         },
@@ -67,7 +68,7 @@ export const PatientDetail = () => {
     const { data: deals = [] } = useQuery({
         queryKey: ['deals', patientId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('deals').select('*').eq('patient_id', patientId!)
+            const { data, error } = await supabase.from('deals').select('id, title, patient_id, estimated_value, status, stage_id, assigned_to, closed_at, created_at').eq('patient_id', patientId!)
             if (error) throw error
             return data
         },
@@ -79,7 +80,7 @@ export const PatientDetail = () => {
         queryFn: async () => {
             if (!clinicaId) return []
             const { data, error } = await supabase.from('pipeline_stages')
-                .select('*').eq('clinica_id', clinicaId).eq('board_type', 'deals').is('is_archived', false).order('sort_order', { ascending: true })
+                .select('id, name, sort_order, is_default, is_archived, resolution_type, clinica_id, board_type').eq('clinica_id', clinicaId).eq('board_type', 'deals').is('is_archived', false).order('sort_order', { ascending: true })
             if (error) throw error
             return data
         },
@@ -90,7 +91,7 @@ export const PatientDetail = () => {
         queryKey: ['patient_appointments', patientId],
         queryFn: async () => {
             const { data, error } = await supabase.from('appointments')
-                .select('*').eq('patient_id', patientId!).order('appointment_date', { ascending: false })
+                .select('id, patient_id, appointment_date, appointment_time, status, doctor_name, service_name, specialty, sucursal_id, assigned_to, created_at').eq('patient_id', patientId!).order('appointment_date', { ascending: false })
             if (error) throw error
             return data
         },
@@ -101,7 +102,7 @@ export const PatientDetail = () => {
         queryKey: ['patient_completed_tasks', patientId],
         queryFn: async () => {
             const { data, error } = await supabase.from('crm_tasks')
-                .select('*').eq('patient_id', patientId!).eq('is_completed', true)
+                .select('id, title, task_type, is_completed, completed_at, created_at').eq('patient_id', patientId!).eq('is_completed', true)
                 .order('completed_at', { ascending: false }).limit(50)
             if (error) throw error
             return data
@@ -281,7 +282,14 @@ export const PatientDetail = () => {
                     {/* Editable Fields */}
                     <div className="px-6 py-5 space-y-4 flex-1">
                         <Field label="Teléfono" icon={LucidePhone}>
-                            <EditableText value={patient.phone || ''} field="phone" saving={savingField} onSave={handleFieldChange} />
+                            <PhoneInput
+                                value={patient.phone || ''}
+                                onChange={() => {}}
+                                onBlur={(v) => { if (v !== (patient.phone || '')) handleFieldChange('phone', v) }}
+                                size="sm"
+                                id="patient-phone"
+                            />
+                            {savingField === 'phone' && <SavingIndicator />}
                         </Field>
                         <Field label="Email" icon={LucideMail}>
                             <EditableText value={patient.email || ''} field="email" saving={savingField} onSave={handleFieldChange} />

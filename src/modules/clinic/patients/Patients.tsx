@@ -19,7 +19,7 @@ export const Patients = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('patients')
-                .select('*')
+                .select('id, name, phone, email, age, status, tags, assigned_to, last_visit, created_at')
                 .order('created_at', { ascending: false });
             if (error) throw error;
             return data;

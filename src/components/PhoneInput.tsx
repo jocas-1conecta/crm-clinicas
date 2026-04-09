@@ -226,12 +226,15 @@ const CountryCodeDropdown: React.FC<{
 
     const selectedCountry = COUNTRY_CODES.find(c => c.code === value)
 
+    // Strip accents for search: "peru" matches "Perú"
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
     // Filter countries by search query
     const filtered = useMemo(() => {
         if (!search.trim()) return SORTED_CODES
-        const q = search.toLowerCase().replace('+', '')
+        const q = normalize(search.replace('+', ''))
         return SORTED_CODES.filter(c =>
-            c.name.toLowerCase().includes(q) ||
+            normalize(c.name).includes(q) ||
             c.code.replace('+', '').includes(q) ||
             c.iso.toLowerCase().includes(q)
         )

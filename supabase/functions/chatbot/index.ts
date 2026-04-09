@@ -1,7 +1,8 @@
 // Chatbot AI — Supabase Edge Function
 // Securely proxies requests to Gemini API with full context from DB.
-// Deploy: supabase functions deploy chatbot --no-verify-jwt
-// Set secret: supabase secrets set GEMINI_API_KEY=AIzaSyCciAurFwWRHP4lmrFhNi3s4mu8jnHRv4w
+// Deploy: supabase functions deploy chatbot
+// Set secret: supabase secrets set GEMINI_API_KEY=<your-key-here>
+// NEVER commit API keys to source code!
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -188,22 +189,48 @@ serve(async (req: Request) => {
       })
     }
 
+    // ── Security: Validate clinica_id format (prevent injection) ──
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_REGEX.test(clinica_id) || !UUID_REGEX.test(conversation_id)) {
+      return new Response(JSON.stringify({ error: 'Invalid ID format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Use service role to access all data
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // 1. Get chatbot config
+    // 1. Get chatbot config — MUST be active
     const { data: config } = await supabase
       .from('chatbot_config')
-      .select('*')
+      .select('bot_name, personality_prompt, greeting_message, fallback_message, is_active')
       .eq('clinica_id', clinica_id)
+      .eq('is_active', true)
       .single()
 
     if (!config) {
-      return new Response(JSON.stringify({ error: 'Chatbot not configured for this clinic' }), {
+      // Generic error to prevent clinica_id enumeration
+      return new Response(JSON.stringify({ error: 'Service unavailable' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2. Validate conversation belongs to this clinic (prevent cross-tenant)
+    const { data: conversation } = await supabase
+      .from('chatbot_conversations')
+      .select('id')
+      .eq('id', conversation_id)
+      .eq('clinica_id', clinica_id)
+      .single()
+
+    if (!conversation) {
+      return new Response(JSON.stringify({ error: 'Invalid conversation' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

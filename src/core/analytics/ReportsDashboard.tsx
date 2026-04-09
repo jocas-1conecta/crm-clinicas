@@ -38,7 +38,7 @@ const SuperAdminReports = ({ currentUser }: { currentUser: any }) => {
     const { data: clinics = [] } = useQuery({
         queryKey: ['clinics-admin'],
         queryFn: async () => {
-            const { data, error } = await supabase.from('clinicas').select('*');
+            const { data, error } = await supabase.from('clinicas').select('id, name, status, plan, created_at');
             if (error) throw error;
             return data;
         }
@@ -106,7 +106,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: branches = [] } = useQuery({
         queryKey: ['branches', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('sucursales').select('*').eq('clinica_id', clinicId)
+            const { data, error } = await supabase.from('sucursales').select('id, name, clinica_id').eq('clinica_id', clinicId)
             if (error) throw error
             return data
         },
@@ -117,7 +117,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
         queryKey: ['leads-admin', clinicId],
         queryFn: async () => {
             // leads table has no clinica_id — RLS scopes by clinic automatically
-            const { data, error } = await supabase.from('leads').select('*').limit(1000)
+            const { data, error } = await supabase.from('leads').select('id, name, status, sucursal_id, assigned_to, created_at').limit(1000)
             if (error) throw error
             return data
         }
@@ -126,7 +126,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: appointments = [] } = useQuery({
         queryKey: ['appointments-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('appointments').select('*').limit(1000)
+            const { data, error } = await supabase.from('appointments').select('id, status, sucursal_id, assigned_to, created_at').limit(1000)
             if (error) throw error
             return data
         }
@@ -135,7 +135,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: team = [] } = useQuery({
         queryKey: ['team', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('profiles').select('*').eq('clinica_id', clinicId)
+            const { data, error } = await supabase.from('profiles').select('id, name, email, role, avatar_url, clinica_id, is_active').eq('clinica_id', clinicId)
             if (error) throw error
             return data
         },
@@ -145,7 +145,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: patients = [] } = useQuery({
         queryKey: ['patients-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('patients').select('*').limit(1000)
+            const { data, error } = await supabase.from('patients').select('id, name, assigned_to, sucursal_id, created_at').limit(1000)
             if (error) throw error
             return data
         }
@@ -154,7 +154,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
     const { data: deals = [] } = useQuery({
         queryKey: ['deals-admin', clinicId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('deals').select('*').limit(1000)
+            const { data, error } = await supabase.from('deals').select('id, title, patient_id, estimated_value, status, stage_id, assigned_to, created_at').limit(1000)
             if (error) throw error
             return data
         }
@@ -165,7 +165,7 @@ const ClinicAdminReports = ({ currentUser }: any) => {
         queryFn: async () => {
             if (!clinicId) return [];
             const { data, error } = await supabase.from('pipeline_stages')
-                .select('*').eq('clinica_id', clinicId).eq('board_type', 'deals').is('is_archived', false);
+                .select('id, name, sort_order, resolution_type, board_type').eq('clinica_id', clinicId).eq('board_type', 'deals').is('is_archived', false);
             if (error) throw error;
             return data;
         },
@@ -278,7 +278,7 @@ const AdvisorReports = ({ currentUser }: any) => {
         queryKey: ['leads', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('leads').select('*').eq('sucursal_id', branchId);
+            const { data, error } = await supabase.from('leads').select('id, name, status, sucursal_id, assigned_to, created_at').eq('sucursal_id', branchId);
             if (error) throw error;
             return data;
         },
@@ -289,7 +289,7 @@ const AdvisorReports = ({ currentUser }: any) => {
         queryKey: ['appointments', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('appointments').select('*').eq('sucursal_id', branchId);
+            const { data, error } = await supabase.from('appointments').select('id, status, sucursal_id, assigned_to, created_at').eq('sucursal_id', branchId);
             if (error) throw error;
             return data;
         },
@@ -300,7 +300,7 @@ const AdvisorReports = ({ currentUser }: any) => {
         queryKey: ['patients', branchId],
         queryFn: async () => {
             if (!branchId) return [];
-            const { data, error } = await supabase.from('patients').select('*').eq('assigned_to', currentUser.id);
+            const { data, error } = await supabase.from('patients').select('id, name, assigned_to, sucursal_id, created_at').eq('assigned_to', currentUser.id);
             if (error) throw error;
             return data;
         },
@@ -316,7 +316,7 @@ const AdvisorReports = ({ currentUser }: any) => {
             const pIds = pData.map(p => p.id);
             if (pIds.length === 0) return [];
 
-            const { data, error } = await supabase.from('deals').select('*').in('patient_id', pIds);
+            const { data, error } = await supabase.from('deals').select('id, title, patient_id, estimated_value, status, stage_id, assigned_to, created_at').in('patient_id', pIds);
             if (error) throw error;
             return data;
         },
@@ -328,7 +328,7 @@ const AdvisorReports = ({ currentUser }: any) => {
         queryFn: async () => {
             if (!currentUser?.clinica_id) return [];
             const { data, error } = await supabase.from('pipeline_stages')
-                .select('*').eq('clinica_id', currentUser.clinica_id).eq('board_type', 'deals').is('is_archived', false);
+                .select('id, name, sort_order, resolution_type, board_type').eq('clinica_id', currentUser.clinica_id).eq('board_type', 'deals').is('is_archived', false);
             if (error) throw error;
             return data;
         },

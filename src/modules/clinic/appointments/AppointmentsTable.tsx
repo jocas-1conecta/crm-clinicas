@@ -30,7 +30,7 @@ export const AppointmentsTable = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('appointments')
-                .select('*')
+                .select('id, patient_name, name, phone, email, service, stage_id, assigned_to, date, appointment_date, appointment_time, created_at')
                 .order('created_at', { ascending: false })
                 .limit(5000)
             if (error) throw error
@@ -44,7 +44,7 @@ export const AppointmentsTable = () => {
         queryFn: async () => {
             const { data } = await supabase
                 .from('pipeline_stages')
-                .select('*')
+                .select('id, name, color, sort_order, resolution_type, board_type')
                 .eq('clinica_id', clinicaId!)
                 .eq('board_type', 'appointments')
                 .order('sort_order')
