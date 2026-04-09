@@ -39,7 +39,7 @@ export const LeadsTable = () => {
         queryFn: async () => {
             let query = supabase
                 .from('leads')
-                .select('*')
+                .select('id, name, phone, email, status, source, service, stage_id, substage_id, assigned_to, sucursal_id, is_converted, created_at')
                 .or('is_converted.is.null,is_converted.eq.false')
                 .order('created_at', { ascending: false })
                 .limit(5000)
@@ -62,7 +62,7 @@ export const LeadsTable = () => {
         queryFn: async () => {
             const { data } = await supabase
                 .from('pipeline_stages')
-                .select('*')
+                .select('id, name, color, sort_order, is_default, is_archived, resolution_type, board_type')
                 .eq('clinica_id', clinicaId!)
                 .eq('board_type', 'leads')
                 .order('sort_order')
@@ -361,7 +361,7 @@ export const LeadsTable = () => {
                                         className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${selectedIds.has(lead.id) ? 'bg-clinical-50/40' : ''}`}
                                         onClick={() => navigate(`/leads/${lead.id}`)}
                                     >
-                                        <td className="px-3 py-3" onClick={e => { e.stopPropagation(); toggleSelect(lead.id) }}>
+                                        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.has(lead.id)}
