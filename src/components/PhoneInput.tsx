@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 
 /* ─────────────────────────────────────────────────────────────
    COUNTRY_CODES — Complete world list with emoji flags
@@ -182,12 +182,11 @@ export const COUNTRY_CODES = [
 ]
 
 /* ─────────────────────────────────────────────────────────────
-   Helpers — parse stored phone like "+57 3001234567"
+   Helpers
    ───────────────────────────────────────────────────────────── */
 export function parsePhone(stored: string | null | undefined): { code: string; number: string } {
     if (!stored) return { code: '+57', number: '' }
     const trimmed = stored.trim()
-    // Match +XX(X)(X) followed by optional space and digits
     const match = trimmed.match(/^(\+\d{1,4})\s*(.*)/)
     if (match) return { code: match[1], number: match[2] }
     return { code: '+57', number: trimmed }
@@ -199,19 +198,125 @@ export function combinePhone(code: string, number: string): string {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   LATAM-first sorted list — puts Latin America on top
+   LATAM-first sorted list
    ───────────────────────────────────────────────────────────── */
 const LATAM_ISO = new Set([
     'CO', 'MX', 'US', 'AR', 'CL', 'PE', 'ES', 'EC', 'PA', 'CR',
     'VE', 'BR', 'GT', 'SV', 'HN', 'NI', 'CU', 'BO', 'PY', 'UY',
-    'DO', 'CA', 'PR',
+    'DO', 'CA',
 ])
 
 const SORTED_CODES = [
     ...COUNTRY_CODES.filter(c => LATAM_ISO.has(c.iso)),
-    { code: '', iso: 'SEP', flag: '', name: '──────────────' },
     ...COUNTRY_CODES.filter(c => !LATAM_ISO.has(c.iso)),
 ]
+
+/* ─────────────────────────────────────────────────────────────
+   Searchable Country Code Dropdown
+   ───────────────────────────────────────────────────────────── */
+const CountryCodeDropdown: React.FC<{
+    value: string
+    onChange: (code: string) => void
+    size: 'sm' | 'md'
+}> = ({ value, onChange, size }) => {
+    const [open, setOpen] = useState(false)
+    const [search, setSearch] = useState('')
+    const containerRef = useRef<HTMLDivElement>(null)
+    const searchInputRef = useRef<HTMLInputElement>(null)
+
+    const selectedCountry = COUNTRY_CODES.find(c => c.code === value)
+
+    // Filter countries by search query
+    const filtered = useMemo(() => {
+        if (!search.trim()) return SORTED_CODES
+        const q = search.toLowerCase().replace('+', '')
+        return SORTED_CODES.filter(c =>
+            c.name.toLowerCase().includes(q) ||
+            c.code.replace('+', '').includes(q) ||
+            c.iso.toLowerCase().includes(q)
+        )
+    }, [search])
+
+    // Close on outside click
+    useEffect(() => {
+        if (!open) return
+        const handleClick = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false)
+                setSearch('')
+            }
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [open])
+
+    // Focus search input when dropdown opens
+    useEffect(() => {
+        if (open) setTimeout(() => searchInputRef.current?.focus(), 50)
+    }, [open])
+
+    const handleSelect = useCallback((code: string) => {
+        onChange(code)
+        setOpen(false)
+        setSearch('')
+    }, [onChange])
+
+    const btnCls = size === 'sm' ? 'py-1.5 text-xs' : 'py-2 text-sm'
+
+    return (
+        <div ref={containerRef} className="relative shrink-0">
+            {/* Trigger Button */}
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className={`flex items-center gap-1.5 px-2.5 ${btnCls} bg-gray-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:ring-2 focus:ring-clinical-500 outline-none transition-all cursor-pointer w-[110px]`}
+            >
+                <span className="text-base leading-none">{selectedCountry?.flag || '🌐'}</span>
+                <span className="font-medium text-gray-800">{value}</span>
+                <svg className={`w-3 h-3 ml-auto text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {/* Dropdown */}
+            {open && (
+                <div className="absolute top-full left-0 mt-1 w-[260px] bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    {/* Search Input */}
+                    <div className="p-2 border-b border-gray-100">
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder="Buscar país o código..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-clinical-500 outline-none placeholder:text-gray-400"
+                        />
+                    </div>
+
+                    {/* List — max 5 visible rows */}
+                    <div className="max-h-[200px] overflow-y-auto">
+                        {filtered.length === 0 ? (
+                            <div className="px-4 py-3 text-xs text-gray-400 text-center">Sin resultados</div>
+                        ) : (
+                            filtered.map(c => (
+                                <button
+                                    key={c.iso}
+                                    type="button"
+                                    onClick={() => handleSelect(c.code)}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-clinical-50 transition-colors text-left ${c.code === value ? 'bg-clinical-50/60 font-semibold' : ''}`}
+                                >
+                                    <span className="text-base leading-none shrink-0">{c.flag}</span>
+                                    <span className="text-gray-800 truncate flex-1">{c.name}</span>
+                                    <span className="text-gray-400 text-xs font-mono shrink-0">{c.code}</span>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
 
 /* ─────────────────────────────────────────────────────────────
    PhoneInput Component
@@ -219,10 +324,10 @@ const SORTED_CODES = [
 interface PhoneInputProps {
     value: string           // stored as "+57 3001234567"
     onChange: (combined: string) => void
-    onBlur?: (combined: string) => void  // fires on blur — use for DB saves
+    onBlur?: (combined: string) => void
     label?: string
     placeholder?: string
-    size?: 'sm' | 'md'      // sm = compact for modals, md = default
+    size?: 'sm' | 'md'
     className?: string
     id?: string
 }
@@ -241,7 +346,6 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     const [code, setCode] = useState(parsed.code)
     const [number, setNumber] = useState(parsed.number)
 
-    // Sync from external value changes
     useEffect(() => {
         const p = parsePhone(value)
         setCode(p.code)
@@ -250,7 +354,9 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
     const handleCodeChange = (newCode: string) => {
         setCode(newCode)
-        onChange(combinePhone(newCode, number))
+        const combined = combinePhone(newCode, number)
+        onChange(combined)
+        onBlur?.(combined)
     }
 
     const handleNumberChange = (raw: string) => {
@@ -259,14 +365,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         onChange(combinePhone(code, clean))
     }
 
-    const selectedCountry = COUNTRY_CODES.find(c => c.code === code)
-
-    const inputCls = size === 'sm'
-        ? 'px-3 py-2 text-sm'
-        : 'px-4 py-2 text-sm'
-    const selectCls = size === 'sm'
-        ? 'px-2 py-2 text-xs'
-        : 'px-2 py-2 text-sm'
+    const inputCls = size === 'sm' ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'
 
     return (
         <div className={className}>
@@ -276,24 +375,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
                 </label>
             )}
             <div className="flex gap-1.5">
-                <div className="relative shrink-0">
-                    <select
-                        value={code}
-                        onChange={(e) => handleCodeChange(e.target.value)}
-                        className={`w-[120px] bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all cursor-pointer appearance-none ${selectCls}`}
-                        style={{ paddingLeft: '2rem' }}
-                    >
-                        {SORTED_CODES.map((c, i) =>
-                            c.iso === 'SEP'
-                                ? <option key={`sep-${i}`} disabled>──────────</option>
-                                : <option key={c.iso} value={c.code}>{c.flag} {c.code} {c.name}</option>
-                        )}
-                    </select>
-                    {/* Flag overlay on the left of the select */}
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-base pointer-events-none">
-                        {selectedCountry?.flag || '🌐'}
-                    </span>
-                </div>
+                <CountryCodeDropdown value={code} onChange={handleCodeChange} size={size} />
                 <input
                     id={id}
                     type="tel"
