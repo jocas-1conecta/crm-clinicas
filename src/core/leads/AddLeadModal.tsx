@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
 import { LucideX, LucideUserPlus, LucideLoader2 } from 'lucide-react'
+import { PhoneInput } from '../../components/PhoneInput'
 
 interface AddLeadModalProps {
     open: boolean
@@ -115,26 +116,26 @@ export const AddLeadModal = ({ open, onClose }: AddLeadModalProps) => {
                         />
                     </div>
 
-                    {/* Phone + Email row */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Teléfono</label>
-                            <input
-                                type="tel"
-                                placeholder="+57 300 123 4567"
-                                value={form.phone} onChange={e => update('phone', e.target.value)}
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
-                            <input
-                                type="email"
-                                placeholder="correo@ejemplo.com"
-                                value={form.email} onChange={e => update('email', e.target.value)}
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none"
-                            />
-                        </div>
+                    {/* Phone */}
+                    <div>
+                        <PhoneInput
+                            label="Teléfono"
+                            value={form.phone}
+                            onChange={(v) => update('phone', v)}
+                            size="sm"
+                            id="add-lead-phone"
+                        />
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
+                        <input
+                            type="email"
+                            placeholder="correo@ejemplo.com"
+                            value={form.email} onChange={e => update('email', e.target.value)}
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-clinical-500 outline-none"
+                        />
                     </div>
 
                     {/* Source + Service row */}

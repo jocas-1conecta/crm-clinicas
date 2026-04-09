@@ -6,6 +6,7 @@ import { supabase } from '../../services/supabase'
 import { EntityTasks } from '../../components/tasks/EntityTasks'
 import { useClinicTags, useEntityTags, useAddEntityTag, useRemoveEntityTag } from '../../hooks/useClinicTags'
 import { useChatByPhone, useChatMessages, useSendMessage, useChatRealtime, useCreateNewConversation } from '../chat/useTimelinesAI'
+import { PhoneInput } from '../../components/PhoneInput'
 import {
     LucideX,
     LucidePhone,
@@ -52,7 +53,7 @@ export const LeadDetail = () => {
     const { data: lead } = useQuery({
         queryKey: ['lead', leadId],
         queryFn: async () => {
-            const { data, error } = await supabase.from('leads').select('*').eq('id', leadId!).single()
+            const { data, error } = await supabase.from('leads').select('id, name, phone, email, status, source, service, stage_id, substage_id, stage_entered_at, assigned_to, sucursal_id, is_converted, converted_at, closed_at, sale_value, lost_reason, created_at').eq('id', leadId!).single()
             if (error) throw error
             return data
         },
@@ -62,7 +63,7 @@ export const LeadDetail = () => {
     const { data: stages = [] } = useQuery({
         queryKey: ['pipeline_stages_leads', currentUser?.clinica_id],
         queryFn: async () => {
-            const { data } = await supabase.from('pipeline_stages').select('*').eq('clinica_id', currentUser!.clinica_id).eq('board_type', 'leads').order('sort_order')
+            const { data } = await supabase.from('pipeline_stages').select('id, name, color, sort_order, is_default, is_archived, resolution_type, clinica_id, board_type').eq('clinica_id', currentUser!.clinica_id).eq('board_type', 'leads').order('sort_order')
             return data || []
         },
         enabled: !!currentUser?.clinica_id
@@ -339,7 +340,14 @@ export const LeadDetail = () => {
                                 <EditableText value={lead.email || ''} field="email" saving={savingField} onSave={handleFieldChange} />
                             </Field>
                             <Field label="Teléfono" icon={LucidePhone}>
-                                <EditableText value={lead.phone || ''} field="phone" saving={savingField} onSave={handleFieldChange} />
+                                <PhoneInput
+                                    value={lead.phone || ''}
+                                    onChange={() => {}}
+                                    onBlur={(v) => { if (v !== (lead.phone || '')) handleFieldChange('phone', v) }}
+                                    size="sm"
+                                    id="lead-phone"
+                                />
+                                {savingField === 'phone' && <SavingIndicator />}
                             </Field>
                             <Field label="Estado (Etapa)" icon={LucideTag}>
                                 <select
