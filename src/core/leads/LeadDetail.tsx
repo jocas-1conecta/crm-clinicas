@@ -188,6 +188,7 @@ export const LeadDetail = () => {
     // ── Convert to Patient ──
     const convertToPatientMutation = useMutation({
         mutationFn: async () => {
+            if (!lead) throw new Error('Lead not loaded')
             // Create patient linked to original lead
             const { error: insertError } = await supabase.from('patients').insert([{
                 name: lead.name,
