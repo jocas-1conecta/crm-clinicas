@@ -64,11 +64,40 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // ── Resolve clinica_id from the webhook secret or API key mapping ──
+    // Each clinic has its own Timelines AI account, so we resolve which
+    // clinic this webhook belongs to. If only one clinic uses Timelines AI,
+    // this still works correctly.
+    //
+    // Strategy: match by the account info in the webhook payload
+    // Fallback: if only one clinic has Timelines AI configured, use that one
+    let resolvedClinicaId: string | null = null
+
+    const accountId = String((payload as Record<string, unknown>)?.account_id ?? '')
+    if (accountId) {
+      // Future: map account_id → clinica_id via a mapping table
+      // For now, find the clinic whose timelines key is configured
+    }
+
+    // Find clinic(s) with Timelines AI configured
+    const { data: clinicas } = await supabase
+      .from('clinicas')
+      .select('id')
+      .or('timelines_ai_api_key_enc.not.is.null,timelines_ai_api_key.not.is.null')
+
+    if (clinicas && clinicas.length === 1) {
+      resolvedClinicaId = clinicas[0].id
+    } else if (clinicas && clinicas.length > 1) {
+      // Multiple clinics — log warning, skip auto-create to prevent cross-tenant
+      console.warn(`⚠️ Multiple clinics (${clinicas.length}) have Timelines AI configured. Cannot auto-resolve. Set up account_id mapping.`)
+    }
+
     const { error: insertError } = await supabase.from('chat_webhook_events').insert({
       event_type: eventType,
       chat_id: chatId,
       message_uid: messageUid || null,
       payload: payload,
+      clinica_id: resolvedClinicaId,
     })
 
     if (insertError) {
@@ -79,9 +108,9 @@ serve(async (req: Request) => {
     }
 
     // ─── Auto-create lead or deal on new incoming message ───────────────
-    if (eventType === 'message:received:new') {
+    if (eventType === 'message:received:new' && resolvedClinicaId) {
       try {
-        await autoCreateLeadOrDeal(supabase, payload)
+        await autoCreateLeadOrDeal(supabase, payload, resolvedClinicaId)
       } catch (autoErr) {
         // Log but don't fail the webhook — the event is already saved
         console.error('Auto-create error:', autoErr)
@@ -100,11 +129,42 @@ serve(async (req: Request) => {
   }
 })
 
+// ─── Resolve responsible user from Timelines AI → CRM profile ─────────────────
+
+async function resolveResponsible(
+  supabase: ReturnType<typeof createClient>,
+  chat: Record<string, unknown>,
+  clinicaId: string
+): Promise<string | null> {
+  // Timelines AI includes responsible_email in the chat object
+  const responsibleEmail = String(chat.responsible_email ?? '').trim().toLowerCase()
+  if (!responsibleEmail) return null
+
+  // Look up this email in our profiles table (same clinic)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', responsibleEmail)
+    .eq('clinica_id', clinicaId)
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+
+  if (profile?.id) {
+    console.log(`✓ Responsible resolved: ${responsibleEmail} → ${profile.id}`)
+    return profile.id
+  }
+
+  console.log(`⚠ Responsible email ${responsibleEmail} not found in profiles for clinic ${clinicaId}`)
+  return null
+}
+
 // ─── Auto-creation logic ──────────────────────────────────────────────────────
 
 async function autoCreateLeadOrDeal(
   supabase: ReturnType<typeof createClient>,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  clinicaId: string
 ) {
   const chat = payload.chat as Record<string, unknown> | undefined
   if (!chat) return
@@ -118,22 +178,10 @@ async function autoCreateLeadOrDeal(
   const displayPhone = formatPhone(rawPhone)
   const contactName = String(chat.full_name ?? chat.name ?? displayPhone)
 
-  // 1. Resolve clinica_id — find the clinic that has Timelines AI configured
-  const { data: clinica } = await supabase
-    .from('clinicas')
-    .select('id')
-    .not('timelines_ai_api_key', 'is', null)
-    .limit(1)
-    .single()
+  // Resolve the Timelines AI responsible → CRM user
+  const assignedTo = await resolveResponsible(supabase, chat, clinicaId)
 
-  if (!clinica?.id) {
-    console.log('No clinica with timelines_ai_api_key found, skipping auto-create')
-    return
-  }
-
-  const clinicaId = clinica.id
-
-  // 2. Get the first sucursal for this clinic (needed for leads)
+  // 1. Get the first sucursal for this clinic (needed for leads)
   const { data: sucursal } = await supabase
     .from('sucursales')
     .select('id')
@@ -184,19 +232,22 @@ async function autoCreateLeadOrDeal(
 
     const stageId = defaultStage?.id ?? null
 
+    // Use Timelines AI responsible if available, otherwise patient's existing assignee
+    const dealAssignee = assignedTo ?? patient.assigned_to ?? null
+
     const { error: dealError } = await supabase.from('deals').insert({
       title: `Oportunidad WhatsApp — ${patient.name}`,
       patient_id: patient.id,
       estimated_value: 0,
       status: 'Nueva oportunidad',
       stage_id: stageId,
-      assigned_to: patient.assigned_to ?? null,
+      assigned_to: dealAssignee,
     })
 
     if (dealError) {
       console.error('Error creating deal:', JSON.stringify(dealError))
     } else {
-      console.log(`✓ Deal created for patient ${patient.id} (${patient.name})`)
+      console.log(`✓ Deal created for patient ${patient.id} (${patient.name}) → assigned: ${dealAssignee}`)
     }
   } else {
     // ─── Unknown number → Create a lead ───────────────────────────────
@@ -233,12 +284,13 @@ async function autoCreateLeadOrDeal(
       sucursal_id: sucursalId,
       stage_id: stageId,
       stage_entered_at: new Date().toISOString(),
+      assigned_to: assignedTo,
     })
 
     if (leadError) {
       console.error('Error creating lead:', JSON.stringify(leadError))
     } else {
-      console.log(`✓ Lead created for ${contactName} (${displayPhone})`)
+      console.log(`✓ Lead created for ${contactName} (${displayPhone}) → assigned: ${assignedTo}`)
     }
   }
 }
