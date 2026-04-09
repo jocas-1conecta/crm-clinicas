@@ -25,13 +25,26 @@ export const ProfileSettings: React.FC = () => {
     })
 
     const [name, setName] = useState('')
-    const [phone, setPhone] = useState('')
+    const [phoneCode, setPhoneCode] = useState('+57')
+    const [phoneNumber, setPhoneNumber] = useState('')
     const [timezone, setTimezone] = useState('America/Bogota')
 
+    // Parse stored phone into code + number
     useEffect(() => {
         if (profile) {
             setName(profile.name || '')
-            setPhone(profile.phone || '')
+            if (profile.phone) {
+                const match = profile.phone.match(/^(\+\d{1,3})\s*(.*)/)
+                if (match) {
+                    setPhoneCode(match[1])
+                    setPhoneNumber(match[2])
+                } else {
+                    setPhoneNumber(profile.phone)
+                }
+            } else {
+                setPhoneCode('+57')
+                setPhoneNumber('')
+            }
             setTimezone(profile.timezone || 'America/Bogota')
         }
     }, [profile])
@@ -57,6 +70,8 @@ export const ProfileSettings: React.FC = () => {
         }
     })
 
+    const phone = phoneNumber ? `${phoneCode} ${phoneNumber}` : ''
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         updateMutation.mutate({ name, phone, timezone })
@@ -65,6 +80,30 @@ export const ProfileSettings: React.FC = () => {
     const isPristine = name === (profile?.name || '') &&
                        phone === (profile?.phone || '') &&
                        timezone === (profile?.timezone || 'America/Bogota')
+
+    const COUNTRY_CODES = [
+        { code: '+57', flag: '🇨🇴', name: 'Colombia' },
+        { code: '+52', flag: '🇲🇽', name: 'México' },
+        { code: '+1', flag: '🇺🇸', name: 'EE.UU. / Canadá' },
+        { code: '+54', flag: '🇦🇷', name: 'Argentina' },
+        { code: '+56', flag: '🇨🇱', name: 'Chile' },
+        { code: '+51', flag: '🇵🇪', name: 'Perú' },
+        { code: '+34', flag: '🇪🇸', name: 'España' },
+        { code: '+593', flag: '🇪🇨', name: 'Ecuador' },
+        { code: '+507', flag: '🇵🇦', name: 'Panamá' },
+        { code: '+506', flag: '🇨🇷', name: 'Costa Rica' },
+        { code: '+58', flag: '🇻🇪', name: 'Venezuela' },
+        { code: '+55', flag: '🇧🇷', name: 'Brasil' },
+        { code: '+502', flag: '🇬🇹', name: 'Guatemala' },
+        { code: '+503', flag: '🇸🇻', name: 'El Salvador' },
+        { code: '+504', flag: '🇭🇳', name: 'Honduras' },
+        { code: '+505', flag: '🇳🇮', name: 'Nicaragua' },
+        { code: '+53', flag: '🇨🇺', name: 'Cuba' },
+        { code: '+591', flag: '🇧🇴', name: 'Bolivia' },
+        { code: '+595', flag: '🇵🇾', name: 'Paraguay' },
+        { code: '+598', flag: '🇺🇾', name: 'Uruguay' },
+        { code: '+809', flag: '🇩🇴', name: 'Rep. Dominicana' },
+    ]
 
     // Compress image using Canvas API — no external libraries needed
     const compressImage = (file: File, maxSize: number, quality = 0.8): Promise<Blob> => {
@@ -214,14 +253,25 @@ export const ProfileSettings: React.FC = () => {
                             
                             <div>
                                 <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700 mb-1">Teléfono Móvil</label>
-                                <input
-                                    id="profile-phone"
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all"
-                                    placeholder="+57 "
-                                />
+                                <div className="flex gap-2">
+                                    <select
+                                        value={phoneCode}
+                                        onChange={(e) => setPhoneCode(e.target.value)}
+                                        className="w-[140px] shrink-0 px-2 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all text-sm"
+                                    >
+                                        {COUNTRY_CODES.map(c => (
+                                            <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        id="profile-phone"
+                                        type="tel"
+                                        value={phoneNumber}
+                                        onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                                        className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:ring-2 focus:ring-clinical-500 focus:border-transparent outline-none transition-all"
+                                        placeholder="3001234567"
+                                    />
+                                </div>
                             </div>
 
                             <div>
