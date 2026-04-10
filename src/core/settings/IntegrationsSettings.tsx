@@ -226,7 +226,8 @@ const TimelinesConfigView: React.FC<{
             return getWhatsAppAccounts(key)
         },
         enabled: !!tenant?.hasKey,
-        staleTime: 60_000,
+        staleTime: 5 * 60_000,  // Cache 5 min — avoids redundant API calls on navigation
+        gcTime: 10 * 60_000,
         retry: 1,
     })
 
@@ -461,10 +462,23 @@ const TimelinesConfigView: React.FC<{
                             </p>
                             <div className="ml-8 space-y-3">
                                 {isLoadingAccounts ? (
-                                    <div className="flex items-center gap-2 text-sm text-gray-500 py-3">
-                                        <LucideLoader2 className="w-4 h-4 animate-spin" />
-                                        Cargando números conectados...
-                                    </div>
+                                    accountId ? (
+                                        <div className="flex items-center gap-3 p-3 rounded-xl border border-clinical-200 bg-clinical-50">
+                                            <div className="w-10 h-10 rounded-lg bg-clinical-100 flex items-center justify-center shrink-0">
+                                                <LucideSmartphone className="w-5 h-5 text-clinical-600" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-sm font-semibold text-clinical-800">Número vinculado</span>
+                                                <p className="text-[11px] text-gray-500 font-mono truncate">{accountId}</p>
+                                            </div>
+                                            <LucideLoader2 className="w-4 h-4 animate-spin text-gray-400 shrink-0" />
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-sm text-gray-500 py-3">
+                                            <LucideLoader2 className="w-4 h-4 animate-spin" />
+                                            Cargando números conectados...
+                                        </div>
+                                    )
                                 ) : whatsappAccounts && whatsappAccounts.length > 0 ? (() => {
                                     const activeAccounts = whatsappAccounts.filter(a => isAccountActive(a.status))
                                     const hasActiveAccounts = activeAccounts.length > 0
