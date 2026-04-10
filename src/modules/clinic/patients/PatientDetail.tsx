@@ -55,7 +55,7 @@ export const PatientDetail = () => {
     const goBack = () => navigate('/pacientes')
 
     /* ── Data ────────────────────────────────────────── */
-    const { data: patient } = useQuery({
+    const { data: patient, isLoading: patientLoading, isError: patientError } = useQuery({
         queryKey: ['patient', patientId],
         queryFn: async () => {
             const { data, error } = await supabase.from('patients').select('id, name, phone, email, age, status, assigned_to, sucursal_id, source, last_visit, converted_from_lead_id, created_at').eq('id', patientId!).single()
@@ -63,6 +63,7 @@ export const PatientDetail = () => {
             return data
         },
         enabled: !!patientId,
+        retry: 2,
     })
 
     const { data: deals = [] } = useQuery({
@@ -186,10 +187,28 @@ export const PatientDetail = () => {
 
 
 
-    if (!patient) {
+    if (patientLoading) {
         return (
             <div className="h-full flex items-center justify-center">
                 <LucideLoader2 className="w-8 h-8 text-clinical-400 animate-spin" />
+            </div>
+        )
+    }
+
+    if (patientError || !patient) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center gap-4 p-8">
+                <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                    <LucideX className="w-8 h-8 text-red-400" />
+                </div>
+                <div className="text-center">
+                    <h2 className="text-lg font-bold text-gray-900 mb-1">Paciente no encontrado</h2>
+                    <p className="text-sm text-gray-500">No se pudo cargar la información del paciente. Es posible que haya sido eliminado o no tengas acceso.</p>
+                </div>
+                <button onClick={goBack} className="mt-2 px-6 py-2.5 bg-clinical-600 text-white rounded-xl text-sm font-bold hover:bg-clinical-700 transition-colors flex items-center gap-2">
+                    <LucideChevronLeft className="w-4 h-4" />
+                    Volver a Pacientes
+                </button>
             </div>
         )
     }
