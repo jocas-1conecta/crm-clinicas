@@ -39,72 +39,64 @@ DROP POLICY IF EXISTS "crm_tasks_by_lead" ON public.crm_tasks;
 DROP POLICY IF EXISTS "crm_tasks_by_patient" ON public.crm_tasks;
 -- Keep platform_owner policy (already correct)
 
--- ─── 3. Admin policies (Super_Admin + Admin_Clinica) ─────────
--- Full access to ALL tasks within their clinic, via sucursal
-CREATE POLICY "crm_tasks_admin_by_sucursal" ON public.crm_tasks
+-- ─── 3. Unified Admin policy (Super_Admin + Admin_Clinica) ───
+-- Full access to ALL tasks within their clinic, via ANY linkage
+CREATE POLICY "crm_tasks_admin_access" ON public.crm_tasks
   FOR ALL TO authenticated
   USING (
     public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NOT NULL
-    AND sucursal_id IN (
-      SELECT s.id FROM public.sucursales s
-      WHERE s.clinica_id = public.get_user_clinica_id()
+    AND (
+      -- Tasks linked via sucursal
+      (sucursal_id IS NOT NULL AND sucursal_id IN (
+        SELECT s.id FROM public.sucursales s
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      -- Tasks linked via lead (no sucursal)
+      (lead_id IS NOT NULL AND lead_id IN (
+        SELECT l.id FROM public.leads l
+        JOIN public.sucursales s ON s.id = l.sucursal_id
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      -- Tasks linked via patient (no sucursal)
+      (patient_id IS NOT NULL AND patient_id IN (
+        SELECT p.id FROM public.patients p
+        JOIN public.sucursales s ON s.id = p.sucursal_id
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      -- Catch-all: tasks assigned to any team member within this clinic
+      (assigned_to IS NOT NULL AND assigned_to IN (
+        SELECT pr.id FROM public.profiles pr
+        WHERE pr.clinica_id = public.get_user_clinica_id()
+      ))
     )
   )
   WITH CHECK (
     public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NOT NULL
-    AND sucursal_id IN (
-      SELECT s.id FROM public.sucursales s
-      WHERE s.clinica_id = public.get_user_clinica_id()
-    )
-  );
-
--- Admin: tasks linked to leads (no sucursal_id)
-CREATE POLICY "crm_tasks_admin_by_lead" ON public.crm_tasks
-  FOR ALL TO authenticated
-  USING (
-    public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NULL
-    AND lead_id IS NOT NULL
-    AND lead_id IN (
-      SELECT l.id FROM public.leads l
-      JOIN public.sucursales s ON s.id = l.sucursal_id
-      WHERE s.clinica_id = public.get_user_clinica_id()
-    )
-  )
-  WITH CHECK (
-    public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NULL
-    AND lead_id IS NOT NULL
-    AND lead_id IN (
-      SELECT l.id FROM public.leads l
-      JOIN public.sucursales s ON s.id = l.sucursal_id
-      WHERE s.clinica_id = public.get_user_clinica_id()
-    )
-  );
-
--- Admin: tasks linked to patients (no sucursal_id)
-CREATE POLICY "crm_tasks_admin_by_patient" ON public.crm_tasks
-  FOR ALL TO authenticated
-  USING (
-    public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NULL
-    AND patient_id IS NOT NULL
-    AND patient_id IN (
-      SELECT p.id FROM public.patients p
-      JOIN public.sucursales s ON s.id = p.sucursal_id
-      WHERE s.clinica_id = public.get_user_clinica_id()
-    )
-  )
-  WITH CHECK (
-    public.get_user_role() IN ('Super_Admin', 'Admin_Clinica')
-    AND sucursal_id IS NULL
-    AND patient_id IS NOT NULL
-    AND patient_id IN (
-      SELECT p.id FROM public.patients p
-      JOIN public.sucursales s ON s.id = p.sucursal_id
-      WHERE s.clinica_id = public.get_user_clinica_id()
+    AND (
+      (sucursal_id IS NOT NULL AND sucursal_id IN (
+        SELECT s.id FROM public.sucursales s
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      (lead_id IS NOT NULL AND lead_id IN (
+        SELECT l.id FROM public.leads l
+        JOIN public.sucursales s ON s.id = l.sucursal_id
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      (patient_id IS NOT NULL AND patient_id IN (
+        SELECT p.id FROM public.patients p
+        JOIN public.sucursales s ON s.id = p.sucursal_id
+        WHERE s.clinica_id = public.get_user_clinica_id()
+      ))
+      OR
+      (assigned_to IS NOT NULL AND assigned_to IN (
+        SELECT pr.id FROM public.profiles pr
+        WHERE pr.clinica_id = public.get_user_clinica_id()
+      ))
     )
   );
 
