@@ -193,9 +193,9 @@ const EmptyState = ({ icon: Icon, title, subtitle, action }: {
 // ─── Chat List Panel ─────────────────────────────────────────────────────────
 
 const STATUS_TABS = [
-    { key: 'all',    label: 'Todos' },
     { key: 'open',   label: 'Abiertos' },
     { key: 'closed', label: 'Cerrados' },
+    { key: 'all',    label: 'Todos' },
 ] as const
 
 const TYPE_PILLS = [
@@ -1163,7 +1163,7 @@ export const ChatModule: React.FC = () => {
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
     // Filter state
-    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
+    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('open')
     const [typeFilter, setTypeFilter]     = useState<'all' | 'direct' | 'group'>('all')
 
     const {
