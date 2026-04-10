@@ -106,10 +106,11 @@ export function useChats(options: {
     const [accumulatedChats, setAccumulatedChats] = useState<api.TimelinesChat[]>([])
     const [hasMore, setHasMore] = useState(false)
 
-    const queryKey = ['timelines_chats', apiKey, options.status, options.chatType, page]
+    // Stable queryKey — page is NOT included so cache survives tab switches
+    const queryKey = ['timelines_chats', apiKey, options.status, options.chatType]
 
     const query = useQuery({
-        queryKey,
+        queryKey: [...queryKey, page],
         queryFn: async () => {
             const result = await api.getChats(apiKey!, {
                 status: options.status,
@@ -130,8 +131,10 @@ export function useChats(options: {
             return result
         },
         enabled: !!apiKey,
-        staleTime: 30_000,       // Don't refetch for 30s — prevents redundant calls on tab switches
-        refetchInterval: 60_000, // Background refresh every 60s
+        staleTime: 60_000,         // Data stays fresh for 60s — no refetch on tab switch
+        gcTime: 10 * 60 * 1000,   // Keep cache for 10min even after unmount
+        refetchInterval: 60_000,   // Background refresh every 60s
+        refetchOnWindowFocus: false, // Don't refetch when switching browser tabs
         retry: 1,
     })
 
@@ -163,8 +166,10 @@ export function useChatMessages(chatId: string | null) {
         queryKey: ['timelines_messages', apiKey, chatId],
         queryFn: () => api.getChatMessages(apiKey!, chatId!),
         enabled: !!apiKey && !!chatId,
-        staleTime: 10_000,       // Don't refetch for 10s — realtime handles most updates
-        refetchInterval: 15_000, // Fallback poll every 15s
+        staleTime: 10_000,         // Don't refetch for 10s — realtime handles most updates
+        gcTime: 5 * 60 * 1000,    // Keep message cache for 5min after unmount
+        refetchInterval: 15_000,   // Fallback poll every 15s
+        refetchOnWindowFocus: false,
         retry: 1,
     })
 }

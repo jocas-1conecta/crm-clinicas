@@ -189,9 +189,9 @@ export async function getChats(
   if (chatType === 'direct') params.set('group', 'false')
   if (chatType === 'group')  params.set('group', 'true')
 
-  // Show unread chats by default → API returns them sorted by recent activity
-  // with last_message_timestamp populated. For 'closed' tab, skip this filter.
-  if (status !== 'closed') params.set('read', 'false')
+  // NOTE: Do NOT set read=false here — that filter hides already-read chats,
+  // causing the list to appear empty intermittently. We want ALL chats regardless
+  // of read status. The API returns chats sorted by recent activity by default.
 
   const url = `${BASE_URL}/chats?${params.toString()}`
   const response = await fetch(url, {
