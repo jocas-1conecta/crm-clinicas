@@ -401,26 +401,41 @@ const ChatListPanel = ({
                     </div>
                 )}
 
-                {filtered.map(chat => (
+                {filtered.map(chat => {
+                    const isUnassigned = !chat.chat_assignee
+
+                    return (
                     <button
                         key={chat.id}
                         onClick={() => onSelect(chat)}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left ${selectedId === chat.id ? 'bg-white/10' : ''}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left relative ${selectedId === chat.id ? 'bg-white/10' : ''} ${isUnassigned ? 'chat-unassigned-glow' : ''}`}
                     >
                         {/* Avatar */}
                         <div className="relative shrink-0">
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white font-bold text-base">
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base ${isUnassigned ? 'bg-gradient-to-br from-lime-400 to-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-gradient-to-br from-emerald-400 to-teal-600'}`}>
                                 {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
                             </div>
                             {(chat.unread_count ?? 0) > 0 && (
                                 <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900" />
+                            )}
+                            {isUnassigned && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-lime-400 rounded-full border-2 border-[#1a1f2e] flex items-center justify-center animate-pulse">
+                                    <span className="text-[7px] font-black text-gray-900">✦</span>
+                                </div>
                             )}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-white truncate">{chat.name || chat.phone}</p>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <p className="text-sm font-semibold text-white truncate">{chat.name || chat.phone}</p>
+                                    {isUnassigned && (
+                                        <span className="shrink-0 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-lime-400/20 text-lime-300 rounded-full border border-lime-400/30">
+                                            Nuevo
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-[10px] text-gray-500 ml-2 shrink-0">
                                     {formatTime(chat.last_message_time)}
                                 </span>
@@ -428,7 +443,8 @@ const ChatListPanel = ({
                             <p className="text-xs text-gray-400 truncate mt-0.5">{chat.last_message || 'Sin mensajes'}</p>
                         </div>
                     </button>
-                ))}
+                    )
+                })}
 
                 {/* Load more button */}
                 {hasMore && (

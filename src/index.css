@@ -13,3 +13,27 @@
     @apply bg-clinical-600 hover:bg-clinical-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-sm;
   }
 }
+
+/* ── Unassigned chat glow (dark sidebar) ─────────────────────────── */
+.chat-unassigned-glow {
+  background: linear-gradient(135deg, rgba(163, 230, 53, 0.06) 0%, rgba(16, 185, 129, 0.04) 100%);
+  border-left: 2px solid rgba(163, 230, 53, 0.5);
+  animation: chat-glow-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes chat-glow-pulse {
+  0%, 100% { border-left-color: rgba(163, 230, 53, 0.3); }
+  50% { border-left-color: rgba(163, 230, 53, 0.7); }
+}
+
+/* ── Unassigned kanban card glow (light board) ───────────────────── */
+.kanban-unassigned-glow {
+  border: 1.5px solid rgba(74, 222, 128, 0.5) !important;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.15), 0 0 4px rgba(74, 222, 128, 0.1);
+  animation: kanban-glow-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes kanban-glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(74, 222, 128, 0.1), 0 0 2px rgba(74, 222, 128, 0.08); }
+  50% { box-shadow: 0 0 16px rgba(74, 222, 128, 0.25), 0 0 6px rgba(74, 222, 128, 0.15); }
+}

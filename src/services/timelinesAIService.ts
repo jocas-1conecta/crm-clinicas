@@ -122,6 +122,7 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
     // Map API fields → UI convenience fields
     last_message: lastMsg || undefined,
     last_message_time: String(raw.last_message_timestamp ?? raw.last_message_time ?? ''),
+    created_timestamp: String(raw.created_timestamp ?? raw.created_at ?? ''),
     chat_status: raw.closed ? 'closed' : 'open',
     chat_assignee: String(raw.responsible_name ?? raw.chat_assignee ?? '') || null,
     whatsapp_account_phone: (() => {
@@ -248,6 +249,7 @@ export async function getChats(
   }
 
   // Sort chats by last_message_time descending → most recent conversations first
+  // Fallback to created_timestamp when no messages exist
   chats.sort((a, b) => {
     const parseTime = (t: string | undefined): number => {
       if (!t) return 0
@@ -257,7 +259,9 @@ export async function getChats(
       const d = new Date(t).getTime()
       return isNaN(d) ? 0 : d
     }
-    return parseTime(b.last_message_time) - parseTime(a.last_message_time)
+    const timeA = parseTime(a.last_message_time) || parseTime(a.created_timestamp)
+    const timeB = parseTime(b.last_message_time) || parseTime(b.created_timestamp)
+    return timeB - timeA
   })
 
   return {

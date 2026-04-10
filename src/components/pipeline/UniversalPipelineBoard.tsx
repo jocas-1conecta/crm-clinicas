@@ -350,6 +350,7 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                     
                     const recordSubstage = substages.find(s => s.id === record.substage_id);
                     let isStagnant = false;
+                    const isUnassigned = !record.assigned_to;
                     
                     if (recordSubstage?.sla_hours && record.stage_entered_at) {
                         const entered = new Date(record.stage_entered_at).getTime();
@@ -378,11 +379,16 @@ const VirtualColumn = ({ records, col, substages, handleMove, convertLeadToPatie
                                 height: `${virtualRow.size - 12}px`, 
                                 transform: `translateY(${virtualRow.start}px)`,
                             }}
-                            className={`bg-white p-4 rounded-xl shadow-sm border ${isStagnant ? 'border-red-400 shadow-red-100/50' : 'border-gray-100'} hover:shadow-md transition-shadow flex flex-col cursor-pointer`}
+                            className={`bg-white p-4 rounded-xl shadow-sm border ${isStagnant ? 'border-red-400 shadow-red-100/50' : isUnassigned ? 'kanban-unassigned-glow' : 'border-gray-100'} hover:shadow-md transition-shadow flex flex-col cursor-pointer`}
                         >
                             {isStagnant && (
                                 <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg" title="¡SLA Vencido! Estancado">
                                     <LucideAlertTriangle className="w-4 h-4" />
+                                </div>
+                            )}
+                            {isUnassigned && !isStagnant && (
+                                <div className="absolute -top-2 -right-2 bg-lime-400 text-gray-900 px-2 py-0.5 rounded-full shadow-lg text-[8px] font-black uppercase tracking-wider animate-pulse" title="Sin asignar — disponible">
+                                    ✦ Nuevo
                                 </div>
                             )}
 
