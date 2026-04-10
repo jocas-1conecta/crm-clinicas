@@ -486,7 +486,7 @@ export const PatientDetail = () => {
                         {/* ── Tasks Tab ── */}
                         {activeTab === 'tasks' && (
                             <div className="p-8">
-                                <EntityTasks entityType="patient" entityId={patientId!} entityPhone={patient.phone} />
+                                <EntityTasks entityType="patient" entityId={patientId!} entityPhone={patient.phone} convertedFromLeadId={patient.converted_from_lead_id} />
                             </div>
                         )}
 

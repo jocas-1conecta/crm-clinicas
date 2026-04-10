@@ -184,12 +184,39 @@ export const COUNTRY_CODES = [
 /* ─────────────────────────────────────────────────────────────
    Helpers
    ───────────────────────────────────────────────────────────── */
+/**
+ * Parse a stored phone like "+57 3001234567" or "+5214772306771" into { code, number }.
+ * Uses longest-match strategy: tries the longest country codes first
+ * so "+1868..." matches Trinidad (+1868) before US (+1).
+ */
 export function parsePhone(stored: string | null | undefined): { code: string; number: string } {
     if (!stored) return { code: '+57', number: '' }
     const trimmed = stored.trim()
+
+    // Must start with +
+    if (!trimmed.startsWith('+')) return { code: '+57', number: trimmed.replace(/[^0-9]/g, '') }
+
+    // Build sorted codes list: longest first for greedy matching
+    const sortedCodes = [...COUNTRY_CODES]
+        .map(c => c.code)
+        .filter((v, i, a) => a.indexOf(v) === i) // dedupe
+        .sort((a, b) => b.length - a.length)      // longest first
+
+    // Strip all non-digit after the +, but keep the + for matching
+    const digits = trimmed.replace(/[^\d+]/g, '')
+
+    for (const code of sortedCodes) {
+        if (digits.startsWith(code)) {
+            const rest = digits.slice(code.length).replace(/[^0-9]/g, '')
+            return { code, number: rest }
+        }
+    }
+
+    // Fallback: try the regex approach
     const match = trimmed.match(/^(\+\d{1,4})\s*(.*)/)
-    if (match) return { code: match[1], number: match[2] }
-    return { code: '+57', number: trimmed }
+    if (match) return { code: match[1], number: match[2].replace(/[^0-9]/g, '') }
+
+    return { code: '+57', number: trimmed.replace(/[^0-9]/g, '') }
 }
 
 export function combinePhone(code: string, number: string): string {

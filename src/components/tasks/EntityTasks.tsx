@@ -35,9 +35,10 @@ interface EntityTasksProps {
     entityType: 'lead' | 'patient'
     entityId: string
     entityPhone?: string  // Pre-fill for llamada type
+    convertedFromLeadId?: string | null  // For patients: also fetch tasks from original lead
 }
 
-export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksProps) => {
+export const EntityTasks = ({ entityType, entityId, entityPhone, convertedFromLeadId }: EntityTasksProps) => {
     const { currentUser } = useStore()
     const queryClient = useQueryClient()
     const [showForm, setShowForm] = useState(false)
@@ -69,8 +70,18 @@ export const EntityTasks = ({ entityType, entityId, entityPhone }: EntityTasksPr
 
     // ─── Queries ──────────────────────────────────────────────
     const { data: tasks = [] } = useQuery({
-        queryKey: ['entity_tasks', entityType, entityId],
+        queryKey: ['entity_tasks', entityType, entityId, convertedFromLeadId],
         queryFn: async () => {
+            // For patients converted from leads: fetch tasks from BOTH patient AND original lead
+            if (entityType === 'patient' && convertedFromLeadId) {
+                const { data, error } = await supabase.from('crm_tasks')
+                    .select('*')
+                    .or(`patient_id.eq.${entityId},lead_id.eq.${convertedFromLeadId}`)
+                    .order('due_date', { ascending: true });
+                if (error) throw error;
+                return data as CrmTask[];
+            }
+            // Normal case: single entity
             const { data, error } = await supabase.from('crm_tasks')
                 .select('*')
                 .eq(entityColumn, entityId)
