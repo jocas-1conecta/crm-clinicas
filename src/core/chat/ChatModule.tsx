@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
-import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote } from './useTimelinesAI'
+import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote, useAssignedPhones } from './useTimelinesAI'
 import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -1145,6 +1145,9 @@ export const ChatModule: React.FC = () => {
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
+    // For asesores: get assigned lead/patient phones to filter chats
+    const { phones: assignedPhones, isLoading: phonesLoading } = useAssignedPhones()
+
     // Filter state
     const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all')
     const [typeFilter, setTypeFilter]     = useState<'all' | 'direct' | 'group'>('all')
@@ -1158,6 +1161,17 @@ export const ChatModule: React.FC = () => {
         loadMore,
         resetAndRefetch,
     } = useChats({ status: statusFilter, chatType: typeFilter })
+
+    // Filter chats: admins see all, asesores only see chats from their assigned leads/patients
+    const visibleChats = React.useMemo(() => {
+        // null = no filter (admin) or still loading
+        if (assignedPhones === null) return chats
+        return chats.filter(chat => {
+            if (!chat.phone) return false
+            const normalised = chat.phone.replace(/[^\d]/g, '')
+            return assignedPhones.has(normalised)
+        })
+    }, [chats, assignedPhones])
 
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
@@ -1196,7 +1210,7 @@ export const ChatModule: React.FC = () => {
             style={{ height: 'calc(100vh - 128px)' }}
         >
             <ChatListPanel
-                chats={chats}
+                chats={visibleChats}
                 selectedId={selectedChat?.id ?? null}
                 onSelect={(chat) => {
                     setSelectedChat(chat)

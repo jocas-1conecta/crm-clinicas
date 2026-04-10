@@ -1,10 +1,67 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
 import * as api from '../../services/timelinesAIService'
 
+// ── Assigned phones (for asesor-level chat filtering) ─────────────────────────
+
+/** Normalise a phone to digits-only for reliable comparison */
+function normalisePhone(phone: string): string {
+    return phone.replace(/[^\d]/g, '')  // strip +, spaces, dashes
+}
+
+/**
+ * Returns a Set of normalised phone numbers from leads + patients
+ * assigned to the current user. Used to filter chats for asesores.
+ * For Admin roles this returns null (= no filter, show all chats).
+ */
+export function useAssignedPhones() {
+    const { currentUser } = useStore()
+    const isAdmin = ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'].includes(currentUser?.role ?? '')
+
+    const query = useQuery({
+        queryKey: ['assigned_phones', currentUser?.id],
+        queryFn: async () => {
+            const userId = currentUser!.id
+
+            // Fetch lead phones assigned to this user
+            const { data: leads } = await supabase
+                .from('leads')
+                .select('phone')
+                .eq('assigned_to', userId)
+
+            // Fetch patient phones assigned to this user
+            const { data: patients } = await supabase
+                .from('patients')
+                .select('phone')
+                .eq('assigned_to', userId)
+
+            const phones = new Set<string>()
+
+            for (const l of (leads ?? [])) {
+                if (l.phone) phones.add(normalisePhone(l.phone))
+            }
+            for (const p of (patients ?? [])) {
+                if (p.phone) phones.add(normalisePhone(p.phone))
+            }
+
+            return phones
+        },
+        enabled: !!currentUser?.id && !isAdmin,
+        staleTime: 2 * 60 * 1000,   // 2 min — leads don't change that often
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+    })
+
+    // For admins, return null = no filtering
+    if (isAdmin) return { phones: null as Set<string> | null, isLoading: false }
+
+    return { phones: query.data ?? null, isLoading: query.isLoading }
+}
+
 // ── API Key ───────────────────────────────────────────────────────────────────
+
 
 function useApiKey() {
     const { currentUser } = useStore()
