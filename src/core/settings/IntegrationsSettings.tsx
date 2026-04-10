@@ -12,12 +12,19 @@ import {
     LucideEyeOff,
     LucideLoader2,
     LucideExternalLink,
+    LucideCopy,
+    LucideCheck,
+    LucideWebhook,
+    LucideInfo,
 } from 'lucide-react'
 
 interface TenantKeyStatus {
     hasKey: boolean
     currentKey: string | null
 }
+
+/** Derive the webhook URL from the Supabase project URL */
+const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/timelines-webhook`
 
 export const IntegrationsSettings: React.FC = () => {
     const { currentUser } = useStore()
@@ -27,6 +34,7 @@ export const IntegrationsSettings: React.FC = () => {
     const [successMsg, setSuccessMsg] = useState('')
     const [isVerifying, setIsVerifying] = useState(false)
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle')
+    const [copiedField, setCopiedField] = useState<string | null>(null)
 
     const { data: tenant, isLoading } = useQuery<TenantKeyStatus | null>({
         queryKey: ['tenant_integrations', currentUser?.clinica_id],
@@ -37,6 +45,20 @@ export const IntegrationsSettings: React.FC = () => {
             // Get the actual key for the input field
             const { data: currentKey } = await supabase.rpc('get_timelines_api_key')
             return { hasKey: !!hasKey, currentKey: currentKey as string | null }
+        },
+        enabled: !!currentUser?.clinica_id,
+    })
+
+    // Fetch the timelines_account_id to show connection status
+    const { data: clinicData } = useQuery({
+        queryKey: ['clinic_timelines_account', currentUser?.clinica_id],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('clinicas')
+                .select('timelines_account_id')
+                .eq('id', currentUser!.clinica_id!)
+                .single()
+            return data
         },
         enabled: !!currentUser?.clinica_id,
     })
@@ -77,8 +99,15 @@ export const IntegrationsSettings: React.FC = () => {
         setIsVerifying(false)
     }
 
+    const handleCopy = (text: string, field: string) => {
+        navigator.clipboard.writeText(text)
+        setCopiedField(field)
+        setTimeout(() => setCopiedField(null), 2000)
+    }
+
     const hasKey = !!tenant?.hasKey
     const isPristine = apiKey === (tenant?.currentKey || '')
+    const webhookConnected = !!clinicData?.timelines_account_id
 
     return (
         <div className="max-w-2xl">
@@ -123,22 +152,27 @@ export const IntegrationsSettings: React.FC = () => {
                 </div>
 
                 {/* Card Body */}
-                <div className="p-6 space-y-5">
+                <div className="p-6 space-y-6">
                     <p className="text-sm text-gray-600">
                         Conecta tu cuenta de{' '}
                         <a href="https://app.timelines.ai" target="_blank" rel="noreferrer" className="text-clinical-600 hover:underline inline-flex items-center gap-1">
                             Timelines AI <LucideExternalLink className="w-3 h-3" />
                         </a>{' '}
                         para ver y responder tus chats de WhatsApp directamente desde el CRM.
-                        Obtén tu API Key en <strong>Timelines AI → Automations → API</strong>.
                     </p>
 
-                    {/* API Key Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            API Key (Bearer Token)
-                        </label>
-                        <div className="flex gap-2">
+                    {/* ─── Step 1: API Key ──────────────────────────────── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                            <label className="text-sm font-semibold text-gray-800">
+                                API Key (Bearer Token)
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 ml-8">
+                            Obtén tu API Key en <strong>Timelines AI → Automations → API</strong>.
+                        </p>
+                        <div className="flex gap-2 ml-8">
                             <div className="relative flex-1">
                                 <input
                                     type={showKey ? 'text' : 'password'}
@@ -169,17 +203,109 @@ export const IntegrationsSettings: React.FC = () => {
 
                         {/* Verification Status */}
                         {verifyStatus === 'success' && (
-                            <div className="mt-2 flex items-center gap-2 text-green-600 text-sm">
+                            <div className="mt-1 ml-8 flex items-center gap-2 text-green-600 text-sm">
                                 <LucideCheckCircle2 className="w-4 h-4" />
                                 <span>Conexión exitosa. La API Key es válida.</span>
                             </div>
                         )}
                         {verifyStatus === 'error' && (
-                            <div className="mt-2 flex items-center gap-2 text-red-500 text-sm">
+                            <div className="mt-1 ml-8 flex items-center gap-2 text-red-500 text-sm">
                                 <LucideAlertCircle className="w-4 h-4" />
                                 <span>No se pudo conectar. Verifica la API Key o revisa CORS (ver documentación).</span>
                             </div>
                         )}
+                    </div>
+
+                    {/* ─── Step 2: Webhook Configuration ──────────────── */}
+                    <div className="space-y-3 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                            <label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                                <LucideWebhook className="w-4 h-4 text-gray-500" />
+                                Configurar Webhook
+                            </label>
+                            {webhookConnected && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+                                    ✓ Vinculado
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500 ml-8">
+                            Configura el webhook en <strong>Timelines AI → Automations → Webhooks</strong> para recibir mensajes en tiempo real.
+                        </p>
+
+                        {/* Webhook URL */}
+                        <div className="ml-8 space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Webhook URL</label>
+                                <div className="flex gap-2">
+                                    <div className="flex-1 relative">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={WEBHOOK_URL}
+                                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl font-mono text-xs cursor-text select-all"
+                                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopy(WEBHOOK_URL, 'webhook')}
+                                        className="px-3 py-2.5 rounded-xl text-sm font-medium border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap flex items-center gap-1.5"
+                                    >
+                                        {copiedField === 'webhook' ? (
+                                            <><LucideCheck className="w-4 h-4 text-green-600" /> <span className="text-green-600 text-xs">Copiado</span></>
+                                        ) : (
+                                            <><LucideCopy className="w-4 h-4" /> <span className="text-xs">Copiar</span></>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Supported Events */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">Eventos a suscribir</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        'message.received.new',
+                                        'message.sent.new',
+                                        'chat.created',
+                                    ].map(evt => (
+                                        <span key={evt} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 text-[11px] font-mono">
+                                            {evt}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Setup Instructions */}
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                                <div className="flex items-start gap-2">
+                                    <LucideInfo className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                                    <div className="text-xs text-blue-800 space-y-1.5">
+                                        <p className="font-semibold">Pasos para configurar:</p>
+                                        <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                                            <li>Ir a <a href="https://app.timelines.ai/settings/webhooks" target="_blank" rel="noreferrer" className="underline font-medium">Timelines AI → Settings → Webhooks</a></li>
+                                            <li>Hacer clic en <strong>"Add webhook"</strong></li>
+                                            <li>Pegar la <strong>Webhook URL</strong> de arriba</li>
+                                            <li>Seleccionar los eventos: <strong>message.received.new</strong>, <strong>message.sent.new</strong>, <strong>chat.created</strong></li>
+                                            <li>Guardar y activar el webhook</li>
+                                        </ol>
+                                        <p className="text-blue-600 mt-2">
+                                            El sistema detectará automáticamente tu cuenta de Timelines AI al recibir el primer evento.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Account ID Status */}
+                            {webhookConnected && (
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                    <LucideCheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                                    <span>Account ID vinculado: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[11px]">{clinicData?.timelines_account_id}</code></span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Error from save */}
