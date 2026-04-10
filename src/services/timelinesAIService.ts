@@ -61,6 +61,16 @@ export interface TimelinesTemplate {
   category?: string
 }
 
+export interface WhatsAppAccount {
+  id: string
+  phone: string
+  status: string
+  owner_name: string
+  owner_email: string
+  account_name: string
+  connected_on: string
+}
+
 
 function authHeaders(apiKey: string) {
   return {
@@ -323,6 +333,28 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** Fetch all WhatsApp accounts connected to the Timelines AI workspace */
+export async function getWhatsAppAccounts(apiKey: string): Promise<WhatsAppAccount[]> {
+  const response = await fetch(`${BASE_URL}/whatsapp_accounts`, {
+    method: 'GET',
+    headers: authHeaders(apiKey),
+  })
+  if (!response.ok) {
+    throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
+  }
+  const json = await response.json()
+  const raw = extractArray<Record<string, unknown>>(json, 'whatsapp_accounts', 'data')
+  return raw.map(a => ({
+    id: String(a.id ?? ''),
+    phone: String(a.phone ?? ''),
+    status: String(a.status ?? ''),
+    owner_name: String(a.owner_name ?? ''),
+    owner_email: String(a.owner_email ?? ''),
+    account_name: String(a.account_name ?? ''),
+    connected_on: String(a.connected_on ?? ''),
+  }))
 }
 
 /** Update a chat — close/reopen or assign responsible */

@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore } from '../../store/useStore'
-import { verifyApiKey } from '../../services/timelinesAIService'
+import { verifyApiKey, getWhatsAppAccounts } from '../../services/timelinesAIService'
+import type { WhatsAppAccount } from '../../services/timelinesAIService'
 import {
     LucidePlugZap,
     LucideSave,
@@ -28,6 +29,7 @@ import {
     LucideLock,
     LucideArrowLeft,
     LucidePlay,
+    LucideSmartphone,
 } from 'lucide-react'
 
 /* ─────────────────── Types ─────────────────── */
@@ -203,6 +205,20 @@ const TimelinesConfigView: React.FC<{
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const [copiedField, setCopiedField] = useState<string | null>(null)
     const [webhookTests, setWebhookTests] = useState<Record<string, { status: WebhookTestStatus; response: string | null }>>({})
+    const [selectedAccountId, setSelectedAccountId] = useState<string>(accountId || '')
+
+    // Fetch WhatsApp accounts when we have a valid key
+    const { data: whatsappAccounts, isLoading: isLoadingAccounts, refetch: refetchAccounts } = useQuery<WhatsAppAccount[]>({
+        queryKey: ['timelines_whatsapp_accounts', tenant?.currentKey],
+        queryFn: async () => {
+            const key = apiKey.trim() || tenant?.currentKey
+            if (!key || key === '***ENCRYPTED***') return []
+            return getWhatsAppAccounts(key)
+        },
+        enabled: !!tenant?.hasKey,
+        staleTime: 60_000,
+        retry: 1,
+    })
 
     // Initialize api key from tenant
     React.useEffect(() => {
@@ -210,6 +226,10 @@ const TimelinesConfigView: React.FC<{
             setApiKey(tenant.currentKey)
         }
     }, [tenant?.currentKey])
+
+    React.useEffect(() => {
+        if (accountId) setSelectedAccountId(accountId)
+    }, [accountId])
 
     const saveMutation = useMutation({
         mutationFn: async (key: string) => {
@@ -232,7 +252,25 @@ const TimelinesConfigView: React.FC<{
         const valid = await verifyApiKey(apiKey.trim())
         setVerifyStatus(valid ? 'success' : 'error')
         setIsVerifying(false)
+        // Also fetch accounts if the key is valid
+        if (valid) refetchAccounts()
     }
+
+    const saveAccountMutation = useMutation({
+        mutationFn: async (waAccountId: string) => {
+            if (!currentUser?.clinica_id) throw new Error('No tenant id')
+            const { error } = await supabase
+                .from('clinicas')
+                .update({ timelines_account_id: waAccountId || null })
+                .eq('id', currentUser.clinica_id)
+            if (error) throw error
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clinic_timelines_account', currentUser?.clinica_id] })
+            setSuccessMsg('Número de WhatsApp vinculado correctamente')
+            setTimeout(() => setSuccessMsg(''), 4000)
+        },
+    })
 
     const handleCopy = (text: string, field: string) => {
         navigator.clipboard.writeText(text)
@@ -393,10 +431,108 @@ const TimelinesConfigView: React.FC<{
                         )}
                     </div>
 
-                    {/* ─── Step 2: Webhook ──────────────── */}
+                    {/* ─── Step 2: WhatsApp Account Selector ──────────────── */}
+                    {hasKey && (
+                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                            <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                                <label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                                    <LucideSmartphone className="w-4 h-4 text-gray-500" />
+                                    Número de WhatsApp
+                                </label>
+                                {selectedAccountId && accountId === selectedAccountId && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+                                        ✓ Vinculado
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500 ml-8">
+                                Selecciona a qué número conectado en Timelines AI corresponde esta clínica. Solo se procesarán los mensajes de este número.
+                            </p>
+                            <div className="ml-8 space-y-3">
+                                {isLoadingAccounts ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 py-3">
+                                        <LucideLoader2 className="w-4 h-4 animate-spin" />
+                                        Cargando números conectados...
+                                    </div>
+                                ) : whatsappAccounts && whatsappAccounts.length > 0 ? (
+                                    <>
+                                        <div className="space-y-2">
+                                            {whatsappAccounts.map(acc => {
+                                                const isSelected = selectedAccountId === acc.id
+                                                const isActive = acc.status === 'Active'
+                                                return (
+                                                    <button
+                                                        key={acc.id}
+                                                        type="button"
+                                                        onClick={() => setSelectedAccountId(acc.id)}
+                                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                                                            isSelected
+                                                                ? 'border-clinical-300 bg-clinical-50 ring-2 ring-clinical-200/50'
+                                                                : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                                            isSelected ? 'bg-clinical-100' : 'bg-gray-100'
+                                                        }`}>
+                                                            <LucideSmartphone className={`w-5 h-5 ${
+                                                                isSelected ? 'text-clinical-600' : 'text-gray-400'
+                                                            }`} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-sm font-semibold ${
+                                                                    isSelected ? 'text-clinical-800' : 'text-gray-800'
+                                                                }`}>
+                                                                    {acc.phone}
+                                                                </span>
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                                                    isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'
+                                                                }`}>
+                                                                    {acc.status}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[11px] text-gray-500 truncate">
+                                                                {acc.account_name || acc.owner_name} · {acc.owner_email}
+                                                            </p>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <LucideCheckCircle2 className="w-5 h-5 text-clinical-600 shrink-0" />
+                                                        )}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                        {selectedAccountId && selectedAccountId !== accountId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => saveAccountMutation.mutate(selectedAccountId)}
+                                                disabled={saveAccountMutation.isPending}
+                                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-clinical-600 text-white hover:bg-clinical-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                            >
+                                                {saveAccountMutation.isPending ? (
+                                                    <LucideLoader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <LucideCheck className="w-4 h-4" />
+                                                )}
+                                                Vincular este número
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2">
+                                        <LucideAlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                        <span>No se encontraron números conectados en tu cuenta de Timelines AI. Verifica que tu número de WhatsApp esté activo en el panel de Timelines AI.</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ─── Step 3: Webhook ──────────────── */}
                     <div className="space-y-3 pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                            <span className="w-6 h-6 rounded-full bg-clinical-100 text-clinical-700 text-xs font-bold flex items-center justify-center shrink-0">3</span>
                             <label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
                                 <LucideWebhook className="w-4 h-4 text-gray-500" />
                                 Configurar Webhook
