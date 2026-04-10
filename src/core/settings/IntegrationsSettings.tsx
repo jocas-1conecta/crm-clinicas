@@ -184,20 +184,6 @@ const WEBHOOK_EVENTS = [
             }
         },
     },
-    {
-        id: 'chat.created',
-        name: 'Chat Creado',
-        payload: {
-            event: 'chat.created',
-            data: {
-                id: 'test_chat_new_' + Date.now(),
-                name: 'Nuevo Paciente Test',
-                phone: '+573001234567',
-                account_id: 'test_account',
-                timestamp: Math.floor(Date.now() / 1000),
-            }
-        },
-    },
 ]
 
 /* ─────────────────── Timelines AI Full Config View ─────────────────── */
