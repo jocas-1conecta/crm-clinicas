@@ -163,11 +163,14 @@ export interface CrmTask {
     lead_id?: string;
     patient_id?: string;
     assigned_to?: string;
+    assigned_to_name?: string; // Joined from profiles, not in DB
     sucursal_id?: string;
     start_time?: string;
     end_time?: string;
+    notes?: string;
     extra_fields?: Record<string, any>;
     created_at?: string;
+    updated_at?: string;
 }
 
 // Legacy alias for backwards compatibility
