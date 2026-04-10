@@ -311,18 +311,49 @@ export async function searchChatByPhone(apiKey: string, phone: string): Promise<
   const cleanPhone = phone.replace(/[\s\-()]/g, '')
   if (!cleanPhone) return null
 
-  const params = new URLSearchParams({ phone: cleanPhone })
-  const response = await fetch(`${BASE_URL}/chats?${params.toString()}`, {
-    method: 'GET',
-    headers: authHeaders(apiKey),
-  })
+  // Extract just digits for flexible matching
+  const digits = cleanPhone.replace(/[^\d]/g, '')
+  const last10 = digits.length > 10 ? digits.slice(-10) : digits
 
-  if (!response.ok) return null
+  // Try with the original phone (includes +)
+  const trySearch = async (searchPhone: string): Promise<TimelinesChat | null> => {
+    const params = new URLSearchParams({ phone: searchPhone })
+    const response = await fetch(`${BASE_URL}/chats?${params.toString()}`, {
+      method: 'GET',
+      headers: authHeaders(apiKey),
+    })
+    if (!response.ok) return null
+    const json = await response.json()
+    const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
+    if (raw.length === 0) return null
+    return normaliseChat(raw[0])
+  }
 
-  const json = await response.json()
-  const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-  if (raw.length === 0) return null
-  return normaliseChat(raw[0])
+  // Try different formats: +573158166898, 573158166898, 3158166898
+  let result = await trySearch(cleanPhone)
+  if (result) return result
+
+  result = await trySearch(digits)
+  if (result) return result
+
+  if (last10 !== digits) {
+    result = await trySearch(last10)
+    if (result) return result
+  }
+
+  // Last resort: fetch recent chats and match by last 10 digits client-side
+  try {
+    const result2 = await getChats(apiKey)
+    const match = result2.chats.find((chat: TimelinesChat) => {
+      if (!chat.phone) return false
+      const chatDigits = chat.phone.replace(/[^\d]/g, '')
+      const chatLast10 = chatDigits.length > 10 ? chatDigits.slice(-10) : chatDigits
+      return chatLast10 === last10
+    })
+    return match || null
+  } catch {
+    return null
+  }
 }
 
 /** Verify an API key by trying to fetch chats. Returns true if valid. */
