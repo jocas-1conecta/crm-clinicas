@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
 import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote } from './useTimelinesAI'
+import { useChatContactMap } from './useChatContactMap'
 import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
     LucideSearch,
@@ -1159,6 +1160,15 @@ export const ChatModule: React.FC = () => {
         resetAndRefetch,
     } = useChats({ status: statusFilter, chatType: typeFilter })
 
+    // Bidirectional mapping: auto-link chats to leads/patients, filter by assignment
+    const { visibleChatIds } = useChatContactMap(chats)
+
+    // Apply visibility filter: admins see all (visibleChatIds=null), asesores see only their mapped chats
+    const filteredChats = React.useMemo(() => {
+        if (visibleChatIds === null) return chats
+        return chats.filter(c => visibleChatIds.has(c.id))
+    }, [chats, visibleChatIds])
+
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
 
@@ -1196,7 +1206,7 @@ export const ChatModule: React.FC = () => {
             style={{ height: 'calc(100vh - 128px)' }}
         >
             <ChatListPanel
-                chats={chats}
+                chats={filteredChats}
                 selectedId={selectedChat?.id ?? null}
                 onSelect={(chat) => {
                     setSelectedChat(chat)
