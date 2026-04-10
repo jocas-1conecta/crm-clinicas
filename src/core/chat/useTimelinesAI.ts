@@ -307,7 +307,7 @@ export function useUpdateChat() {
             payload,
         }: {
             chatId: string
-            payload: { closed?: boolean; responsible_id?: string | null }
+            payload: { closed?: boolean; responsible?: string | null }
         }) => {
             if (!apiKey) throw new Error('No API Key configurada')
             return api.updateChat(apiKey, chatId, payload)

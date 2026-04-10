@@ -122,7 +122,7 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
     // Map API fields → UI convenience fields
     last_message: lastMsg || undefined,
     last_message_time: String(raw.last_message_timestamp ?? raw.last_message_time ?? ''),
-    created_timestamp: String(raw.created_timestamp ?? raw.created_at ?? ''),
+    created_timestamp: String(raw.created_timestamp ?? ''),
     chat_status: raw.closed ? 'closed' : 'open',
     chat_assignee: String(raw.responsible_name ?? raw.chat_assignee ?? '') || null,
     whatsapp_account_phone: (() => {
@@ -239,6 +239,11 @@ export async function getChats(
               else text = '📎 Archivo'
             }
             chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
+            // Also update last_message_time from the enriched message for correct sorting
+            const msgTimestamp = String(latestMsg.timestamp ?? latestMsg.created_at ?? '')
+            if (msgTimestamp && !chat.last_message_time) {
+              chat.last_message_time = msgTimestamp
+            }
           }
         }
       } catch {
@@ -250,14 +255,19 @@ export async function getChats(
 
   // Sort chats by last_message_time descending → most recent conversations first
   // Fallback to created_timestamp when no messages exist
+  // Timelines AI formats: '2024-01-08 10:35:18 +0200' or Unix timestamp
   chats.sort((a, b) => {
     const parseTime = (t: string | undefined): number => {
       if (!t) return 0
       // Unix timestamp (all digits) → convert to ms
       if (/^\d+$/.test(t)) return Number(t) * (t.length <= 10 ? 1000 : 1)
-      // ISO string or other date format → parse
+      // Any date string (ISO, Timelines AI format '2024-01-08 10:35:18 +0200', etc.)
       const d = new Date(t).getTime()
-      return isNaN(d) ? 0 : d
+      if (!isNaN(d)) return d
+      // Try replacing space before timezone offset: '2024-01-08 10:35:18 +0200' → ISO-ish
+      const isoish = t.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s*([+-]\d{4})/, '$1T$2$3')
+      const d2 = new Date(isoish).getTime()
+      return isNaN(d2) ? 0 : d2
     }
     const timeA = parseTime(a.last_message_time) || parseTime(a.created_timestamp)
     const timeB = parseTime(b.last_message_time) || parseTime(b.created_timestamp)
@@ -418,7 +428,7 @@ export async function getWhatsAppAccounts(apiKey: string): Promise<WhatsAppAccou
 export async function updateChat(
   apiKey: string,
   chatId: string,
-  payload: { closed?: boolean; responsible_id?: string | null }
+  payload: { closed?: boolean; responsible?: string | null; name?: string; read?: boolean }
 ): Promise<void> {
   const response = await fetch(`${BASE_URL}/chats/${chatId}`, {
     method: 'PATCH',
@@ -426,7 +436,8 @@ export async function updateChat(
     body: JSON.stringify(payload),
   })
   if (!response.ok) {
-    throw new Error(`Error actualizando chat ${response.status}: ${response.statusText}`)
+    const text = await response.text().catch(() => '')
+    throw new Error(`Error actualizando chat ${response.status}: ${response.statusText} — ${text}`)
   }
 }
 

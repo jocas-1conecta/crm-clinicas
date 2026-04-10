@@ -662,10 +662,20 @@ const ConversationPanel = ({
                 <div className="flex items-center gap-1">
                     {/* Close / Reopen */}
                     <button
-                        onClick={() => updateMutation.mutate({
-                            chatId: chat.id,
-                            payload: { closed: !chat.chat_status?.includes('closed') },
-                        })}
+                        onClick={() => {
+                            const isClosed = chat.chat_status?.includes('closed')
+                            updateMutation.mutate(
+                                { chatId: chat.id, payload: { closed: !isClosed } },
+                                {
+                                    onSuccess: () => {
+                                        // If we just closed the chat, deselect it so user sees it disappear
+                                        if (!isClosed) {
+                                            // Will be removed on next query refetch
+                                        }
+                                    }
+                                }
+                            )
+                        }}
                         disabled={updateMutation.isPending}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                             chat.chat_status === 'closed'
@@ -697,7 +707,7 @@ const ConversationPanel = ({
                                 <div className="py-1">
                                     <button
                                         onClick={() => {
-                                            updateMutation.mutate({ chatId: chat.id, payload: { responsible_id: null } })
+                                            updateMutation.mutate({ chatId: chat.id, payload: { responsible: '' } })
                                             setShowAssign(false)
                                         }}
                                         className="w-full px-4 py-2 text-left text-xs text-gray-500 hover:bg-gray-50 transition-colors"
@@ -708,7 +718,7 @@ const ConversationPanel = ({
                                         <button
                                             key={m.id}
                                             onClick={() => {
-                                                updateMutation.mutate({ chatId: chat.id, payload: { responsible_id: m.email } })
+                                                updateMutation.mutate({ chatId: chat.id, payload: { responsible: m.email } })
                                                 setShowAssign(false)
                                             }}
                                             className="w-full px-4 py-2 text-left text-xs text-gray-800 hover:bg-gray-50 transition-colors flex items-center gap-2"
