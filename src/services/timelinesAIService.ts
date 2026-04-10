@@ -254,8 +254,11 @@ export async function getChats(
   }
 
   // Sort chats by last_message_time descending → most recent conversations first
-  // Fallback to created_timestamp when no messages exist
-  // Timelines AI formats: '2024-01-08 10:35:18 +0200' or Unix timestamp
+  // IMPORTANT: The Timelines AI API already returns chats sorted by recent activity.
+  // We only re-sort when we have valid parseable timestamps. Otherwise, we preserve
+  // the API's native ordering by using the original array index as a tie-breaker.
+  const indexMap = new Map(chats.map((c, i) => [c.id, i]))
+
   chats.sort((a, b) => {
     const parseTime = (t: string | undefined): number => {
       if (!t) return 0
@@ -271,7 +274,14 @@ export async function getChats(
     }
     const timeA = parseTime(a.last_message_time) || parseTime(a.created_timestamp)
     const timeB = parseTime(b.last_message_time) || parseTime(b.created_timestamp)
-    return timeB - timeA
+
+    // If both have valid timestamps, sort by time descending
+    if (timeA > 0 && timeB > 0) return timeB - timeA
+    // If only one has a timestamp, it goes first
+    if (timeA > 0 && timeB === 0) return -1
+    if (timeB > 0 && timeA === 0) return 1
+    // Neither has a valid timestamp → preserve original API order
+    return (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0)
   })
 
   return {
