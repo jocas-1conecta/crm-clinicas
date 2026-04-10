@@ -184,8 +184,13 @@ export function useChatContactMap(chats: TimelinesChat[]) {
         for (const m of mappings) {
             mappedChatIds.add(m.chat_id)
 
-            // Chat is visible if lead or patient is assigned to current user
-            if (m.lead_assigned_to === userId || m.patient_assigned_to === userId) {
+            // Chat is visible if:
+            // 1. Lead or patient is assigned to current user, OR
+            // 2. Neither lead nor patient has anyone assigned (shared pool — any asesor can claim it)
+            const isAssignedToMe = m.lead_assigned_to === userId || m.patient_assigned_to === userId
+            const isUnassigned = !m.lead_assigned_to && !m.patient_assigned_to
+
+            if (isAssignedToMe || isUnassigned) {
                 visible.add(m.chat_id)
             }
         }
