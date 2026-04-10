@@ -110,6 +110,9 @@ function extractArray<T>(json: unknown, ...keys: string[]): T[] {
 
 /** Normalise a raw chat object to our TimelinesChat shape */
 function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
+  // Try to extract last_message from multiple possible API fields
+  const lastMsg = String(raw.last_message_text ?? raw.last_message ?? raw.last_message_body ?? raw.latest_message_text ?? '')
+
   return {
     ...(raw as unknown as TimelinesChat),
     id: String(raw.id ?? ''),
@@ -117,6 +120,7 @@ function normaliseChat(raw: Record<string, unknown>): TimelinesChat {
     phone: String(raw.phone ?? ''),
     labels: Array.isArray(raw.labels) ? (raw.labels as string[]) : [],
     // Map API fields → UI convenience fields
+    last_message: lastMsg || undefined,
     last_message_time: String(raw.last_message_timestamp ?? raw.last_message_time ?? ''),
     chat_status: raw.closed ? 'closed' : 'open',
     chat_assignee: String(raw.responsible_name ?? raw.chat_assignee ?? '') || null,
@@ -207,36 +211,51 @@ export async function getChats(
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
   const chats = raw.map(normaliseChat)
 
-  // Enrich first 5 chats with last message text preview (in parallel)
-  // Kept minimal to avoid rate-limit issues at scale (200+ concurrent users)
-  const enrichPromises = chats.slice(0, 5).map(async (chat) => {
-    try {
-      const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
-        method: 'GET',
-        headers: authHeaders(apiKey),
-      })
-      if (msgResponse.ok) {
-        const msgJson = await msgResponse.json()
-        const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
-        if (msgs.length > 0) {
-          const latestMsg = msgs[0]
-          let text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
-          // If no text but has attachment, show a descriptive label
-          if (!text && latestMsg.has_attachment) {
-            const fn = String(latestMsg.attachment_filename ?? '').toLowerCase()
-            if (fn.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/)) text = '📷 Imagen'
-            else if (fn.match(/\.(mp3|ogg|opus|wav|m4a|aac|oga)$/)) text = '🎵 Audio'
-            else if (fn.match(/\.(mp4|webm|mov|avi|3gp)$/)) text = '🎬 Video'
-            else text = '📎 Archivo'
+  // Enrich chats that don't already have a last_message preview.
+  // Process in batches of 10 to avoid rate-limit issues.
+  const chatsNeedingEnrichment = chats.filter(c => !c.last_message)
+  const BATCH_SIZE = 10
+  for (let i = 0; i < chatsNeedingEnrichment.length; i += BATCH_SIZE) {
+    const batch = chatsNeedingEnrichment.slice(i, i + BATCH_SIZE)
+    const enrichPromises = batch.map(async (chat) => {
+      try {
+        const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
+          method: 'GET',
+          headers: authHeaders(apiKey),
+        })
+        if (msgResponse.ok) {
+          const msgJson = await msgResponse.json()
+          const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
+          if (msgs.length > 0) {
+            const latestMsg = msgs[0]
+            let text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
+            // If no text but has attachment, show a descriptive label
+            if (!text && (latestMsg.has_attachment || latestMsg.attachment_url)) {
+              const fn = String(latestMsg.attachment_filename ?? '').toLowerCase()
+              if (fn.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/)) text = '📷 Imagen'
+              else if (fn.match(/\.(mp3|ogg|opus|wav|m4a|aac|oga)$/)) text = '🎵 Audio'
+              else if (fn.match(/\.(mp4|webm|mov|avi|3gp)$/)) text = '🎬 Video'
+              else text = '📎 Archivo'
+            }
+            chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
           }
-          chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
         }
+      } catch {
+        // Silently skip individual enrichment failures
       }
-    } catch {
-      // Silently skip
-    }
+    })
+    await Promise.all(enrichPromises)
+  }
+
+  // Sort chats by last_message_time descending → most recent conversations first
+  chats.sort((a, b) => {
+    const timeA = a.last_message_time || ''
+    const timeB = b.last_message_time || ''
+    // Numeric timestamps (unix) or ISO strings both sort correctly with >
+    if (timeA > timeB) return -1
+    if (timeA < timeB) return 1
+    return 0
   })
-  await Promise.all(enrichPromises)
 
   return {
     chats,
