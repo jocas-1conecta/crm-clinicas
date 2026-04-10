@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useStore } from '../../store/useStore'
+import { supabase } from '../../services/supabase'
 import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote } from './useTimelinesAI'
 import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
 import {
@@ -456,6 +458,7 @@ const ConversationPanel = ({
     onShowInfo: () => void
     showInfo: boolean
 }) => {
+    const { currentUser } = useStore()
     const [draft, setDraft] = useState('')
     const [showAssign, setShowAssign] = useState(false)
     const [showTemplates, setShowTemplates] = useState(false)
@@ -474,6 +477,33 @@ const ConversationPanel = ({
     const { data: members = [] } = useWorkspaceMembers()
     const uploadMutation = useUploadAndSendFile()
     const { data: templates = [] } = useTemplates()
+
+    // Fetch clinic name for template variable resolution
+    const { data: clinicName } = useQuery({
+        queryKey: ['clinic_name_for_templates', currentUser?.clinica_id],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('clinicas')
+                .select('name')
+                .eq('id', currentUser!.clinica_id!)
+                .single()
+            return data?.name ?? ''
+        },
+        enabled: !!currentUser?.clinica_id,
+        staleTime: 1000 * 60 * 30, // 30 min cache
+    })
+
+    /** Replace template variables with real contact/clinic data */
+    const resolveTemplateVariables = useCallback((body: string): string => {
+        const now = new Date()
+        return body
+            .replace(/\{\{nombre\}\}/g, chat?.name || 'cliente')
+            .replace(/\{\{telefono\}\}/g, chat?.phone || '')
+            .replace(/\{\{clinica\}\}/g, clinicName || '')
+            .replace(/\{\{fecha\}\}/g, now.toLocaleDateString('es-CO'))
+            .replace(/\{\{hora\}\}/g, now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }))
+            .replace(/\{\{asesor\}\}/g, currentUser?.name || '')
+    }, [chat?.name, chat?.phone, clinicName, currentUser?.name])
 
     // Real-time: instantly reload messages when a webhook event arrives
     useChatRealtime(chat?.id ?? null)
@@ -828,7 +858,7 @@ const ConversationPanel = ({
                             <button
                                 key={t.id}
                                 onClick={() => {
-                                    setDraft(t.body)
+                                    setDraft(resolveTemplateVariables(t.body))
                                     setShowTemplates(false)
                                 }}
                                 className="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
