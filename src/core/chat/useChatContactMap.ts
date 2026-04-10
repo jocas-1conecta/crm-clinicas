@@ -46,7 +46,7 @@ export function useChatContactMap(chats: TimelinesChat[]) {
     const isAdmin = ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'].includes(currentUser?.role ?? '')
 
     // 1. Fetch existing mappings with assignment info
-    const { data: mappings = [], isLoading: mappingsLoading } = useQuery({
+    const { data: mappings = [], isLoading: mappingsLoading, isError: mappingsError } = useQuery({
         queryKey: ['chat_contact_map', clinicaId],
         queryFn: async () => {
             const { data, error } = await supabase
@@ -56,7 +56,10 @@ export function useChatContactMap(chats: TimelinesChat[]) {
                     leads!chat_contact_map_lead_id_fkey ( assigned_to ),
                     patients!chat_contact_map_patient_id_fkey ( assigned_to )
                 `)
-            if (error) throw error
+            if (error) {
+                console.warn('[chat_contact_map] Query error (table may not exist):', error.message)
+                throw error
+            }
             return (data ?? []).map((row: any) => ({
                 ...row,
                 lead_assigned_to: row.leads?.assigned_to ?? null,
@@ -66,12 +69,13 @@ export function useChatContactMap(chats: TimelinesChat[]) {
         enabled: !!clinicaId,
         staleTime: 2 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
+        retry: 1, // Only retry once — if the table doesn't exist, retrying won't help
     })
 
-    // 2. Auto-map unmapped chats
+    // 2. Auto-map unmapped chats (only if the table query succeeded)
     const autoMapRunRef = useRef<string>('')
     useEffect(() => {
-        if (!clinicaId || chats.length === 0 || mappingsLoading) return
+        if (!clinicaId || chats.length === 0 || mappingsLoading || mappingsError) return
 
         const mappedChatIds = new Set(mappings.map(m => m.chat_id))
         const unmapped = chats.filter(c => !mappedChatIds.has(c.id) && c.phone)
@@ -147,14 +151,29 @@ export function useChatContactMap(chats: TimelinesChat[]) {
                 console.warn('[chat_contact_map] Auto-map error:', err)
             }
         })()
-    }, [chats, mappings, mappingsLoading, clinicaId, queryClient])
+    }, [chats, mappings, mappingsLoading, mappingsError, clinicaId, queryClient])
 
     // 3. Compute visible chat IDs for current user
     const visibleChatIds = useMemo(() => {
         // Admins see everything
         if (isAdmin) return null
 
-        if (mappingsLoading) return null // While loading, don't filter
+        // While loading, don't filter — show all chats
+        if (mappingsLoading) return null
+
+        // CRITICAL: If the mapping query failed (table doesn't exist, RLS error, etc.),
+        // show ALL chats rather than hiding everything. This prevents the "No hay chats"
+        // bug when the chat_contact_map table hasn't been deployed yet.
+        if (mappingsError) {
+            console.warn('[chat_contact_map] Mapping query failed — showing all chats for asesor')
+            return null
+        }
+
+        // If mappings are empty and there are chats, all chats are unmapped
+        // → show all of them (they'll get auto-mapped in the background)
+        if (mappings.length === 0 && chats.length > 0) {
+            return null
+        }
 
         const userId = currentUser?.id
         if (!userId) return new Set<string>()
@@ -179,7 +198,7 @@ export function useChatContactMap(chats: TimelinesChat[]) {
         }
 
         return visible
-    }, [mappings, mappingsLoading, chats, currentUser?.id, isAdmin])
+    }, [mappings, mappingsLoading, mappingsError, chats, currentUser?.id, isAdmin])
 
     return {
         visibleChatIds,
