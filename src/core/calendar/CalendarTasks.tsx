@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { useStore, CrmTask } from '../../store/useStore'
+import { useStore } from '../../store/useStore'
 import { useTasks, useToggleTask, StatusFilter, DateFilter } from '../../hooks/useTasks'
 import { useTaskRealtime } from '../../hooks/useTaskRealtime'
 import { TaskCard } from '../../components/tasks/TaskCard'
@@ -47,23 +47,15 @@ export const CalendarTasks = () => {
     // ─── Realtime ─────────────────────────────────────────────
     useTaskRealtime(currentUser?.id)
 
-    // ─── Drawer State ─────────────────────────────────────────
-    const [drawerOpen, setDrawerOpen] = useState(false)
-    const [drawerTask, setDrawerTask] = useState<CrmTask | null>(null)
+    // ─── Create Drawer State (create-only, editing is inline) ──
+    const [createDrawerOpen, setCreateDrawerOpen] = useState(false)
 
     const openCreateDrawer = useCallback(() => {
-        setDrawerTask(null)
-        setDrawerOpen(true)
+        setCreateDrawerOpen(true)
     }, [])
 
-    const openEditDrawer = useCallback((task: CrmTask) => {
-        setDrawerTask(task)
-        setDrawerOpen(true)
-    }, [])
-
-    const closeDrawer = useCallback(() => {
-        setDrawerOpen(false)
-        setDrawerTask(null)
+    const closeCreateDrawer = useCallback(() => {
+        setCreateDrawerOpen(false)
     }, [])
 
     // ─── Selection State ──────────────────────────────────────
@@ -224,7 +216,6 @@ export const CalendarTasks = () => {
                             selectionMode={selectionMode}
                             onToggleComplete={() => toggleMut.mutate({ id: task.id, completed: !task.is_completed })}
                             onSelect={() => toggleSelection(task.id)}
-                            onOpenDrawer={() => openEditDrawer(task)}
                         />
                     ))
                 )}
@@ -255,11 +246,11 @@ export const CalendarTasks = () => {
                 </div>
             )}
 
-            {/* Side Drawer */}
+            {/* Create-Only Side Drawer */}
             <TaskDrawer
-                open={drawerOpen}
-                task={drawerTask}
-                onClose={closeDrawer}
+                open={createDrawerOpen}
+                task={null}
+                onClose={closeCreateDrawer}
             />
 
             {/* Bulk Actions Bar */}
