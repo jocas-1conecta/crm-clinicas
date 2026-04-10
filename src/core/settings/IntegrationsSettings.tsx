@@ -455,74 +455,114 @@ const TimelinesConfigView: React.FC<{
                                         <LucideLoader2 className="w-4 h-4 animate-spin" />
                                         Cargando números conectados...
                                     </div>
-                                ) : whatsappAccounts && whatsappAccounts.length > 0 ? (
-                                    <>
-                                        <div className="space-y-2">
-                                            {whatsappAccounts.map(acc => {
-                                                const isSelected = selectedAccountId === acc.id
-                                                const isActive = acc.status === 'Active'
-                                                return (
-                                                    <button
-                                                        key={acc.id}
-                                                        type="button"
-                                                        onClick={() => setSelectedAccountId(acc.id)}
-                                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                                                            isSelected
-                                                                ? 'border-clinical-300 bg-clinical-50 ring-2 ring-clinical-200/50'
-                                                                : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'
-                                                        }`}
-                                                    >
-                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                                                            isSelected ? 'bg-clinical-100' : 'bg-gray-100'
-                                                        }`}>
-                                                            <LucideSmartphone className={`w-5 h-5 ${
-                                                                isSelected ? 'text-clinical-600' : 'text-gray-400'
-                                                            }`} />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`text-sm font-semibold ${
-                                                                    isSelected ? 'text-clinical-800' : 'text-gray-800'
-                                                                }`}>
-                                                                    {acc.phone}
-                                                                </span>
-                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                                                    isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'
-                                                                }`}>
-                                                                    {acc.status}
-                                                                </span>
+                                ) : whatsappAccounts && whatsappAccounts.length > 0 ? (() => {
+                                    const activeAccounts = whatsappAccounts.filter(a => a.status === 'Active')
+                                    const hasActiveAccounts = activeAccounts.length > 0
+                                    const selectedIsActive = whatsappAccounts.find(a => a.id === selectedAccountId)?.status === 'Active'
+                                    return (
+                                        <>
+                                            {!hasActiveAccounts && (
+                                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                                                    <LucideAlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-red-800">No hay números activos</p>
+                                                        <p className="text-xs text-red-600 mt-1">
+                                                            Todos tus números de WhatsApp están desconectados. Para usar esta integración, debes tener al menos un número con estado <strong>"Active"</strong> en tu panel de Timelines AI.
+                                                        </p>
+                                                        <a
+                                                            href="https://app.timelines.ai/whatsapp-accounts"
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-900 underline mt-2"
+                                                        >
+                                                            Ir a Timelines AI → WhatsApp Accounts <LucideExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="space-y-2">
+                                                {whatsappAccounts.map(acc => {
+                                                    const isSelected = selectedAccountId === acc.id
+                                                    const isActive = acc.status === 'Active'
+                                                    return (
+                                                        <button
+                                                            key={acc.id}
+                                                            type="button"
+                                                            onClick={() => isActive && setSelectedAccountId(acc.id)}
+                                                            disabled={!isActive}
+                                                            className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                                                                !isActive
+                                                                    ? 'border-gray-200 bg-gray-50/60 opacity-50 cursor-not-allowed'
+                                                                    : isSelected
+                                                                        ? 'border-clinical-300 bg-clinical-50 ring-2 ring-clinical-200/50 cursor-pointer'
+                                                                        : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white cursor-pointer'
+                                                            }`}
+                                                        >
+                                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                                                isSelected && isActive ? 'bg-clinical-100' : 'bg-gray-100'
+                                                            }`}>
+                                                                <LucideSmartphone className={`w-5 h-5 ${
+                                                                    isSelected && isActive ? 'text-clinical-600' : 'text-gray-400'
+                                                                }`} />
                                                             </div>
-                                                            <p className="text-[11px] text-gray-500 truncate">
-                                                                {acc.account_name || acc.owner_name} · {acc.owner_email}
-                                                            </p>
-                                                        </div>
-                                                        {isSelected && (
-                                                            <LucideCheckCircle2 className="w-5 h-5 text-clinical-600 shrink-0" />
-                                                        )}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                        {selectedAccountId && selectedAccountId !== accountId && (
-                                            <button
-                                                type="button"
-                                                onClick={() => saveAccountMutation.mutate(selectedAccountId)}
-                                                disabled={saveAccountMutation.isPending}
-                                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-clinical-600 text-white hover:bg-clinical-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`text-sm font-semibold ${
+                                                                        !isActive ? 'text-gray-400' : isSelected ? 'text-clinical-800' : 'text-gray-800'
+                                                                    }`}>
+                                                                        {acc.phone}
+                                                                    </span>
+                                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                                                        isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                                                                    }`}>
+                                                                        {isActive ? 'Activo' : 'Desconectado'}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[11px] text-gray-500 truncate">
+                                                                    {acc.account_name || acc.owner_name} · {acc.owner_email}
+                                                                </p>
+                                                            </div>
+                                                            {isSelected && isActive && (
+                                                                <LucideCheckCircle2 className="w-5 h-5 text-clinical-600 shrink-0" />
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                            {selectedAccountId && selectedAccountId !== accountId && selectedIsActive && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => saveAccountMutation.mutate(selectedAccountId)}
+                                                    disabled={saveAccountMutation.isPending}
+                                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-clinical-600 text-white hover:bg-clinical-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                >
+                                                    {saveAccountMutation.isPending ? (
+                                                        <LucideLoader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <LucideCheck className="w-4 h-4" />
+                                                    )}
+                                                    Vincular este número
+                                                </button>
+                                            )}
+                                        </>
+                                    )
+                                })() : (
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                                        <LucideAlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-semibold text-red-800">Sin números de WhatsApp</p>
+                                            <p className="text-xs text-red-600 mt-1">
+                                                No se encontraron números conectados en tu cuenta de Timelines AI. <strong>Debes conectar al menos un número de WhatsApp activo</strong> para poder usar esta integración.
+                                            </p>
+                                            <a
+                                                href="https://app.timelines.ai/whatsapp-accounts"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-900 underline mt-2"
                                             >
-                                                {saveAccountMutation.isPending ? (
-                                                    <LucideLoader2 className="w-4 h-4 animate-spin" />
-                                                ) : (
-                                                    <LucideCheck className="w-4 h-4" />
-                                                )}
-                                                Vincular este número
-                                            </button>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-start gap-2">
-                                        <LucideAlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span>No se encontraron números conectados en tu cuenta de Timelines AI. Verifica que tu número de WhatsApp esté activo en el panel de Timelines AI.</span>
+                                                Conectar número en Timelines AI <LucideExternalLink className="w-3 h-3" />
+                                            </a>
+                                        </div>
                                     </div>
                                 )}
                             </div>
