@@ -249,12 +249,15 @@ export async function getChats(
 
   // Sort chats by last_message_time descending → most recent conversations first
   chats.sort((a, b) => {
-    const timeA = a.last_message_time || ''
-    const timeB = b.last_message_time || ''
-    // Numeric timestamps (unix) or ISO strings both sort correctly with >
-    if (timeA > timeB) return -1
-    if (timeA < timeB) return 1
-    return 0
+    const parseTime = (t: string | undefined): number => {
+      if (!t) return 0
+      // Unix timestamp (all digits) → convert to ms
+      if (/^\d+$/.test(t)) return Number(t) * (t.length <= 10 ? 1000 : 1)
+      // ISO string or other date format → parse
+      const d = new Date(t).getTime()
+      return isNaN(d) ? 0 : d
+    }
+    return parseTime(b.last_message_time) - parseTime(a.last_message_time)
   })
 
   return {
