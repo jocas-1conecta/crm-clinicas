@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react'
 import { CrmTask, TaskCategory, TaskPriority } from '../../store/useStore'
 import { useStore } from '../../store/useStore'
 import { useUpdateTask, useDeleteTask, useTeamMembers } from '../../hooks/useTasks'
+import { useTaskAttachments } from '../../hooks/useTaskAttachments'
+import { TaskAttachments } from './TaskAttachments'
 import { toast } from 'sonner'
 import {
     LucideCheckCircle2, LucideCircle, LucideAlertTriangle, LucideClock,
     LucidePhone, LucideMessageSquare, LucideUsers, LucideFileText, LucidePin,
     LucidePencil, LucideX, LucideTrash2, LucideLoader2,
     LucideUser, LucideCalendar, LucideStickyNote, LucideChevronDown,
+    LucidePaperclip,
 } from 'lucide-react'
 
 // ─── Constants ────────────────────────────────────────────────
@@ -66,6 +69,7 @@ export const TaskCard = ({ task, isSelected, selectionMode, onToggleComplete, on
     const updateMut = useUpdateTask()
     const deleteMut = useDeleteTask()
     const { data: teamMembers = [] } = useTeamMembers()
+    const { data: attachments = [] } = useTaskAttachments(task.id)
     const isAdmin = currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica'
 
     const typeConfig = getTypeConfig(task.task_type)
@@ -280,6 +284,13 @@ export const TaskCard = ({ task, isSelected, selectionMode, onToggleComplete, on
                                 {task.start_time}{task.end_time ? ` - ${task.end_time}` : ''}
                             </span>
                         )}
+                        {/* Attachment count badge */}
+                        {attachments.length > 0 && (
+                            <span className="inline-flex items-center space-x-0.5 text-[10px] font-medium text-gray-400">
+                                <LucidePaperclip className="w-3 h-3" />
+                                <span>{attachments.length}</span>
+                            </span>
+                        )}
                     </div>
 
                     {/* Description preview (only when collapsed) */}
@@ -338,6 +349,13 @@ export const TaskCard = ({ task, isSelected, selectionMode, onToggleComplete, on
                                 label="Notas Internas"
                                 value={task.notes || task.extra_fields?.notes}
                             />
+
+                            {/* Attachments (read-only) */}
+                            {attachments.length > 0 && (
+                                <div className="pt-2">
+                                    <TaskAttachments taskId={task.id} readonly />
+                                </div>
+                            )}
 
                             {/* No details message */}
                             {!task.description && !assignedName && !(task.notes || task.extra_fields?.notes) && (
@@ -477,6 +495,9 @@ export const TaskCard = ({ task, isSelected, selectionMode, onToggleComplete, on
                                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent text-sm resize-none placeholder:text-gray-400"
                                 />
                             </div>
+
+                            {/* Attachments (editable) */}
+                            <TaskAttachments taskId={task.id} />
 
                             {/* Action Buttons */}
                             <div className="flex items-center justify-between pt-2 border-t border-gray-100">

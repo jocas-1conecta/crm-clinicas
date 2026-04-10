@@ -151,6 +151,17 @@ export interface Deal {
 export type TaskCategory = 'llamada' | 'mensaje' | 'reunion' | 'cotizacion' | 'otro';
 export type TaskPriority = 'alta' | 'normal' | 'baja';
 
+export interface TaskAttachment {
+    id: string;
+    task_id: string;
+    file_name: string;
+    file_url: string;
+    file_type?: string;
+    file_size?: number;
+    uploaded_by?: string;
+    created_at?: string;
+}
+
 export interface CrmTask {
     id: string;
     title: string;
@@ -171,6 +182,7 @@ export interface CrmTask {
     extra_fields?: Record<string, any>;
     created_at?: string;
     updated_at?: string;
+    attachments?: TaskAttachment[];
 }
 
 // Legacy alias for backwards compatibility

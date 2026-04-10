@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import { useStore, CrmTask, TaskCategory, TaskPriority } from '../../store/useStore'
+import { useTaskAttachments } from '../../hooks/useTaskAttachments'
+import { TaskAttachments } from './TaskAttachments'
 import {
     LucidePlus, LucideX, LucideCheckCircle2, LucideCircle,
-    LucidePhone, LucideMessageSquare, LucideUsers, LucideFileText	,
+    LucidePhone, LucideMessageSquare, LucideUsers, LucideFileText,
     LucidePin, LucideAlertTriangle, LucideChevronDown, LucideChevronUp,
-    LucideClock, LucideCalendar
+    LucideClock, LucideCalendar, LucidePaperclip
 } from 'lucide-react'
 
 // ─── Task Type Config ────────────────────────────────────────────
@@ -333,6 +335,7 @@ const TaskCard = ({ task, onToggle, onEdit, onDelete }: {
     task: CrmTask; onToggle: () => void; onEdit: () => void; onDelete: () => void
 }) => {
     const [expanded, setExpanded] = useState(false)
+    const { data: attachments = [] } = useTaskAttachments(task.id)
     const typeConfig = getTaskTypeConfig(task.task_type)
     const prioConfig = getPriorityConfig(task.priority)
     const overdue = isOverdue(task)
@@ -415,6 +418,13 @@ const TaskCard = ({ task, onToggle, onEdit, onDelete }: {
                                 {task.start_time}{task.end_time ? ` - ${task.end_time}` : ''}
                             </span>
                         )}
+                        {/* Attachment badge */}
+                        {attachments.length > 0 && (
+                            <span className="inline-flex items-center space-x-0.5 text-[10px] font-medium text-gray-400">
+                                <LucidePaperclip className="w-3 h-3" />
+                                <span>{attachments.length}</span>
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -425,6 +435,10 @@ const TaskCard = ({ task, onToggle, onEdit, onDelete }: {
                     {task.description && (
                         <p className="text-sm text-gray-600 mt-3 whitespace-pre-wrap leading-relaxed">{task.description}</p>
                     )}
+                    {/* Attachments */}
+                    <div className="mt-3">
+                        <TaskAttachments taskId={task.id} />
+                    </div>
                     <div className="flex items-center space-x-3 mt-3">
                         <button onClick={onEdit}
                             className="text-xs font-bold text-clinical-600 bg-clinical-50 px-3 py-1.5 rounded-lg hover:bg-clinical-100 transition-colors">

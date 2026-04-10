@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { CrmTask, TaskCategory, TaskPriority } from '../../store/useStore'
 import { useStore } from '../../store/useStore'
 import { useCreateTask, useUpdateTask, useDeleteTask, useTeamMembers } from '../../hooks/useTasks'
+import { useUploadTaskAttachment } from '../../hooks/useTaskAttachments'
 import { TASK_TYPES, PRIORITIES } from './TaskCard'
+import { TaskAttachments } from './TaskAttachments'
 import {
     LucideX, LucideTrash2, LucideLoader2, LucideUser,
     LucideLink, LucideCalendar, LucideStickyNote,
@@ -25,6 +27,7 @@ export const TaskDrawer = ({ open, task, onClose, prefill }: TaskDrawerProps) =>
     const createMut = useCreateTask()
     const updateMut = useUpdateTask()
     const deleteMut = useDeleteTask()
+    const uploadAttachment = useUploadTaskAttachment()
     const { data: teamMembers = [] } = useTeamMembers()
 
     const isAdmin = currentUser?.role === 'Super_Admin' || currentUser?.role === 'Admin_Clinica'
@@ -40,6 +43,7 @@ export const TaskDrawer = ({ open, task, onClose, prefill }: TaskDrawerProps) =>
     const [endTime, setEndTime] = useState('')
     const [notes, setNotes] = useState('')
     const [assignTo, setAssignTo] = useState(currentUser?.id || '')
+    const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
     // Populate form when editing
     useEffect(() => {
@@ -68,6 +72,7 @@ export const TaskDrawer = ({ open, task, onClose, prefill }: TaskDrawerProps) =>
         setEndTime('')
         setNotes('')
         setAssignTo(currentUser?.id || '')
+        setPendingFiles([])
     }
 
     const handleSave = (e: React.FormEvent) => {
@@ -104,7 +109,13 @@ export const TaskDrawer = ({ open, task, onClose, prefill }: TaskDrawerProps) =>
                 ...(prefill?.patientId ? { patient_id: prefill.patientId } : {}),
             }
             createMut.mutate(createPayload, {
-                onSuccess: () => {
+                onSuccess: (newTask) => {
+                    // Upload any pending files to the newly created task
+                    if (pendingFiles.length > 0 && newTask?.id) {
+                        pendingFiles.forEach(file => {
+                            uploadAttachment.mutate({ taskId: newTask.id, file })
+                        })
+                    }
                     toast.success('Tarea creada')
                     onClose()
                 },
@@ -295,6 +306,20 @@ export const TaskDrawer = ({ open, task, onClose, prefill }: TaskDrawerProps) =>
                             rows={2}
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-clinical-500 focus:border-transparent text-sm resize-none placeholder:text-gray-400"
                         />
+                    </div>
+
+                    {/* Attachments */}
+                    <div>
+                        {isEditing ? (
+                            <TaskAttachments taskId={task.id} />
+                        ) : (
+                            <TaskAttachments
+                                taskId={undefined}
+                                pendingMode
+                                pendingFiles={pendingFiles}
+                                onPendingFilesChange={setPendingFiles}
+                            />
+                        )}
                     </div>
 
                     {/* Linked Entity (readonly) */}
