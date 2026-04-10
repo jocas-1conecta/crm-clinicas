@@ -212,10 +212,10 @@ export async function getChats(
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
   const chats = raw.map(normaliseChat)
 
-  // Enrich chats that don't already have a last_message preview.
-  // Process in batches of 10 to avoid rate-limit issues.
-  const chatsNeedingEnrichment = chats.filter(c => !c.last_message)
-  const BATCH_SIZE = 10
+  // Enrich ONLY a small number of chats to avoid 429 rate-limit from Timelines AI.
+  // The API throttles aggressively — limit to 5 chats max, in micro-batches of 2.
+  const chatsNeedingEnrichment = chats.filter(c => !c.last_message).slice(0, 5)
+  const BATCH_SIZE = 2
   for (let i = 0; i < chatsNeedingEnrichment.length; i += BATCH_SIZE) {
     const batch = chatsNeedingEnrichment.slice(i, i + BATCH_SIZE)
     const enrichPromises = batch.map(async (chat) => {
@@ -251,36 +251,38 @@ export async function getChats(
       }
     })
     await Promise.all(enrichPromises)
+    // Small delay between batches to respect rate limits
+    if (i + BATCH_SIZE < chatsNeedingEnrichment.length) {
+      await new Promise(r => setTimeout(r, 500))
+    }
   }
 
   // Sort chats by last_message_time descending → most recent conversations first
   // IMPORTANT: The Timelines AI API already returns chats sorted by recent activity.
-  // We only re-sort when we have valid parseable timestamps. Otherwise, we preserve
-  // the API's native ordering by using the original array index as a tie-breaker.
+  // We ONLY re-sort when a chat has a valid last_message_time (from enrichment or API).
+  // We do NOT use created_timestamp for sorting — it's often identical across many chats,
+  // which would scramble the API's native ordering.
   const indexMap = new Map(chats.map((c, i) => [c.id, i]))
 
   chats.sort((a, b) => {
     const parseTime = (t: string | undefined): number => {
       if (!t) return 0
-      // Unix timestamp (all digits) → convert to ms
       if (/^\d+$/.test(t)) return Number(t) * (t.length <= 10 ? 1000 : 1)
-      // Any date string (ISO, Timelines AI format '2024-01-08 10:35:18 +0200', etc.)
       const d = new Date(t).getTime()
       if (!isNaN(d)) return d
-      // Try replacing space before timezone offset: '2024-01-08 10:35:18 +0200' → ISO-ish
       const isoish = t.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s*([+-]\d{4})/, '$1T$2$3')
       const d2 = new Date(isoish).getTime()
       return isNaN(d2) ? 0 : d2
     }
-    const timeA = parseTime(a.last_message_time) || parseTime(a.created_timestamp)
-    const timeB = parseTime(b.last_message_time) || parseTime(b.created_timestamp)
+    const timeA = parseTime(a.last_message_time)
+    const timeB = parseTime(b.last_message_time)
 
-    // If both have valid timestamps, sort by time descending
+    // Both have message timestamps → sort by most recent message
     if (timeA > 0 && timeB > 0) return timeB - timeA
-    // If only one has a timestamp, it goes first
+    // Chat WITH messages should appear before chat WITHOUT messages
     if (timeA > 0 && timeB === 0) return -1
     if (timeB > 0 && timeA === 0) return 1
-    // Neither has a valid timestamp → preserve original API order
+    // Neither has message timestamps → preserve API's native order
     return (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0)
   })
 
