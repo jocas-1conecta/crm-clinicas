@@ -188,6 +188,16 @@ const WEBHOOK_EVENTS = [
     },
 ]
 
+/* ─────────────────── Helpers ─────────────────── */
+
+/** Timelines AI returns various status strings — normalise for "active" check */
+const isAccountActive = (status: string) => {
+    const s = status.toLowerCase()
+    return s === 'active' || s === 'online' || s === 'connected'
+}
+
+const getStatusLabel = (status: string) => isAccountActive(status) ? 'Online' : 'Desconectado'
+
 /* ─────────────────── Timelines AI Full Config View ─────────────────── */
 
 const TimelinesConfigView: React.FC<{
@@ -456,9 +466,9 @@ const TimelinesConfigView: React.FC<{
                                         Cargando números conectados...
                                     </div>
                                 ) : whatsappAccounts && whatsappAccounts.length > 0 ? (() => {
-                                    const activeAccounts = whatsappAccounts.filter(a => a.status === 'Active')
+                                    const activeAccounts = whatsappAccounts.filter(a => isAccountActive(a.status))
                                     const hasActiveAccounts = activeAccounts.length > 0
-                                    const selectedIsActive = whatsappAccounts.find(a => a.id === selectedAccountId)?.status === 'Active'
+                                    const selectedIsActive = (() => { const acc = whatsappAccounts.find(a => a.id === selectedAccountId); return acc ? isAccountActive(acc.status) : false })()
                                     return (
                                         <>
                                             {!hasActiveAccounts && (
@@ -467,7 +477,7 @@ const TimelinesConfigView: React.FC<{
                                                     <div>
                                                         <p className="text-sm font-semibold text-red-800">No hay números activos</p>
                                                         <p className="text-xs text-red-600 mt-1">
-                                                            Todos tus números de WhatsApp están desconectados. Para usar esta integración, debes tener al menos un número con estado <strong>"Active"</strong> en tu panel de Timelines AI.
+                                                            Todos tus números de WhatsApp están desconectados. Para usar esta integración, debes tener al menos un número con estado <strong>"Online"</strong> en tu panel de Timelines AI.
                                                         </p>
                                                         <a
                                                             href="https://app.timelines.ai/whatsapp-accounts"
@@ -483,7 +493,7 @@ const TimelinesConfigView: React.FC<{
                                             <div className="space-y-2">
                                                 {whatsappAccounts.map(acc => {
                                                     const isSelected = selectedAccountId === acc.id
-                                                    const isActive = acc.status === 'Active'
+                                                    const isActive = isAccountActive(acc.status)
                                                     return (
                                                         <button
                                                             key={acc.id}
@@ -515,7 +525,7 @@ const TimelinesConfigView: React.FC<{
                                                                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
                                                                         isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
                                                                     }`}>
-                                                                        {isActive ? 'Activo' : 'Desconectado'}
+                                                                        {getStatusLabel(acc.status)}
                                                                     </span>
                                                                 </div>
                                                                 <p className="text-[11px] text-gray-500 truncate">
