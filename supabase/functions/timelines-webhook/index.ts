@@ -64,32 +64,50 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // ── Resolve clinica_id from the webhook secret or API key mapping ──
-    // Each clinic has its own Timelines AI account, so we resolve which
-    // clinic this webhook belongs to. If only one clinic uses Timelines AI,
-    // this still works correctly.
-    //
-    // Strategy: match by the account info in the webhook payload
-    // Fallback: if only one clinic has Timelines AI configured, use that one
+    // ── Resolve clinica_id via account_id mapping (multi-tenant safe) ──
+    // Each clinic stores its Timelines AI account_id in clinicas.timelines_account_id.
+    // The webhook payload includes account_id, so we match directly.
     let resolvedClinicaId: string | null = null
 
     const accountId = String((payload as Record<string, unknown>)?.account_id ?? '')
+
+    // Step 1: Direct account_id → clinica_id lookup (preferred, multi-tenant safe)
     if (accountId) {
-      // Future: map account_id → clinica_id via a mapping table
-      // For now, find the clinic whose timelines key is configured
+      const { data: matchedClinic } = await supabase
+        .from('clinicas')
+        .select('id')
+        .eq('timelines_account_id', accountId)
+        .limit(1)
+        .single()
+
+      if (matchedClinic) {
+        resolvedClinicaId = matchedClinic.id
+        console.log(`✓ Resolved clinic by account_id ${accountId} → ${matchedClinic.id}`)
+      }
     }
 
-    // Find clinic(s) with Timelines AI configured
-    const { data: clinicas } = await supabase
-      .from('clinicas')
-      .select('id')
-      .or('timelines_ai_api_key_enc.not.is.null,timelines_ai_api_key.not.is.null')
+    // Step 2: Fallback — if only one clinic has Timelines AI, use it
+    //         Also auto-populate account_id so future lookups use Step 1
+    if (!resolvedClinicaId) {
+      const { data: clinicas } = await supabase
+        .from('clinicas')
+        .select('id, timelines_account_id')
+        .or('timelines_ai_api_key_enc.not.is.null,timelines_ai_api_key.not.is.null')
 
-    if (clinicas && clinicas.length === 1) {
-      resolvedClinicaId = clinicas[0].id
-    } else if (clinicas && clinicas.length > 1) {
-      // Multiple clinics — log warning, skip auto-create to prevent cross-tenant
-      console.warn(`⚠️ Multiple clinics (${clinicas.length}) have Timelines AI configured. Cannot auto-resolve. Set up account_id mapping.`)
+      if (clinicas && clinicas.length === 1) {
+        resolvedClinicaId = clinicas[0].id
+
+        // Auto-populate account_id for this clinic if missing
+        if (accountId && !clinicas[0].timelines_account_id) {
+          await supabase
+            .from('clinicas')
+            .update({ timelines_account_id: accountId })
+            .eq('id', clinicas[0].id)
+          console.log(`✓ Auto-populated timelines_account_id=${accountId} for clinic ${clinicas[0].id}`)
+        }
+      } else if (clinicas && clinicas.length > 1) {
+        console.warn(`⚠️ ${clinicas.length} clinics have Timelines AI but none match account_id=${accountId}. Configure timelines_account_id on each clinic.`)
+      }
     }
 
     const { error: insertError } = await supabase.from('chat_webhook_events').insert({
