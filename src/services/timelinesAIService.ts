@@ -162,12 +162,11 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 // ── Filter types ──────────────────────────────────────────────────────────────
-export type ChatStatusFilter = 'all' | 'open' | 'closed'
-export type ChatTypeFilter   = 'all' | 'direct' | 'group'
+// Simplified to 2 views: 'open' (all open chats) and 'unread' (open + unread only)
+export type ChatViewFilter = 'open' | 'unread'
 
 export interface GetChatsOptions {
-  status?: ChatStatusFilter  // 'all' | 'open' | 'closed'
-  chatType?: ChatTypeFilter  // 'all' | 'direct' | 'group'
+  view?: ChatViewFilter      // 'open' | 'unread'
   page?: number              // 1-indexed, 50 chats per page
 }
 
@@ -177,26 +176,27 @@ export interface GetChatsResult {
   page: number
 }
 
-/** Fetch a single page of chats with optional filters */
+/** Fetch a single page of chats with correct API filters.
+ *  - 'open':   GET /chats?closed=false         → all open chats, ordered by recent activity
+ *  - 'unread': GET /chats?closed=false&read=false → only unread open chats
+ *  The Timelines AI API returns chats sorted by last_message_timestamp DESC
+ *  when using these filters, so NO client-side re-sorting is needed.
+ */
 export async function getChats(
   apiKey: string,
   options: GetChatsOptions = {}
 ): Promise<GetChatsResult> {
-  const { status = 'all', chatType = 'all', page = 1 } = options
+  const { view = 'open', page = 1 } = options
 
   const params = new URLSearchParams({ page: String(page) })
 
-  // Status filter
-  if (status === 'open')   params.set('closed', 'false')
-  if (status === 'closed') params.set('closed', 'true')
+  // Both views only show open chats
+  params.set('closed', 'false')
 
-  // Type filter
-  if (chatType === 'direct') params.set('group', 'false')
-  if (chatType === 'group')  params.set('group', 'true')
-
-  // NOTE: Do NOT set read=false here — that filter hides already-read chats,
-  // causing the list to appear empty intermittently. We want ALL chats regardless
-  // of read status. The API returns chats sorted by recent activity by default.
+  // 'unread' view adds the read=false filter for only unread chats
+  if (view === 'unread') {
+    params.set('read', 'false')
+  }
 
   const url = `${BASE_URL}/chats?${params.toString()}`
   const response = await fetch(url, {
@@ -212,15 +212,24 @@ export async function getChats(
   const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
   const chats = raw.map(normaliseChat)
 
-  // Enrich ONLY a small number of chats to avoid 429 rate-limit from Timelines AI.
-  // The API throttles aggressively — limit to 5 chats max, in micro-batches of 2.
-  const chatsNeedingEnrichment = chats.filter(c => !c.last_message).slice(0, 5)
-  const BATCH_SIZE = 2
-  for (let i = 0; i < chatsNeedingEnrichment.length; i += BATCH_SIZE) {
-    const batch = chatsNeedingEnrichment.slice(i, i + BATCH_SIZE)
-    const enrichPromises = batch.map(async (chat) => {
+  // Filter out phantom contacts: chats synced from the WhatsApp directory
+  // that have no message history (last_message_timestamp is null AND last_message_uid is null).
+  // These are contacts like '.', '0', '????', or long numeric @lid IDs.
+  const realChats = chats.filter(c => {
+    const hasMessageHistory = !!(c.last_message_time || c.last_message_uid)
+    return hasMessageHistory
+  })
+
+  // Enrich message previews: the /chats endpoint doesn't return message text,
+  // only last_message_uid. Fetch the latest message for chats missing a preview.
+  // Limit to 8 chats in batches of 3 to avoid 429 rate limits.
+  const chatsNeedingPreview = realChats.filter(c => !c.last_message).slice(0, 8)
+  const BATCH_SIZE = 3
+  for (let i = 0; i < chatsNeedingPreview.length; i += BATCH_SIZE) {
+    const batch = chatsNeedingPreview.slice(i, i + BATCH_SIZE)
+    await Promise.all(batch.map(async (chat) => {
       try {
-        const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1`, {
+        const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1&sorting_order=desc`, {
           method: 'GET',
           headers: authHeaders(apiKey),
         })
@@ -230,7 +239,6 @@ export async function getChats(
           if (msgs.length > 0) {
             const latestMsg = msgs[0]
             let text = String(latestMsg.text ?? latestMsg.body ?? latestMsg.caption ?? '')
-            // If no text but has attachment, show a descriptive label
             if (!text && (latestMsg.has_attachment || latestMsg.attachment_url)) {
               const fn = String(latestMsg.attachment_filename ?? '').toLowerCase()
               if (fn.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/)) text = '📷 Imagen'
@@ -239,63 +247,41 @@ export async function getChats(
               else text = '📎 Archivo'
             }
             chat.last_message = text.length > 60 ? text.slice(0, 60) + '…' : text
-            // Also update last_message_time from the enriched message for correct sorting
-            const msgTimestamp = String(latestMsg.timestamp ?? latestMsg.created_at ?? '')
-            if (msgTimestamp && !chat.last_message_time) {
-              chat.last_message_time = msgTimestamp
-            }
           }
         }
       } catch {
         // Silently skip individual enrichment failures
       }
-    })
-    await Promise.all(enrichPromises)
-    // Small delay between batches to respect rate limits
-    if (i + BATCH_SIZE < chatsNeedingEnrichment.length) {
-      await new Promise(r => setTimeout(r, 500))
+    }))
+    if (i + BATCH_SIZE < chatsNeedingPreview.length) {
+      await new Promise(r => setTimeout(r, 400))
     }
   }
 
-  // Sort chats by last_message_time descending → most recent conversations first
-  // IMPORTANT: The Timelines AI API already returns chats sorted by recent activity.
-  // We ONLY re-sort when a chat has a valid last_message_time (from enrichment or API).
-  // We do NOT use created_timestamp for sorting — it's often identical across many chats,
-  // which would scramble the API's native ordering.
-  const indexMap = new Map(chats.map((c, i) => [c.id, i]))
-
-  chats.sort((a, b) => {
-    const parseTime = (t: string | undefined): number => {
-      if (!t) return 0
-      if (/^\d+$/.test(t)) return Number(t) * (t.length <= 10 ? 1000 : 1)
-      const d = new Date(t).getTime()
-      if (!isNaN(d)) return d
-      const isoish = t.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s*([+-]\d{4})/, '$1T$2$3')
-      const d2 = new Date(isoish).getTime()
-      return isNaN(d2) ? 0 : d2
-    }
-    const timeA = parseTime(a.last_message_time)
-    const timeB = parseTime(b.last_message_time)
-
-    // Both have message timestamps → sort by most recent message
-    if (timeA > 0 && timeB > 0) return timeB - timeA
-    // Chat WITH messages should appear before chat WITHOUT messages
-    if (timeA > 0 && timeB === 0) return -1
-    if (timeB > 0 && timeA === 0) return 1
-    // Neither has message timestamps → preserve API's native order
-    return (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0)
-  })
-
   return {
-    chats,
+    chats: realChats,
     hasMore: json?.data?.has_more_pages === true,
     page,
   }
 }
 
-/** Fetch messages for a specific chat */
-export async function getChatMessages(apiKey: string, chatId: string): Promise<TimelinesMessage[]> {
-  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
+/** Fetch messages for a specific chat.
+ *  Supports incremental loading via afterMessage — only fetches messages
+ *  created after the specified message UID.
+ *  Uses sorting_order=asc so messages are in chronological order.
+ */
+export async function getChatMessages(
+  apiKey: string,
+  chatId: string,
+  options?: { afterMessage?: string }
+): Promise<TimelinesMessage[]> {
+  const params = new URLSearchParams()
+  params.set('sorting_order', 'asc')
+  if (options?.afterMessage) {
+    params.set('after_message', options.afterMessage)
+  }
+
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages?${params.toString()}`, {
     method: 'GET',
     headers: authHeaders(apiKey),
   })
@@ -305,7 +291,6 @@ export async function getChatMessages(apiKey: string, chatId: string): Promise<T
   }
 
   const json = await response.json()
-  // Real response: { status: "ok", data: { messages: [...] } } or similar
   const raw = extractArray<Record<string, unknown>>(json, 'messages', 'data', 'results')
   return raw.map(normaliseMessage)
 }

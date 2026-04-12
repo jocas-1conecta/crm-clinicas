@@ -5,7 +5,7 @@ import { useStore } from '../../store/useStore'
 import { supabase } from '../../services/supabase'
 import { useChats, useChatMessages, useSendMessage, useApiKey, useUpdateChat, useWorkspaceMembers, useUploadAndSendFile, useTemplates, useChatRealtime, useCreateNewConversation, useMarkChatAsRead, useChatLabels, useAddChatNote } from './useTimelinesAI'
 import { useChatContactMap } from './useChatContactMap'
-import { TimelinesChat, TimelinesMessage } from '../../services/timelinesAIService'
+import { TimelinesChat, TimelinesMessage, ChatViewFilter } from '../../services/timelinesAIService'
 import {
     LucideSearch,
     LucideSend,
@@ -192,17 +192,10 @@ const EmptyState = ({ icon: Icon, title, subtitle, action }: {
 
 // ─── Chat List Panel ─────────────────────────────────────────────────────────
 
-const STATUS_TABS = [
-    { key: 'open',   label: 'Abiertos' },
-    { key: 'closed', label: 'Cerrados' },
-    { key: 'all',    label: 'Todos' },
-] as const
-
-const TYPE_PILLS = [
-    { key: 'all',    label: 'Todos' },
-    { key: 'direct', label: 'Directos' },
-    { key: 'group',  label: 'Grupos' },
-] as const
+const VIEW_TABS = [
+    { key: 'open' as const,   label: 'Abiertos', icon: LucideInbox },
+    { key: 'unread' as const, label: 'No leídos', icon: LucideMessageSquare },
+]
 
 const ChatListPanel = ({
     chats,
@@ -213,10 +206,8 @@ const ChatListPanel = ({
     onRefresh,
     hasMore,
     onLoadMore,
-    statusFilter,
-    typeFilter,
-    onStatusChange,
-    onTypeChange,
+    viewFilter,
+    onViewChange,
 }: {
     chats: TimelinesChat[]
     selectedId: string | null
@@ -226,10 +217,8 @@ const ChatListPanel = ({
     onRefresh: () => void
     hasMore: boolean
     onLoadMore: () => void
-    statusFilter: 'all' | 'open' | 'closed'
-    typeFilter: 'all' | 'direct' | 'group'
-    onStatusChange: (v: 'all' | 'open' | 'closed') => void
-    onTypeChange: (v: 'all' | 'direct' | 'group') => void
+    viewFilter: ChatViewFilter
+    onViewChange: (v: ChatViewFilter) => void
 }) => {
     const [search, setSearch] = useState('')
     const [showNewChat, setShowNewChat] = useState(false)
@@ -344,38 +333,26 @@ const ChatListPanel = ({
                     />
                 </div>
 
-                {/* Status tabs: Todos / Abiertos / Cerrados */}
+                {/* View tabs: Abiertos / No leídos */}
                 <div className="flex gap-1 mb-2">
-                    {STATUS_TABS.map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => onStatusChange(tab.key)}
-                            className={`flex-1 text-xs py-1.5 rounded-lg font-medium transition-colors ${
-                                statusFilter === tab.key
-                                    ? 'bg-green-500 text-white'
-                                    : 'text-gray-400 hover:bg-white/10'
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Type pills: Todos / Directos / Grupos */}
-                <div className="flex gap-1">
-                    {TYPE_PILLS.map(pill => (
-                        <button
-                            key={pill.key}
-                            onClick={() => onTypeChange(pill.key)}
-                            className={`flex-1 text-[11px] py-1 rounded-lg transition-colors ${
-                                typeFilter === pill.key
-                                    ? 'bg-white/20 text-white'
-                                    : 'text-gray-500 hover:bg-white/10'
-                            }`}
-                        >
-                            {pill.label}
-                        </button>
-                    ))}
+                    {VIEW_TABS.map(tab => {
+                        const Icon = tab.icon
+                        const isActive = viewFilter === tab.key
+                        return (
+                            <button
+                                key={tab.key}
+                                onClick={() => onViewChange(tab.key)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg font-medium transition-all duration-200 ${
+                                    isActive
+                                        ? 'bg-green-500 text-white shadow-md shadow-green-500/25'
+                                        : 'text-gray-400 hover:bg-white/10 hover:text-gray-300'
+                                }`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                            </button>
+                        )
+                    })}
                 </div>
             </div>
 
@@ -395,20 +372,37 @@ const ChatListPanel = ({
                 )}
 
                 {!isLoading && !isError && filtered.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-gray-500 text-sm">
-                        <LucideMessageSquare className="w-8 h-8 text-gray-600" />
-                        <span>{search ? 'Sin resultados' : 'No hay chats'}</span>
+                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-gray-500 text-sm px-4 text-center">
+                        {search ? (
+                            <>
+                                <LucideSearch className="w-8 h-8 text-gray-600" />
+                                <span>Sin resultados para "{search}"</span>
+                            </>
+                        ) : viewFilter === 'unread' ? (
+                            <>
+                                <LucideInbox className="w-8 h-8 text-green-500/50" />
+                                <span className="text-green-400/70">¡Todo atendido! 🎉</span>
+                                <span className="text-xs text-gray-600">No tienes chats sin leer</span>
+                            </>
+                        ) : (
+                            <>
+                                <LucideMessageSquare className="w-8 h-8 text-gray-600" />
+                                <span>No hay chats abiertos</span>
+                                <span className="text-xs text-gray-600">Prueba en "No leídos"</span>
+                            </>
+                        )}
                     </div>
                 )}
 
                 {filtered.map(chat => {
+                    const isUnread = (chat.unread_count ?? 0) > 0
                     const isUnassigned = !chat.chat_assignee
 
                     return (
                     <button
                         key={chat.id}
                         onClick={() => onSelect(chat)}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left relative ${selectedId === chat.id ? 'bg-white/10' : ''} ${isUnassigned ? 'chat-unassigned-glow' : ''}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left relative ${selectedId === chat.id ? 'bg-white/10' : ''} ${isUnread ? 'chat-unread-glow' : ''} ${isUnassigned ? 'chat-unassigned-glow' : ''}`}
                     >
                         {/* Avatar */}
                         <div className="relative shrink-0">
@@ -1172,9 +1166,8 @@ export const ChatModule: React.FC = () => {
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
-    // Filter state
-    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('open')
-    const [typeFilter, setTypeFilter]     = useState<'all' | 'direct' | 'group'>('all')
+    // Filter state — simplified to 2 views
+    const [viewFilter, setViewFilter] = useState<ChatViewFilter>('open')
 
     const {
         data: chats,
@@ -1184,7 +1177,7 @@ export const ChatModule: React.FC = () => {
         hasMore,
         loadMore,
         resetAndRefetch,
-    } = useChats({ status: statusFilter, chatType: typeFilter })
+    } = useChats({ view: viewFilter })
 
     // Bidirectional mapping: auto-link chats to leads/patients, filter by assignment
     const { visibleChatIds } = useChatContactMap(chats)
@@ -1198,14 +1191,8 @@ export const ChatModule: React.FC = () => {
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
 
-    const handleStatusChange = (v: 'all' | 'open' | 'closed') => {
-        setStatusFilter(v)
-        setSelectedChat(null)
-        resetAndRefetch()
-    }
-
-    const handleTypeChange = (v: 'all' | 'direct' | 'group') => {
-        setTypeFilter(v)
+    const handleViewChange = (v: ChatViewFilter) => {
+        setViewFilter(v)
         setSelectedChat(null)
         resetAndRefetch()
     }
@@ -1248,10 +1235,8 @@ export const ChatModule: React.FC = () => {
 
                 hasMore={hasMore}
                 onLoadMore={loadMore}
-                statusFilter={statusFilter}
-                typeFilter={typeFilter}
-                onStatusChange={handleStatusChange}
-                onTypeChange={handleTypeChange}
+                viewFilter={viewFilter}
+                onViewChange={handleViewChange}
             />
             <ConversationPanel
                 chat={selectedChat}

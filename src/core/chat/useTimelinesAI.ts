@@ -153,10 +153,9 @@ function playNotificationSound() {
     }
 }
 
-/** Hook to fetch and paginate chats with filters */
+/** Hook to fetch and paginate chats with simplified 2-tab filter */
 export function useChats(options: {
-    status?: api.ChatStatusFilter
-    chatType?: api.ChatTypeFilter
+    view?: api.ChatViewFilter
 } = {}) {
     const { data: apiKey } = useApiKey()
     const [page, setPage] = useState(1)
@@ -164,14 +163,13 @@ export function useChats(options: {
     const [hasMore, setHasMore] = useState(false)
 
     // Stable queryKey — page is NOT included so cache survives tab switches
-    const queryKey = ['timelines_chats', apiKey, options.status, options.chatType]
+    const queryKey = ['timelines_chats', apiKey, options.view]
 
     const query = useQuery({
         queryKey: [...queryKey, page],
         queryFn: async () => {
             const result = await api.getChats(apiKey!, {
-                status: options.status,
-                chatType: options.chatType,
+                view: options.view,
                 page,
             })
             setHasMore(result.hasMore)
@@ -215,17 +213,52 @@ export function useChats(options: {
     }
 }
 
-/** Fetch messages for a specific chat */
+/** Fetch messages for a specific chat with incremental loading.
+ *  On first load: fetches all messages (sorted asc).
+ *  On subsequent polls: only fetches messages AFTER the last cached one,
+ *  then merges them into the existing cache — avoiding full reloads.
+ */
 export function useChatMessages(chatId: string | null) {
     const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
 
     return useQuery({
         queryKey: ['timelines_messages', apiKey, chatId],
-        queryFn: () => api.getChatMessages(apiKey!, chatId!),
+        queryFn: async () => {
+            // Check for existing cached messages
+            const cached = queryClient.getQueryData<api.TimelinesMessage[]>(
+                ['timelines_messages', apiKey, chatId]
+            )
+
+            if (cached && cached.length > 0) {
+                // Incremental: only fetch messages after the last cached one
+                const lastUid = cached[cached.length - 1].uid
+                // Skip temp messages (optimistic updates)
+                const realLastUid = lastUid.startsWith('temp-')
+                    ? cached.filter(m => !m.uid.startsWith('temp-')).pop()?.uid
+                    : lastUid
+
+                if (realLastUid) {
+                    const newMsgs = await api.getChatMessages(apiKey!, chatId!, {
+                        afterMessage: realLastUid,
+                    })
+                    if (newMsgs.length > 0) {
+                        // Deduplicate by uid and merge
+                        const existingUids = new Set(cached.map(m => m.uid))
+                        const unique = newMsgs.filter(m => !existingUids.has(m.uid))
+                        return [...cached, ...unique]
+                    }
+                    return cached // No new messages
+                }
+            }
+
+            // First load: fetch all messages
+            return api.getChatMessages(apiKey!, chatId!)
+        },
         enabled: !!apiKey && !!chatId,
         staleTime: 10_000,         // Don't refetch for 10s — realtime handles most updates
         gcTime: 5 * 60 * 1000,    // Keep message cache for 5min after unmount
-        refetchInterval: 15_000,   // Fallback poll every 15s
+        refetchInterval: 15_000,   // Fallback poll every 15s (incremental, not full reload)
         refetchOnWindowFocus: false,
         retry: 1,
     })
