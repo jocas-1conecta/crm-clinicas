@@ -208,6 +208,7 @@ const ChatListPanel = ({
     onLoadMore,
     viewFilter,
     onViewChange,
+    currentUserEmail,
 }: {
     chats: TimelinesChat[]
     selectedId: string | null
@@ -219,12 +220,30 @@ const ChatListPanel = ({
     onLoadMore: () => void
     viewFilter: ChatViewFilter
     onViewChange: (v: ChatViewFilter) => void
+    currentUserEmail?: string
 }) => {
     const [search, setSearch] = useState('')
     const [showNewChat, setShowNewChat] = useState(false)
     const [newPhone, setNewPhone] = useState('')
     const [newText, setNewText] = useState('')
     const createMutation = useCreateNewConversation()
+
+    /** Determine which glow class a chat should get:
+     *  - 'chat-glow-new'  (green)  → unassigned in Timelines AI
+     *  - 'chat-glow-mine' (cyan)   → assigned to current user
+     *  - ''               (none)   → assigned to someone else, or read
+     */
+    const getGlowClass = (chat: TimelinesChat) => {
+        const isUnassigned = !chat.chat_assignee && !chat.responsible_email
+        if (isUnassigned) return 'chat-glow-new'
+        // Assigned to me?
+        if (currentUserEmail && chat.responsible_email) {
+            if (chat.responsible_email.toLowerCase() === currentUserEmail.toLowerCase()) {
+                return 'chat-glow-mine'
+            }
+        }
+        return '' // assigned to someone else — no glow
+    }
 
     const handleCreateChat = () => {
         if (!newPhone.trim() || !newText.trim()) return
@@ -395,24 +414,30 @@ const ChatListPanel = ({
                 )}
 
                 {filtered.map(chat => {
-                    const isUnread = (chat.unread_count ?? 0) > 0
-                    const isUnassigned = !chat.chat_assignee
+                    const isUnassigned = !chat.chat_assignee && !chat.responsible_email
+                    const glowClass = getGlowClass(chat)
+                    const isMyChat = glowClass === 'chat-glow-mine'
+                    const isNew = glowClass === 'chat-glow-new'
 
                     return (
                     <button
                         key={chat.id}
                         onClick={() => onSelect(chat)}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left relative ${selectedId === chat.id ? 'bg-white/10' : ''} ${isUnread ? 'chat-unread-glow' : ''} ${isUnassigned ? 'chat-unassigned-glow' : ''}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/5 transition-colors text-left relative ${selectedId === chat.id ? 'bg-white/10' : ''} ${glowClass}`}
                     >
                         {/* Avatar */}
                         <div className="relative shrink-0">
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base ${isUnassigned ? 'bg-gradient-to-br from-lime-400 to-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-gradient-to-br from-emerald-400 to-teal-600'}`}>
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base ${
+                                isNew ? 'bg-gradient-to-br from-lime-400 to-emerald-500 shadow-lg shadow-emerald-500/40'
+                                : isMyChat ? 'bg-gradient-to-br from-sky-400 to-blue-500 shadow-lg shadow-blue-500/30'
+                                : 'bg-gradient-to-br from-emerald-400 to-teal-600'
+                            }`}>
                                 {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
                             </div>
                             {(chat.unread_count ?? 0) > 0 && (
-                                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900" />
+                                <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 ${isMyChat ? 'bg-sky-400' : 'bg-green-400'}`} />
                             )}
-                            {isUnassigned && (
+                            {isNew && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-lime-400 rounded-full border-2 border-[#1a1f2e] flex items-center justify-center animate-pulse">
                                     <span className="text-[7px] font-black text-gray-900">✦</span>
                                 </div>
@@ -424,9 +449,14 @@ const ChatListPanel = ({
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                     <p className="text-sm font-semibold text-white truncate">{chat.name || chat.phone}</p>
-                                    {isUnassigned && (
+                                    {isNew && (
                                         <span className="shrink-0 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-lime-400/20 text-lime-300 rounded-full border border-lime-400/30">
                                             Nuevo
+                                        </span>
+                                    )}
+                                    {isMyChat && (
+                                        <span className="shrink-0 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-sky-400/20 text-sky-300 rounded-full border border-sky-400/30">
+                                            Tuyo
                                         </span>
                                     )}
                                 </div>
@@ -1155,11 +1185,131 @@ const NoApiKeyBanner = () => (
     </div>
 )
 
+// ─── New Chat Assignment Modal ───────────────────────────────────────────────
+
+const DISMISS_KEY = 'chat_new_modal_dismissed'
+
+const NewChatModal = ({
+    chat,
+    members,
+    onAssign,
+    onClose,
+}: {
+    chat: TimelinesChat
+    members: { id: string; name: string; email: string }[]
+    onAssign: (email: string) => void
+    onClose: () => void
+}) => {
+    const [selectedMember, setSelectedMember] = useState('')
+    const [dontShowAgain, setDontShowAgain] = useState(false)
+
+    const handleClose = () => {
+        if (dontShowAgain) {
+            localStorage.setItem(DISMISS_KEY, 'true')
+        }
+        onClose()
+    }
+
+    const handleAssign = () => {
+        if (dontShowAgain) {
+            localStorage.setItem(DISMISS_KEY, 'true')
+        }
+        if (selectedMember) {
+            onAssign(selectedMember)
+        }
+        onClose()
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={handleClose}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 animate-in fade-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-white font-bold shadow-lg shadow-emerald-500/30">
+                        {(chat.name || chat.phone || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900">Nuevo chat entrante</h3>
+                        <p className="text-sm text-gray-500">{chat.name || chat.phone}</p>
+                    </div>
+                </div>
+
+                {/* Explanation */}
+                <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-3">
+                    <p className="text-sm text-gray-700 font-medium">Este chat viene de un contacto nuevo y aún no ha sido asignado.</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 shrink-0" />
+                        <span className="text-xs text-gray-600"><strong className="text-emerald-600">Verde</strong> = Chat nuevo, sin asignar</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 shrink-0" />
+                        <span className="text-xs text-gray-600"><strong className="text-blue-600">Celeste</strong> = Asignado a ti</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 shrink-0" />
+                        <span className="text-xs text-gray-600"><strong className="text-teal-600">Teal</strong> = Asignado a otro asesor</span>
+                    </div>
+                </div>
+
+                {/* Assign to */}
+                {members.length > 0 && (
+                    <div className="mb-4">
+                        <label className="text-sm font-medium text-gray-700 mb-1.5 block">¿Asignar a otro asesor? (opcional)</label>
+                        <select
+                            value={selectedMember}
+                            onChange={e => setSelectedMember(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        >
+                            <option value="">— Mantener sin asignar —</option>
+                            {members.map(m => (
+                                <option key={m.id} value={m.email}>{m.name} ({m.email})</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* Don't show again */}
+                <label className="flex items-center gap-2 mb-4 cursor-pointer group">
+                    <input
+                        type="checkbox"
+                        checked={dontShowAgain}
+                        onChange={e => setDontShowAgain(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">No mostrar esto de nuevo</span>
+                </label>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                    {selectedMember ? (
+                        <button
+                            onClick={handleAssign}
+                            className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-semibold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <LucideUserCheck className="w-4 h-4" />
+                            Asignar y continuar
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleClose}
+                            className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-semibold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all shadow-sm"
+                        >
+                            Entendido
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ─── Main Module ──────────────────────────────────────────────────────────────
 
 export const ChatModule: React.FC = () => {
     const { currentUser } = useStore()
     const markAsRead = useMarkChatAsRead()
+    const updateChat = useUpdateChat()
+    const { data: workspaceMembers = [] } = useWorkspaceMembers()
 
     // Admin/Director roles should NOT mark chats as read when viewing
     const isAdmin = ['Platform_Owner', 'Super_Admin', 'Admin_Clinica'].includes(currentUser?.role ?? '')
@@ -1191,10 +1341,39 @@ export const ChatModule: React.FC = () => {
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
 
+    // New chat modal state
+    const [newChatModalChat, setNewChatModalChat] = useState<TimelinesChat | null>(null)
+
     const handleViewChange = (v: ChatViewFilter) => {
         setViewFilter(v)
         setSelectedChat(null)
         resetAndRefetch()
+    }
+
+    const handleSelectChat = (chat: TimelinesChat) => {
+        setSelectedChat(chat)
+        setShowInfo(false)
+
+        // Mark as read only for non-admin roles
+        if (!isAdmin && (chat.unread_count ?? 0) > 0) {
+            markAsRead(chat.id)
+        }
+
+        // Show new-chat modal if unassigned and not dismissed
+        const isUnassigned = !chat.chat_assignee && !chat.responsible_email
+        const isDismissed = localStorage.getItem(DISMISS_KEY) === 'true'
+        if (isUnassigned && !isDismissed) {
+            setNewChatModalChat(chat)
+        }
+    }
+
+    const handleAssignFromModal = (email: string) => {
+        if (newChatModalChat) {
+            updateChat.mutate({
+                chatId: newChatModalChat.id,
+                payload: { responsible: email },
+            })
+        }
     }
 
     if (keyLoading) {
@@ -1214,6 +1393,7 @@ export const ChatModule: React.FC = () => {
     }
 
     return (
+        <>
         <div
             className="flex bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
             style={{ height: 'calc(100vh - 128px)' }}
@@ -1221,22 +1401,15 @@ export const ChatModule: React.FC = () => {
             <ChatListPanel
                 chats={filteredChats}
                 selectedId={selectedChat?.id ?? null}
-                onSelect={(chat) => {
-                    setSelectedChat(chat)
-                    setShowInfo(false)
-                    // Mark as read only for non-admin roles
-                    if (!isAdmin && (chat.unread_count ?? 0) > 0) {
-                        markAsRead(chat.id)
-                    }
-                }}
+                onSelect={handleSelectChat}
                 isLoading={chatsLoading}
                 isError={isError}
                 onRefresh={refetch}
-
                 hasMore={hasMore}
                 onLoadMore={loadMore}
                 viewFilter={viewFilter}
                 onViewChange={handleViewChange}
+                currentUserEmail={currentUser?.email}
             />
             <ConversationPanel
                 chat={selectedChat}
@@ -1247,5 +1420,17 @@ export const ChatModule: React.FC = () => {
                 <ContactInfoPanel chat={selectedChat} onClose={() => setShowInfo(false)} />
             )}
         </div>
+
+        {/* New Chat Assignment Modal */}
+        {newChatModalChat && (
+            <NewChatModal
+                chat={newChatModalChat}
+                members={workspaceMembers}
+                onAssign={handleAssignFromModal}
+                onClose={() => setNewChatModalChat(null)}
+            />
+        )}
+        </>
     )
 }
+

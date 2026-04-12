@@ -158,51 +158,54 @@ export function useChats(options: {
     view?: api.ChatViewFilter
 } = {}) {
     const { data: apiKey } = useApiKey()
+    const queryClient = useQueryClient()
     const [page, setPage] = useState(1)
     const [accumulatedChats, setAccumulatedChats] = useState<api.TimelinesChat[]>([])
     const [hasMore, setHasMore] = useState(false)
 
-    // Stable queryKey — page is NOT included so cache survives tab switches
-    const queryKey = ['timelines_chats', apiKey, options.view]
-
     const query = useQuery({
-        queryKey: [...queryKey, page],
+        queryKey: ['timelines_chats', apiKey, options.view, page],
         queryFn: async () => {
-            const result = await api.getChats(apiKey!, {
+            return await api.getChats(apiKey!, {
                 view: options.view,
                 page,
             })
-            setHasMore(result.hasMore)
-            if (page === 1) {
-                setAccumulatedChats(result.chats)
-            } else {
-                setAccumulatedChats(prev => {
-                    // Merge: avoid duplicates by id
-                    const existingIds = new Set(prev.map(c => c.id))
-                    const newChats = result.chats.filter(c => !existingIds.has(c.id))
-                    return [...prev, ...newChats]
-                })
-            }
-            return result
         },
         enabled: !!apiKey,
-        staleTime: 60_000,         // Data stays fresh for 60s — no refetch on tab switch
-        gcTime: 10 * 60 * 1000,   // Keep cache for 10min even after unmount
-        refetchInterval: 60_000,   // Background refresh every 60s
-        refetchOnWindowFocus: false, // Don't refetch when switching browser tabs
+        staleTime: 30_000,           // 30s — short enough for tab switches to feel fresh
+        gcTime: 5 * 60 * 1000,      // 5min cache
+        refetchInterval: 60_000,     // Background refresh every 60s
+        refetchOnWindowFocus: false,
         retry: 1,
     })
+
+    // Sync accumulated chats from query data — runs when query data changes OR cache returns
+    useEffect(() => {
+        if (!query.data) return
+        setHasMore(query.data.hasMore)
+        if (page === 1) {
+            setAccumulatedChats(query.data.chats)
+        } else {
+            setAccumulatedChats(prev => {
+                const existingIds = new Set(prev.map(c => c.id))
+                const newChats = query.data.chats.filter(c => !existingIds.has(c.id))
+                return [...prev, ...newChats]
+            })
+        }
+    }, [query.data, page])
 
     const loadMore = useCallback(() => {
         if (hasMore && !query.isFetching) setPage(p => p + 1)
     }, [hasMore, query.isFetching])
 
-    // Reset to page 1 when filters change
+    // Reset to page 1 and force fresh fetch when tab changes
     const resetAndRefetch = useCallback(() => {
         setPage(1)
         setAccumulatedChats([])
         setHasMore(false)
-    }, [])
+        // Remove stale cache for ALL chat list queries so queryFn re-runs
+        queryClient.removeQueries({ queryKey: ['timelines_chats'] })
+    }, [queryClient])
 
     return {
         ...query,
