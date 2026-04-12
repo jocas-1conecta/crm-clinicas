@@ -293,10 +293,12 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 
 | Parámetro | Chat List | Messages |
 |-----------|-----------|----------|
-| `staleTime` | 60s | 15s |
-| `gcTime` | 10 min | 5 min |
+| `staleTime` | 30s | 15s |
+| `gcTime` | 5 min | 5 min |
 | `refetchInterval` | 60s | 15s |
 | `refetchOnWindowFocus` | No | No |
+
+> **Nota importante sobre tab switching:** La acumulación de chats se hace en un `useEffect` que reacciona a `query.data`, NO dentro del `queryFn`. Cuando el usuario cambia de tab, `resetAndRefetch()` llama `queryClient.removeQueries()` para forzar un fetch fresco (evita el bug donde el cache stale impedía re-ejecutar el queryFn).
 
 ---
 
@@ -319,13 +321,28 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 | 📥 **Abiertos** | `closed=false` | Todos los chats abiertos (leídos + no leídos) |
 | 💬 **No leídos** | `closed=false&read=false` | Solo chats con mensajes pendientes |
 
-### Efectos Visuales
+### Efectos Visuales — Sistema de Glows Contextuales
 
-- **Glow verde pulsante** (`.chat-unread-glow`): Chats con `unread_count > 0` tienen un borde izquierdo verde animado
-- **Glow lime pulsante** (`.chat-unassigned-glow`): Chats sin responsable (para asignar)
-- **Badge "NUEVO"**: Chats sin `chat_assignee`
-- **Punto verde**: Indicador de no leído en el avatar
+| Clase CSS | Color | Condición | Significado |
+|-----------|-------|-----------|-------------|
+| `.chat-glow-new` | 🟢 Verde | `!chat_assignee && !responsible_email` | Chat nuevo, sin asignar |
+| `.chat-glow-mine` | 🔵 Celeste | `responsible_email === currentUser.email` | Asignado a ti |
+| _(sin glow)_ | — | Asignado a otro asesor | No requiere tu atención |
+
+- **Badge "NUEVO"** (verde): Indica chat sin responsable asignado en Timelines AI
+- **Badge "TUYO"** (celeste): Indica chat asignado al usuario actual
+- **Punto de notificación**: Verde (nuevo) o celeste (tuyo) en el avatar
 - **Audio notification**: Sonido Web Audio API (880Hz + 1100Hz) al recibir mensaje
+
+### Modal de Nuevo Chat
+
+Cuando un asesor abre un chat sin asignar (`!chat_assignee && !responsible_email`), se muestra un modal informativo:
+
+1. **Explica los colores**: Verde = nuevo, Celeste = tuyo, Teal = otro asesor
+2. **Opción de asignar**: Dropdown con miembros del workspace de Timelines AI
+3. **"No mostrar de nuevo"**: Checkbox que guarda preferencia en `localStorage` (`chat_new_modal_dismissed`)
+
+Si el usuario marca "No mostrar de nuevo", el modal no aparece en futuros chats nuevos. La preferencia se puede resetear borrando `localStorage.removeItem('chat_new_modal_dismissed')` desde DevTools.
 
 ### Mapeo Chat → Contacto CRM
 
