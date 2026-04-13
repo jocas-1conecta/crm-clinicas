@@ -542,12 +542,15 @@ timelines_account_id      TEXT   -- Account ID para multi-tenant webhook routing
 ```
 1. ChatModule monta
 2. useApiKey() → supabase.rpc('get_timelines_api_key') → API key descifrada
-3. useChats({ view: 'open' }) → GET /chats?closed=false
-4. Timelines AI retorna chats crudos
-5. normaliseChat() mapea campos
-6. Filtro fantasma: descarta chats sin last_message_uid
-7. Enriquecimiento: fetch preview de últimos 8 chats sin texto
-8. useChatContactMap() filtra por visibilidad del asesor
+3. useChats() → getChats() dual-fetch:
+   a. GET /chats?closed=false&read=false (no leídos)
+   b. GET /chats?closed=false&read=true  (leídos)
+   c. Merge + dedup por chat ID + sort por timestamp
+4. normaliseChat() mapea campos, unread_count correcto
+5. Filtro fantasma: descarta chats sin last_message_uid
+6. Enriquecimiento: fetch preview de últimos 5 chats sin texto
+7. useChatContactMap() filtra por visibilidad del asesor
+8. Tab "No leídos" → filtro client-side: unread_count > 0 (instantáneo)
 9. ChatListPanel renderiza con glow animado
 ```
 
@@ -633,11 +636,10 @@ timelines_account_id      TEXT   -- Account ID para multi-tenant webhook routing
 #### Chats
 
 ```http
-# Listar chats abiertos (paginado, 50 por página)
-GET /chats?closed=false&page=1
-
-# Listar chats no leídos
-GET /chats?closed=false&read=false&page=1
+# Listar chats abiertos — DUAL-FETCH (siempre ambos en paralelo)
+GET /chats?closed=false&read=false&page=1   # No leídos (sin fantasmas)
+GET /chats?closed=false&read=true&page=1    # Leídos (sin fantasmas)
+# ⚠️ NUNCA usar GET /chats?closed=false sin filtro read → devuelve 500+ fantasmas
 
 # Buscar chat por teléfono
 GET /chats?phone=+573158166898
