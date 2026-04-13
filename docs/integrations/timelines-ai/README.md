@@ -1,6 +1,6 @@
 # Integración Timelines AI (WhatsApp)
 
-> **Última actualización:** 2026-04-12  
+> **Última actualización:** 2026-04-13  
 > **Estado:** ✅ Producción  
 > **Documentación oficial:**  
 > - API: https://timelinesai.mintlify.app/public-api-reference/overview  
@@ -83,12 +83,13 @@ Timelines AI es un servicio SaaS que conecta cuentas de WhatsApp Business/Person
 ```
 src/
 ├── services/
-│   └── timelinesAIService.ts          ← API client + types + normalización
+│   └── timelinesAIService.ts                ← API client + types + normalización
 ├── core/chat/
-│   ├── ChatModule.tsx                 ← UI completa (lista + conversación + info)
-│   ├── useTimelinesAI.ts             ← Hooks React Query (chats, messages, mutations)
-│   └── useChatContactMap.ts          ← Mapeo chat ↔ lead/patient + filtro visibilidad
-├── index.css                          ← CSS animaciones (glow no leídos)
+│   ├── ChatModule.tsx                       ← UI completa (lista + conversación + info)
+│   ├── useTimelinesAI.ts                    ← Hooks React Query (chats, messages, mutations)
+│   ├── useChatContactMap.ts                 ← Mapeo chat ↔ lead/patient + filtro visibilidad
+│   └── useGlobalChatNotifications.ts        ← Notificaciones globales (polling + browser)
+├── index.css                                ← CSS animaciones (glow no leídos)
 
 supabase/
 ├── functions/
@@ -164,11 +165,15 @@ interface TimelinesChat {
     closed?: boolean
     read?: boolean
     labels?: string[]
-    last_message?: string        // Preview del último mensaje
-    last_message_time?: string   // Timestamp del último mensaje
-    unread_count?: number        // 0 o 1 (basado en campo read)
-    chat_assignee?: string | null // Nombre del responsable en Timelines AI
+    last_message?: string              // Preview del último mensaje
+    last_message_time?: string         // Timestamp del último mensaje
+    last_message_uid?: string          // UID del último mensaje (para enriquecimiento)
+    unread_count?: number              // 0 o 1 (basado en campo read)
+    chat_assignee?: string | null      // Nombre del responsable en Timelines AI
+    responsible_email?: string | null   // Email del responsable (clave para glows)
+    responsible_name?: string | null    // Nombre del responsable
     whatsapp_account_phone?: string
+    chat_status?: string               // 'open' | 'closed' (derivado de closed)
 }
 
 // Mensaje de WhatsApp normalizado
@@ -178,10 +183,13 @@ interface TimelinesMessage {
     text: string
     timestamp: string
     from_me: boolean
-    message_type: 'text' | 'image' | 'document' | 'audio' | 'video' | string
+    direction?: 'sent' | 'received'    // Alternativa a from_me
+    message_type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'contact' | string
     has_attachment?: boolean
     attachment_url?: string
     attachment_filename?: string
+    media_url?: string                 // Alternativa a attachment_url
+    caption?: string                   // Caption de adjuntos
     author_name?: string
 }
 
@@ -288,12 +296,14 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 | `useChatLabels(chatId)` | CRUD de etiquetas del chat |
 | `useAddChatNote()` | Agregar nota interna |
 | `useAssignedPhones()` | Phones de leads/patients del asesor actual |
+| `useMessageStatus(messageUid)` | Historial de estado de entrega de un mensaje |
+| `useChatByPhone(phone)` | Busca un chat por teléfono (usado en LeadDetail y PatientDetail) |
 
 ### Configuración de Cache (React Query)
 
 | Parámetro | Chat List | Messages |
 |-----------|-----------|----------|
-| `staleTime` | 30s | 15s |
+| `staleTime` | 30s | 10s |
 | `gcTime` | 5 min | 5 min |
 | `refetchInterval` | 60s | 15s |
 | `refetchOnWindowFocus` | No | No |
@@ -357,6 +367,13 @@ Vincula automáticamente los chats de Timelines AI con leads/patients del CRM us
 - ❌ Chats mapeados a leads/patients de otro asesor
 
 **Admins ven todos los chats sin restricción.**
+
+**Hooks exportados:**
+
+| Hook | Propósito |
+|------|-----------|
+| `useChatContactMap(chats)` | Auto-mapea chats ↔ leads/patients y retorna `visibleChatIds` filtrados por rol |
+| `useLinkChatToContact()` | Mutation para vincular manualmente un chat a un lead o patient (upsert en `chat_contact_map`) |
 
 ---
 
@@ -423,6 +440,28 @@ supabase
         }
     })
 ```
+
+### Notificaciones Globales (fuera del Chat)
+
+**Archivo:** `src/core/chat/useGlobalChatNotifications.ts`  
+**Montado en:** `App.tsx` — se ejecuta en **todas las rutas**, no solo en `/chat`.
+
+Este hook complementa la subscripción Realtime con un **sistema de polling** que garantiza notificaciones incluso si Realtime no está configurado o falla:
+
+| Aspecto | Valor |
+|---------|-------|
+| **Intervalo de polling** | 5 segundos |
+| **Tabla consultada** | `chat_webhook_events` (últimos 10 registros) |
+| **Baseline** | Al montar, registra el último `id` como baseline para no notificar eventos viejos |
+| **Filtro** | Solo procesa eventos `message:received:new` posteriores al baseline |
+
+**Acciones al recibir un mensaje entrante:**
+
+1. 🔊 **Sonido de notificación** — Web Audio API (880Hz + 1100Hz, two-tone chime)
+2. 🖥️ **Browser notification** (OS-level) — Pide permiso al montar; muestra título con nombre/teléfono del contacto y preview del mensaje (80 chars). Click en la notificación navega a `/chat`.
+3. ⚡ **Invalidación de cache** — `invalidateQueries(['timelines_chats'])` + queries de mensajes por `chat_id`.
+
+> **Nota:** El permiso de browser notifications se solicita automáticamente al cargar la app. Si el usuario lo deniega, solo se reproduce el sonido.
 
 ---
 
