@@ -188,37 +188,59 @@ export async function getChats(
 ): Promise<GetChatsResult> {
   const { view = 'open', page = 1 } = options
 
-  const params = new URLSearchParams({ page: String(page) })
+  // ── Auto-skip phantom pages ─────────────────────────────────────────
+  // The Timelines AI API can return pages full of "phantom" contacts —
+  // WhatsApp directory entries with no message history (last_message_timestamp = null).
+  // When the phantom filter removes ALL chats from a page but has_more_pages is true,
+  // we automatically fetch the next page. Max 5 auto-skips to prevent infinite loops.
+  const MAX_AUTO_SKIP = 5
+  let currentPage = page
+  let realChats: TimelinesChat[] = []
+  let apiHasMore = false
 
-  // Both views only show open chats
-  params.set('closed', 'false')
+  for (let attempt = 0; attempt <= MAX_AUTO_SKIP; attempt++) {
+    const params = new URLSearchParams({ page: String(currentPage) })
 
-  // 'unread' view adds the read=false filter for only unread chats
-  if (view === 'unread') {
-    params.set('read', 'false')
+    // Both views only show open chats
+    params.set('closed', 'false')
+
+    // 'unread' view adds the read=false filter for only unread chats
+    if (view === 'unread') {
+      params.set('read', 'false')
+    }
+
+    const url = `${BASE_URL}/chats?${params.toString()}`
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: authHeaders(apiKey),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
+    }
+
+    const json = await response.json()
+    const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
+    const chats = raw.map(normaliseChat)
+
+    apiHasMore = json?.data?.has_more_pages === true
+
+    // Filter out phantom contacts: chats synced from the WhatsApp directory
+    // that have no message history (last_message_timestamp is null AND last_message_uid is null).
+    const pageRealChats = chats.filter(c => {
+      const hasMessageHistory = !!(c.last_message_time || c.last_message_uid)
+      return hasMessageHistory
+    })
+
+    realChats.push(...pageRealChats)
+
+    // If we got real chats OR there are no more pages, stop auto-skipping
+    if (realChats.length > 0 || !apiHasMore) break
+
+    // Entire page was phantoms and more pages exist → auto-skip to next page
+    console.log(`[getChats] Page ${currentPage} had only phantom contacts, auto-skipping to page ${currentPage + 1}`)
+    currentPage++
   }
-
-  const url = `${BASE_URL}/chats?${params.toString()}`
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: authHeaders(apiKey),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
-  }
-
-  const json = await response.json()
-  const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-  const chats = raw.map(normaliseChat)
-
-  // Filter out phantom contacts: chats synced from the WhatsApp directory
-  // that have no message history (last_message_timestamp is null AND last_message_uid is null).
-  // These are contacts like '.', '0', '????', or long numeric @lid IDs.
-  const realChats = chats.filter(c => {
-    const hasMessageHistory = !!(c.last_message_time || c.last_message_uid)
-    return hasMessageHistory
-  })
 
   // Enrich message previews: the /chats endpoint doesn't return message text,
   // only last_message_uid. Fetch the latest message for chats missing a preview.
@@ -260,8 +282,8 @@ export async function getChats(
 
   return {
     chats: realChats,
-    hasMore: json?.data?.has_more_pages === true,
-    page,
+    hasMore: apiHasMore,
+    page: currentPage,
   }
 }
 
