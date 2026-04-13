@@ -153,10 +153,10 @@ function playNotificationSound() {
     }
 }
 
-/** Hook to fetch and paginate chats with simplified 2-tab filter */
-export function useChats(options: {
-    view?: api.ChatViewFilter
-} = {}) {
+/** Hook to fetch and paginate all open chats.
+ *  The "No leídos" tab filters this data client-side via unread_count.
+ */
+export function useChats() {
     const { data: apiKey } = useApiKey()
     const queryClient = useQueryClient()
     const [page, setPage] = useState(1)
@@ -164,15 +164,12 @@ export function useChats(options: {
     const [hasMore, setHasMore] = useState(false)
 
     const query = useQuery({
-        queryKey: ['timelines_chats', apiKey, options.view, page],
+        queryKey: ['timelines_chats', apiKey, page],
         queryFn: async () => {
-            return await api.getChats(apiKey!, {
-                view: options.view,
-                page,
-            })
+            return await api.getChats(apiKey!, { page })
         },
         enabled: !!apiKey,
-        staleTime: 30_000,           // 30s — short enough for tab switches to feel fresh
+        staleTime: 30_000,           // 30s
         gcTime: 5 * 60 * 1000,      // 5min cache
         refetchInterval: 60_000,     // Background refresh every 60s
         refetchOnWindowFocus: false,
@@ -198,21 +195,29 @@ export function useChats(options: {
         if (hasMore && !query.isFetching) setPage(p => p + 1)
     }, [hasMore, query.isFetching])
 
-    // Reset to page 1 and force fresh fetch when tab changes
-    const resetAndRefetch = useCallback(() => {
+    // Force fresh fetch (manual refresh button)
+    const forceRefresh = useCallback(() => {
         setPage(1)
         setAccumulatedChats([])
         setHasMore(false)
-        // Remove stale cache for ALL chat list queries so queryFn re-runs
         queryClient.removeQueries({ queryKey: ['timelines_chats'] })
     }, [queryClient])
+
+    // Immediately update a chat in the local accumulated state
+    // Used for optimistic updates (e.g., mark as read) so tab filtering responds instantly
+    const updateChat = useCallback((chatId: string, patch: Partial<api.TimelinesChat>) => {
+        setAccumulatedChats(prev =>
+            prev.map(c => c.id === chatId ? { ...c, ...patch } : c)
+        )
+    }, [])
 
     return {
         ...query,
         data: accumulatedChats,
         hasMore,
         loadMore,
-        resetAndRefetch,
+        forceRefresh,
+        updateChat,
     }
 }
 

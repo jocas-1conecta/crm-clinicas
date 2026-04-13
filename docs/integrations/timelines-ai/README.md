@@ -236,28 +236,40 @@ read === false               → unread_count = 1
 phone (JID format)           → whatsapp_account_phone
 ```
 
-### Filtros de Chat y Eliminación de Fantasmas
+### Filtros de Chat y Eliminación de Fantasmas (Dual-Fetch)
+
+La API de Timelines AI devuelve "contactos fantasma" (entradas del directorio WhatsApp sin historial de mensajes) cuando se consulta sin filtro `read`. Estos fantasmas pueden ser 500+ entradas antes de aparecer chats reales.
+
+**Estrategia dual-fetch:** Para evitar fantasmas, `getChats()` siempre ejecuta 2 requests en paralelo:
 
 ```typescript
-// Vista "Abiertos": Todos los chats abiertos
-GET /chats?closed=false&page=1
-
-// Vista "No leídos": Solo chats abiertos + no leídos
-GET /chats?closed=false&read=false&page=1
+// Ambas requests en paralelo — NUNCA se llama sin filtro read
+GET /chats?closed=false&read=false&page=1  → chats no leídos (sin fantasmas)
+GET /chats?closed=false&read=true&page=1   → chats leídos (sin fantasmas)
 ```
 
-**Filtro post-procesamiento:** Se eliminan "chats fantasma" (contactos sincronizados sin historial de mensajes):
+Luego se combinan, deduplicando por chat ID, con `unread_count` correcto:
+- Chats de `read=true` → `unread_count = 0`
+- Chats de `read=false` → `unread_count = 1` (sobrescribe si duplicado)
+
+Se ordenan por `last_message_timestamp` DESC y se eliminan fantasmas:
 ```typescript
-const realChats = chats.filter(c => !!(c.last_message_time || c.last_message_uid))
+const realChats = merged.filter(c => !!(c.last_message_time || c.last_message_uid))
 ```
+
+El tab **"No leídos"** es un **filtro client-side** (`unread_count > 0`), NO hace una llamada adicional a la API.
+
+### Retry con Backoff Exponencial
+
+Todas las llamadas a la API usan `fetchWithRetry` con backoff exponencial (2s, 4s, 8s) para manejar errores HTTP 429 (rate limit).
 
 ### Enriquecimiento de Previews
 
 El endpoint `/chats` **NO retorna el texto del último mensaje**, solo `last_message_uid`. Por eso hacemos un enriquecimiento ligero:
 
-- Se toman los primeros 8 chats sin preview
-- Se fetch en batches de 3 (para evitar rate limit 429)
-- Delay de 400ms entre batches
+- Se toman los primeros 5 chats sin preview
+- Se fetch en batches de 2 (para evitar rate limit 429)
+- Delay de 800ms entre batches
 - Para adjuntos: se muestra emoji según extensión (📷 Imagen, 🎵 Audio, etc.)
 
 ### Carga Incremental de Mensajes
@@ -283,7 +295,7 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 | Hook | Propósito |
 |------|-----------|
 | `useApiKey()` | Obtiene la API key descifrada vía RPC |
-| `useChats({ view })` | Lista de chats con paginación y filtro de vista |
+| `useChats()` | Todos los chats abiertos (dual-fetch), filtrado de "No leídos" es client-side |
 | `useChatMessages(chatId)` | Mensajes con carga incremental y polling 15s |
 | `useSendMessage()` | Mutation para enviar texto con optimistic update |
 | `useUpdateChat()` | Mutation para cerrar/asignar/marcar leído |
@@ -308,7 +320,7 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 | `refetchInterval` | 60s | 15s |
 | `refetchOnWindowFocus` | No | No |
 
-> **Nota importante sobre tab switching:** La acumulación de chats se hace en un `useEffect` que reacciona a `query.data`, NO dentro del `queryFn`. Cuando el usuario cambia de tab, `resetAndRefetch()` llama `queryClient.removeQueries()` para forzar un fetch fresco (evita el bug donde el cache stale impedía re-ejecutar el queryFn).
+> **Nota sobre tab switching:** Los tabs "Abiertos" y "No leídos" comparten la misma query de datos. El filtro de "No leídos" (`unread_count > 0`) se aplica client-side en `ChatModule.tsx`, haciendo el cambio de tab **instantáneo** (sin llamadas API). Al hacer clic en un chat, `updateChatLocal()` actualiza `unread_count: 0` inmediatamente en el estado local.
 
 ---
 
@@ -326,10 +338,10 @@ Los mensajes nuevos se fusionan con el caché existente en React Query, evitando
 
 ### Filtros (2 Tabs)
 
-| Tab | Filtro API | Descripción |
-|-----|-----------|-------------|
-| 📥 **Abiertos** | `closed=false` | Todos los chats abiertos (leídos + no leídos) |
-| 💬 **No leídos** | `closed=false&read=false` | Solo chats con mensajes pendientes |
+| Tab | Filtro | Descripción |
+|-----|--------|-------------|
+| 📥 **Abiertos** | Dual-fetch API (`read=false` + `read=true`) | Todos los chats abiertos (leídos + no leídos) |
+| 💬 **No leídos** | Client-side (`unread_count > 0`) | Solo chats con mensajes pendientes — **cambio instantáneo** |
 
 ### Efectos Visuales — Sistema de Glows Contextuales
 
@@ -567,21 +579,25 @@ timelines_account_id      TEXT   -- Account ID para multi-tenant webhook routing
 
 ## Problemas Conocidos y Soluciones
 
-### Problema: Chats Fantasma
+### Problema: Chats Fantasma ✅ RESUELTO
 
-**Síntoma:** La lista de chats muestra ~288 contactos vacíos (nombres como ".", "0", "????") en las primeras páginas.
+**Síntoma:** La lista de chats mostraba ~500+ contactos vacíos (nombres como ".", "0", "????") en las primeras páginas.
 
-**Causa:** La API sin filtros devuelve contactos del directorio de WhatsApp sincronizados que no tienen historial de mensajes.
+**Causa:** La API sin filtro `read` devuelve contactos del directorio de WhatsApp sincronizados que no tienen historial de mensajes.
 
-**Solución:**
-1. Usar `closed=false` y `read=false` en los filtros de la API
-2. Filtro post-procesamiento: `chats.filter(c => c.last_message_time || c.last_message_uid)`
+**Solución (dual-fetch):**
+1. NUNCA llamar sin filtro `read` — siempre usar `read=false` y `read=true` en paralelo
+2. Merge con deduplicación por chat ID
+3. Filtro post-procesamiento: `chats.filter(c => c.last_message_time || c.last_message_uid)`
 
-### Problema: Rate Limit 429
+### Problema: Rate Limit 429 ✅ MITIGADO
 
 **Síntoma:** Errores 429 al enriquecer previews o hacer muchas consultas.
 
-**Solución:** Batches de 3 con delay de 400ms. Límite de 8 chats para enriquecimiento por página.
+**Solución:** 
+- `fetchWithRetry` con backoff exponencial (2s, 4s, 8s) para todas las llamadas
+- Batches de 2 con delay de 800ms para enriquecimiento de previews
+- Límite de 5 chats para enriquecimiento por página
 
 ### Problema: Texto "Sin mensajes" en lista
 

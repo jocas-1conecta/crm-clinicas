@@ -1316,27 +1316,36 @@ export const ChatModule: React.FC = () => {
 
     const { data: apiKey, isLoading: keyLoading } = useApiKey()
 
-    // Filter state — simplified to 2 views
+    // Filter state — tab selection (filtering is client-side, no separate API call)
     const [viewFilter, setViewFilter] = useState<ChatViewFilter>('open')
 
     const {
-        data: chats,
+        data: allChats,
         isLoading: chatsLoading,
         isError,
         refetch,
         hasMore,
         loadMore,
-        resetAndRefetch,
-    } = useChats({ view: viewFilter })
+        forceRefresh,
+        updateChat: updateChatLocal,
+    } = useChats()
 
     // Bidirectional mapping: auto-link chats to leads/patients, filter by assignment
-    const { visibleChatIds } = useChatContactMap(chats)
+    const { visibleChatIds } = useChatContactMap(allChats)
 
-    // Apply visibility filter: admins see all (visibleChatIds=null), asesores see only their mapped chats
+    // Apply visibility filter + tab filter (unread is client-side)
     const filteredChats = React.useMemo(() => {
-        if (visibleChatIds === null) return chats
-        return chats.filter(c => visibleChatIds.has(c.id))
-    }, [chats, visibleChatIds])
+        let chats = allChats
+        // Assignment visibility: admins see all, asesores only their mapped chats
+        if (visibleChatIds !== null) {
+            chats = chats.filter(c => visibleChatIds.has(c.id))
+        }
+        // "No leídos" tab: client-side filter on unread_count
+        if (viewFilter === 'unread') {
+            chats = chats.filter(c => (c.unread_count ?? 0) > 0)
+        }
+        return chats
+    }, [allChats, visibleChatIds, viewFilter])
 
     const [selectedChat, setSelectedChat] = useState<TimelinesChat | null>(null)
     const [showInfo, setShowInfo] = useState(false)
@@ -1344,10 +1353,10 @@ export const ChatModule: React.FC = () => {
     // New chat modal state
     const [newChatModalChat, setNewChatModalChat] = useState<TimelinesChat | null>(null)
 
+    // Tab switch: instant, no API call — just changes the client-side filter
     const handleViewChange = (v: ChatViewFilter) => {
         setViewFilter(v)
         setSelectedChat(null)
-        resetAndRefetch()
     }
 
     const handleSelectChat = (chat: TimelinesChat) => {
@@ -1357,6 +1366,7 @@ export const ChatModule: React.FC = () => {
         // Mark as read only for non-admin roles
         if (!isAdmin && (chat.unread_count ?? 0) > 0) {
             markAsRead(chat.id)
+            updateChatLocal(chat.id, { unread_count: 0 }) // instant local update for tab filtering
         }
 
         // Show new-chat modal if unassigned and not dismissed

@@ -162,11 +162,10 @@ function normaliseMessage(raw: Record<string, unknown>): TimelinesMessage {
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 // ── Filter types ──────────────────────────────────────────────────────────────
-// Simplified to 2 views: 'open' (all open chats) and 'unread' (open + unread only)
+// UI tab state — 'unread' filtering is done client-side on the data from 'open'
 export type ChatViewFilter = 'open' | 'unread'
 
 export interface GetChatsOptions {
-  view?: ChatViewFilter      // 'open' | 'unread'
   page?: number              // 1-indexed, 50 chats per page
 }
 
@@ -176,17 +175,17 @@ export interface GetChatsResult {
   page: number
 }
 
-/** Fetch a page of chats with correct API filters.
- *  - 'open':   Dual-fetch read=false + read=true in parallel, merge by recency.
- *              This bypasses the "phantom" contacts (directory entries with no messages)
- *              that dominate page 1+ when using closed=false without a read filter.
- *  - 'unread': GET /chats?closed=false&read=false → only unread open chats
+/** Fetch a page of all open chats using dual-fetch strategy.
+ *  Fetches read=false + read=true in parallel, merges by recency.
+ *  This bypasses the "phantom" contacts (directory entries with no messages)
+ *  that dominate page 1+ when using closed=false without a read filter.
+ *  The "No leídos" tab filters this data client-side via unread_count.
  */
 export async function getChats(
   apiKey: string,
   options: GetChatsOptions = {}
 ): Promise<GetChatsResult> {
-  const { view = 'open', page = 1 } = options
+  const { page = 1 } = options
 
   /** Fetch with automatic 429 retry (exponential backoff: 2s, 4s, 8s) */
   async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
@@ -204,11 +203,10 @@ export async function getChats(
   }
 
   /** Fetch a single page with explicit read filter */
-  async function fetchPage(pg: number, readFilter?: boolean) {
+  async function fetchPage(pg: number, readFilter: boolean) {
     const params = new URLSearchParams({ page: String(pg), per_page: '50' })
     params.set('closed', 'false')
-    if (readFilter === false) params.set('read', 'false')
-    if (readFilter === true) params.set('read', 'true')
+    params.set('read', String(readFilter))
 
     const url = `${BASE_URL}/chats?${params.toString()}`
     const response = await fetchWithRetry(url)
@@ -222,42 +220,40 @@ export async function getChats(
     }
   }
 
-  let resultChats: TimelinesChat[] = []
-  let hasMore = false
+  // Dual-fetch: unread + read in parallel (only 2 requests, bypasses phantoms)
+  const [unreadResult, readResult] = await Promise.all([
+    fetchPage(page, false).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
+    fetchPage(page, true).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
+  ])
 
-  if (view === 'unread') {
-    // ── Unread: simple single fetch ──────────────────────────────────────
-    const result = await fetchPage(page, false)
-    resultChats = result.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
-    hasMore = result.hasMore
-  } else {
-    // ── Open (Abiertos): dual-fetch to bypass phantoms ──────────────────
-    // Fetch unread + read pages in parallel (only 2 requests, no phantoms)
-    const [unreadResult, readResult] = await Promise.all([
-      fetchPage(page, false).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
-      fetchPage(page, true).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
-    ])
+  // Merge both lists with correct unread_count tracking.
+  // 1. Index read chats first (unread_count = 0)
+  // 2. Layer unread chats on top (unread_count = 1, overwrites read version)
+  // This ensures chats appearing in BOTH lists get the unread status.
+  const chatMap = new Map<string, TimelinesChat>()
 
-    // Merge both lists, deduplicate by chat id, skip phantoms
-    const seen = new Set<string>()
-    const merged: TimelinesChat[] = []
-    for (const chat of [...unreadResult.chats, ...readResult.chats]) {
-      if (seen.has(chat.id)) continue
-      seen.add(chat.id)
-      if (!chat.last_message_time && !chat.last_message_uid) continue
-      merged.push(chat)
-    }
-
-    // Sort by last_message_time DESC (most recent first)
-    merged.sort((a, b) => {
-      const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
-      const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
-      return tb - ta
-    })
-
-    resultChats = merged
-    hasMore = unreadResult.hasMore || readResult.hasMore
+  for (const chat of readResult.chats) {
+    if (!chat.last_message_time && !chat.last_message_uid) continue // skip phantoms
+    chat.unread_count = 0
+    chatMap.set(chat.id, chat)
   }
+  for (const chat of unreadResult.chats) {
+    if (!chat.last_message_time && !chat.last_message_uid) continue // skip phantoms
+    chat.unread_count = 1
+    chatMap.set(chat.id, chat) // overwrites read version if duplicate
+  }
+
+  const merged = Array.from(chatMap.values())
+
+  // Sort by last_message_time DESC (most recent first)
+  merged.sort((a, b) => {
+    const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+    const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+    return tb - ta
+  })
+
+  const resultChats = merged
+  const hasMore = unreadResult.hasMore || readResult.hasMore
 
   // Enrich message previews: the /chats endpoint doesn't return message text,
   // only last_message_uid. Fetch the latest message for chats missing a preview.
