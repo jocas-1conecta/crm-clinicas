@@ -188,58 +188,66 @@ export async function getChats(
 ): Promise<GetChatsResult> {
   const { view = 'open', page = 1 } = options
 
-  // ── Auto-skip phantom pages ─────────────────────────────────────────
-  // The Timelines AI API can return pages full of "phantom" contacts —
-  // WhatsApp directory entries with no message history (last_message_timestamp = null).
-  // When the phantom filter removes ALL chats from a page but has_more_pages is true,
-  // we automatically fetch the next page. Max 5 auto-skips to prevent infinite loops.
-  const MAX_AUTO_SKIP = 5
+  // ── Smart phantom page skipping ─────────────────────────────────────
+  // The Timelines AI API returns "phantom" contacts — WhatsApp directory entries
+  // with no message history (last_message_timestamp = null). These can dominate
+  // many pages before real chats appear. Strategy:
+  // 1. Fetch the requested page
+  // 2. If ALL results are phantoms AND there are more pages, fetch next pages
+  //    in PARALLEL batches of 5 for speed (covers ~250 phantoms per round)
+  // 3. Repeat up to 4 rounds (= 20 pages max = ~1000 phantoms capacity)
+  const PARALLEL_BATCH = 5
+  const MAX_ROUNDS = 4
   let currentPage = page
   let realChats: TimelinesChat[] = []
   let apiHasMore = false
 
-  for (let attempt = 0; attempt <= MAX_AUTO_SKIP; attempt++) {
-    const params = new URLSearchParams({ page: String(currentPage) })
-
-    // Both views only show open chats
+  async function fetchSinglePage(pg: number) {
+    const params = new URLSearchParams({ page: String(pg), per_page: '50' })
     params.set('closed', 'false')
-
-    // 'unread' view adds the read=false filter for only unread chats
-    if (view === 'unread') {
-      params.set('read', 'false')
-    }
+    if (view === 'unread') params.set('read', 'false')
 
     const url = `${BASE_URL}/chats?${params.toString()}`
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: authHeaders(apiKey),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
-    }
+    const response = await fetch(url, { method: 'GET', headers: authHeaders(apiKey) })
+    if (!response.ok) throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
 
     const json = await response.json()
     const raw = extractArray<Record<string, unknown>>(json, 'chats', 'data', 'results')
-    const chats = raw.map(normaliseChat)
+    return {
+      chats: raw.map(normaliseChat),
+      hasMore: json?.data?.has_more_pages === true,
+    }
+  }
 
-    apiHasMore = json?.data?.has_more_pages === true
+  // Round 0: fetch the requested page
+  const firstResult = await fetchSinglePage(currentPage)
+  apiHasMore = firstResult.hasMore
+  const firstRealChats = firstResult.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
+  realChats.push(...firstRealChats)
 
-    // Filter out phantom contacts: chats synced from the WhatsApp directory
-    // that have no message history (last_message_timestamp is null AND last_message_uid is null).
-    const pageRealChats = chats.filter(c => {
-      const hasMessageHistory = !!(c.last_message_time || c.last_message_uid)
-      return hasMessageHistory
-    })
+  // If first page is all phantoms and there are more pages, batch-fetch ahead
+  if (realChats.length === 0 && apiHasMore) {
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      const startPage = currentPage + 1 + (round * PARALLEL_BATCH)
+      const pagesToFetch = Array.from({ length: PARALLEL_BATCH }, (_, i) => startPage + i)
 
-    realChats.push(...pageRealChats)
+      console.log(`[getChats] Phantom pages detected, parallel-fetching pages ${pagesToFetch[0]}–${pagesToFetch[pagesToFetch.length - 1]}`)
 
-    // If we got real chats OR there are no more pages, stop auto-skipping
-    if (realChats.length > 0 || !apiHasMore) break
+      const results = await Promise.all(pagesToFetch.map(pg => fetchSinglePage(pg).catch(() => null)))
 
-    // Entire page was phantoms and more pages exist → auto-skip to next page
-    console.log(`[getChats] Page ${currentPage} had only phantom contacts, auto-skipping to page ${currentPage + 1}`)
-    currentPage++
+      for (const result of results) {
+        if (!result) continue
+        apiHasMore = result.hasMore
+        const pageReal = result.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
+        realChats.push(...pageReal)
+      }
+
+      // Track the last page we fetched for pagination continuity
+      currentPage = pagesToFetch[pagesToFetch.length - 1]
+
+      // Stop if we found real chats or ran out of pages
+      if (realChats.length > 0 || !apiHasMore) break
+    }
   }
 
   // Enrich message previews: the /chats endpoint doesn't return message text,
