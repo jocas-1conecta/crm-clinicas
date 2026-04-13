@@ -176,11 +176,11 @@ export interface GetChatsResult {
   page: number
 }
 
-/** Fetch a single page of chats with correct API filters.
- *  - 'open':   GET /chats?closed=false         → all open chats, ordered by recent activity
+/** Fetch a page of chats with correct API filters.
+ *  - 'open':   Dual-fetch read=false + read=true in parallel, merge by recency.
+ *              This bypasses the "phantom" contacts (directory entries with no messages)
+ *              that dominate page 1+ when using closed=false without a read filter.
  *  - 'unread': GET /chats?closed=false&read=false → only unread open chats
- *  The Timelines AI API returns chats sorted by last_message_timestamp DESC
- *  when using these filters, so NO client-side re-sorting is needed.
  */
 export async function getChats(
   apiKey: string,
@@ -188,27 +188,30 @@ export async function getChats(
 ): Promise<GetChatsResult> {
   const { view = 'open', page = 1 } = options
 
-  // ── Smart phantom page skipping ─────────────────────────────────────
-  // The Timelines AI API returns "phantom" contacts — WhatsApp directory entries
-  // with no message history (last_message_timestamp = null). These can dominate
-  // many pages before real chats appear. Strategy:
-  // 1. Fetch the requested page
-  // 2. If ALL results are phantoms AND there are more pages, fetch next pages
-  //    in PARALLEL batches of 5 for speed (covers ~250 phantoms per round)
-  // 3. Repeat up to 4 rounds (= 20 pages max = ~1000 phantoms capacity)
-  const PARALLEL_BATCH = 5
-  const MAX_ROUNDS = 4
-  let currentPage = page
-  let realChats: TimelinesChat[] = []
-  let apiHasMore = false
+  /** Fetch with automatic 429 retry (exponential backoff: 2s, 4s, 8s) */
+  async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const response = await fetch(url, { method: 'GET', headers: authHeaders(apiKey) })
+      if (response.status === 429 && attempt < retries) {
+        const backoff = Math.pow(2, attempt + 1) * 1000
+        console.warn(`[getChats] Rate limited (429), retrying in ${backoff}ms (attempt ${attempt + 1}/${retries})`)
+        await new Promise(r => setTimeout(r, backoff))
+        continue
+      }
+      return response
+    }
+    throw new Error('Max retries exceeded')
+  }
 
-  async function fetchSinglePage(pg: number) {
+  /** Fetch a single page with explicit read filter */
+  async function fetchPage(pg: number, readFilter?: boolean) {
     const params = new URLSearchParams({ page: String(pg), per_page: '50' })
     params.set('closed', 'false')
-    if (view === 'unread') params.set('read', 'false')
+    if (readFilter === false) params.set('read', 'false')
+    if (readFilter === true) params.set('read', 'true')
 
     const url = `${BASE_URL}/chats?${params.toString()}`
-    const response = await fetch(url, { method: 'GET', headers: authHeaders(apiKey) })
+    const response = await fetchWithRetry(url)
     if (!response.ok) throw new Error(`Timelines AI error ${response.status}: ${response.statusText}`)
 
     const json = await response.json()
@@ -219,50 +222,55 @@ export async function getChats(
     }
   }
 
-  // Round 0: fetch the requested page
-  const firstResult = await fetchSinglePage(currentPage)
-  apiHasMore = firstResult.hasMore
-  const firstRealChats = firstResult.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
-  realChats.push(...firstRealChats)
+  let resultChats: TimelinesChat[] = []
+  let hasMore = false
 
-  // If first page is all phantoms and there are more pages, batch-fetch ahead
-  if (realChats.length === 0 && apiHasMore) {
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      const startPage = currentPage + 1 + (round * PARALLEL_BATCH)
-      const pagesToFetch = Array.from({ length: PARALLEL_BATCH }, (_, i) => startPage + i)
+  if (view === 'unread') {
+    // ── Unread: simple single fetch ──────────────────────────────────────
+    const result = await fetchPage(page, false)
+    resultChats = result.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
+    hasMore = result.hasMore
+  } else {
+    // ── Open (Abiertos): dual-fetch to bypass phantoms ──────────────────
+    // Fetch unread + read pages in parallel (only 2 requests, no phantoms)
+    const [unreadResult, readResult] = await Promise.all([
+      fetchPage(page, false).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
+      fetchPage(page, true).catch(() => ({ chats: [] as TimelinesChat[], hasMore: false })),
+    ])
 
-      console.log(`[getChats] Phantom pages detected, parallel-fetching pages ${pagesToFetch[0]}–${pagesToFetch[pagesToFetch.length - 1]}`)
-
-      const results = await Promise.all(pagesToFetch.map(pg => fetchSinglePage(pg).catch(() => null)))
-
-      for (const result of results) {
-        if (!result) continue
-        apiHasMore = result.hasMore
-        const pageReal = result.chats.filter(c => !!(c.last_message_time || c.last_message_uid))
-        realChats.push(...pageReal)
-      }
-
-      // Track the last page we fetched for pagination continuity
-      currentPage = pagesToFetch[pagesToFetch.length - 1]
-
-      // Stop if we found real chats or ran out of pages
-      if (realChats.length > 0 || !apiHasMore) break
+    // Merge both lists, deduplicate by chat id, skip phantoms
+    const seen = new Set<string>()
+    const merged: TimelinesChat[] = []
+    for (const chat of [...unreadResult.chats, ...readResult.chats]) {
+      if (seen.has(chat.id)) continue
+      seen.add(chat.id)
+      if (!chat.last_message_time && !chat.last_message_uid) continue
+      merged.push(chat)
     }
+
+    // Sort by last_message_time DESC (most recent first)
+    merged.sort((a, b) => {
+      const ta = a.last_message_time ? new Date(a.last_message_time).getTime() : 0
+      const tb = b.last_message_time ? new Date(b.last_message_time).getTime() : 0
+      return tb - ta
+    })
+
+    resultChats = merged
+    hasMore = unreadResult.hasMore || readResult.hasMore
   }
 
   // Enrich message previews: the /chats endpoint doesn't return message text,
   // only last_message_uid. Fetch the latest message for chats missing a preview.
-  // Limit to 8 chats in batches of 3 to avoid 429 rate limits.
-  const chatsNeedingPreview = realChats.filter(c => !c.last_message).slice(0, 8)
-  const BATCH_SIZE = 3
+  // Limit to 5 chats in batches of 2 with delays to stay within rate limits.
+  const chatsNeedingPreview = resultChats.filter(c => !c.last_message).slice(0, 5)
+  const BATCH_SIZE = 2
   for (let i = 0; i < chatsNeedingPreview.length; i += BATCH_SIZE) {
     const batch = chatsNeedingPreview.slice(i, i + BATCH_SIZE)
     await Promise.all(batch.map(async (chat) => {
       try {
-        const msgResponse = await fetch(`${BASE_URL}/chats/${chat.id}/messages?limit=1&sorting_order=desc`, {
-          method: 'GET',
-          headers: authHeaders(apiKey),
-        })
+        const msgResponse = await fetchWithRetry(
+          `${BASE_URL}/chats/${chat.id}/messages?limit=1&sorting_order=desc`
+        )
         if (msgResponse.ok) {
           const msgJson = await msgResponse.json()
           const msgs = extractArray<Record<string, unknown>>(msgJson, 'messages', 'data')
@@ -284,14 +292,14 @@ export async function getChats(
       }
     }))
     if (i + BATCH_SIZE < chatsNeedingPreview.length) {
-      await new Promise(r => setTimeout(r, 400))
+      await new Promise(r => setTimeout(r, 800))
     }
   }
 
   return {
-    chats: realChats,
-    hasMore: apiHasMore,
-    page: currentPage,
+    chats: resultChats,
+    hasMore,
+    page,
   }
 }
 
